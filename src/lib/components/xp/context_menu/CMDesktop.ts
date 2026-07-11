@@ -1,25 +1,17 @@
-import { queueProgram, clipboard, hardDrive } from '../../../store';
+import { queueProgram, clipboard } from '../../../store';
 import { get } from 'svelte/store';
-import { recycle_bin_id, protected_items, SortOptions, SortOrders } from '../../../system';
 import * as fs from '../../../fs';
+import type { ContextMenuSpec, FolderOriginator } from '../../../types';
 
-export let make = ({type, originator}) => {
-    
-    let sort_menu_items = [
-        {name: 'None', value: SortOptions.NONE},
-        {name: 'Name', value: SortOptions.NAME},
-        {name: 'Size', value: SortOptions.SIZE},
-        {name: 'Date Created', value: SortOptions.DATE_CREATED},
-        {name: 'Date Modified', value: SortOptions.DATE_MODIFIED}
-    ]
-    let sort_order_menu_items = [
-        {name: 'Ascending', value: SortOrders.ASCENDING},
-        {name: 'Descending', value: SortOrders.DESCENDING}
-    ]
-
+export const make = ({
+    originator,
+}: {
+    type: string;
+    originator: FolderOriginator;
+}): ContextMenuSpec => {
     return {
         required_width: 180 + 20,
-        required_height: 27*6  + 20,
+        required_height: 27 * 6 + 20,
         menu: [
             [
                 // {
@@ -56,17 +48,17 @@ export let make = ({type, originator}) => {
                     name: 'Refresh',
                     action: () => {
                         console.log('refresh');
-                        let nodes = document.querySelectorAll('.fs-item');
-                        for(let node of nodes){
+                        const nodes = document.querySelectorAll('.fs-item');
+                        for (const node of nodes) {
                             node.classList.add('animate-blink');
                         }
                         setTimeout(() => {
-                            for(let node of nodes){
+                            for (const node of nodes) {
                                 node.classList.remove('animate-blink');
                             }
                         }, 1000);
-                    }
-                }
+                    },
+                },
             ],
             [
                 {
@@ -74,12 +66,12 @@ export let make = ({type, originator}) => {
                     disabled: get(clipboard).length == 0,
                     action: () => {
                         fs.paste(originator.id);
-                    }
+                    },
                 },
                 {
                     name: 'Paste Shortcut',
-                    disabled: true
-                }
+                    disabled: true,
+                },
             ],
             [
                 {
@@ -89,45 +81,64 @@ export let make = ({type, originator}) => {
                             name: 'Folder',
                             icon: '/images/xp/icons/FolderClosed.png',
                             action: () => {
-                                fs.new_fs_item('folder', '', 'New Folder', originator.id);
-                            }
+                                void fs.new_fs_item(
+                                    'folder',
+                                    '',
+                                    'New Folder',
+                                    originator.id,
+                                );
+                            },
                         },
                         {
                             name: 'Shortcut',
-                            icon: '/images/xp/icons/Shortcutoverlay.png'
+                            icon: '/images/xp/icons/Shortcutoverlay.png',
                         },
                         {
                             name: 'Briefcase',
-                            icon: '/images/xp/icons/Briefcase.png'
+                            icon: '/images/xp/icons/Briefcase.png',
                         },
                         {
                             name: 'Bitmap Image',
                             icon: '/images/xp/icons/Bitmap.png',
                             action: () => {
-                                fs.new_fs_item('file', '.bmp', 'New Bitmap Image', originator.id);
-                            }
+                                void fs.new_fs_item(
+                                    'file',
+                                    '.bmp',
+                                    'New Bitmap Image',
+                                    originator.id,
+                                );
+                            },
                         },
                         {
                             name: 'Text Document',
                             icon: '/images/xp/icons/TXT.png',
                             action: () => {
-                                fs.new_fs_item('file', '.txt', 'New Text Document', originator.id);
-                            }
+                                void fs.new_fs_item(
+                                    'file',
+                                    '.txt',
+                                    'New Text Document',
+                                    originator.id,
+                                );
+                            },
                         },
                         {
                             name: 'Wave Sound',
                             icon: '/images/xp/icons/WMV.png',
                             action: () => {
-                                fs.new_fs_item('file', '.wav', 'New Sound', originator.id);
-                            }
+                                void fs.new_fs_item(
+                                    'file',
+                                    '.wav',
+                                    'New Sound',
+                                    originator.id,
+                                );
+                            },
                         },
                         {
                             name: 'Compressed (zipped) Folder',
-                            icon: '/images/xp/icons/Zipfolder.png'
-                        }
-
-                    ]
-                }
+                            icon: '/images/xp/icons/Zipfolder.png',
+                        },
+                    ],
+                },
             ],
             [
                 {
@@ -136,11 +147,11 @@ export let make = ({type, originator}) => {
                         queueProgram.set({
                             name: 'Display Properties',
                             icon: 'DisplayProperties.png',
-                            path: './programs/display_properties.svelte'
-                        })
-                    }
-                }
-            ]
-        ]
-    }
-}
+                            path: './programs/display_properties.svelte',
+                        });
+                    },
+                },
+            ],
+        ],
+    };
+};
