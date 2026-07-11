@@ -1,0 +1,11 @@
+build/
+.svelte-kit/
+.netlify/
+static/
+coverage/
+node_modules/
+package-lock.json
+test-results/
+playwright-report/
+design/
+docs/
