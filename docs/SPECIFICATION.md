@@ -1300,6 +1300,8 @@ XP-style icons needed (32x32 and 48x48):
 
 Each phase runs through six gates, in order. Every red-team gate uses a **fresh-context subagent explicitly instructed to find problems, not validate** — verdicts it grades Weak/Wrong get fixed (or rejected only with a concrete reasoning flaw, never a vibe):
 
+**Autonomy rule:** the gates run back-to-back **without pausing for owner approval between them**. Stop and ask only when something genuinely needs the owner: destructive or irreversible actions beyond the plan, scope changes, account/credential/spend decisions, or a red-team finding that invalidates a locked decision. Everything else: decide with for-and-against, document it, keep moving — the owner reviews at the phase handoff and can override there.
+
 1. **Spec** — spec the phase in detail using the superpowers skills (brainstorming first, then the relevant process skills); output: a written phase spec (scope, exit criteria, sub-decisions with for/against)
 2. **Red-team the spec** — attack scope gaps, hidden sub-decisions, cross-decision conflicts, wrong assumptions
 3. **Plan** — implementation plan (planner agent / plan mode): files, order, test strategy, risks
