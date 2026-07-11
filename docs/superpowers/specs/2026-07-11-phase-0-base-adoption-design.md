@@ -13,7 +13,7 @@ stand up tooling + CI/CD, and deploy the skeleton to Netlify.
 
 | Decision | Verdict | Rationale |
 | --- | --- | --- |
-| Clone strategy | **Prune before first commit** | Copy base → execute prune manifest locally → verify build → first commit is already the lean (~45MB) tree. Git history never carries the ~130MB of removed embeds; upstream repo + this manifest are the removed-code record. (Rejected: vendor-snapshot-then-prune — permanent history bloat; subtree/upstream remote — TS conversion + rebrand make future upstream merges unmergeable.) |
+| Clone strategy | **Prune before first commit** | Copy base → execute prune manifest locally → verify build → first commit is already the lean (~60MB) tree. Git history never carries the ~130MB of removed embeds; upstream repo + this manifest are the removed-code record. (Rejected: vendor-snapshot-then-prune — permanent history bloat; subtree/upstream remote — TS conversion + rebrand make future upstream merges unmergeable.) |
 | Netlify setup | **Via Netlify MCP from this session** | Create site, link GitHub repo, production branch = `main`, deploy previews on PRs. Owner is authenticated. |
 | Coverage gate | **Ratchet: new/changed code only** | Phase 0: 80%+ enforced via **glob-scoped Vitest thresholds on new modules only** (seed-version logic, extracted utils) — the TS-conversion diff renames every inherited file, so a naive diff-based gate would demand 80% on the whole codebase in the first PR, which is exactly what this decision rejects. From Phase 1: diff-based patch coverage vs the post-Phase-0 `dev` baseline, enforced with **diff-cover** (lcov × git diff) or Codecov patch status in CI. Inherited code is protected by smoke E2E and gains unit coverage as later phases touch it. |
 | Work ordering | **Prune → adapter swap → tooling + smoke E2E → TS conversion → seed-version logic (TDD) → CI/CD + deploy** | Converting after pruning means ~40% less code to convert; tooling (Playwright/Vitest/ESLint) must exist **before** the conversion so the smoke E2E can run before/after it, and before the seed-version logic so that is written TDD in typed code. |
@@ -49,7 +49,7 @@ Every removal includes **four cleanup surfaces**: (1) `static/json/hard_drive.js
 
 | Remove | Detail |
 | --- | --- |
-| `static/html/*` except `jspaint/` | koodo (28MB), notepad (26MB ace build), msword (8.4MB), foxit_reader (16MB), minesweeper embed (licenseless, CDN jQuery), visualizers |
+| `static/html/*` except `jspaint/` **and `visualizers/`** | koodo (28MB), notepad (26MB ace build), msword (8.4MB), foxit_reader (16MB), minesweeper embed (licenseless, CDN jQuery), example/, ffmpeg/, photon/. **Deviation (plan red-team):** `visualizers/` is KEPT — it is 96KB (the size rationale was wrong) and kept `media_player_classic.svelte:315` iframes it for audio playback |
 | CrazyGames | ~20 game entries in `hard_drive.json`; `static/files/*` demo media |
 | Programs | `microsoft_word`, `koodo`, `flash_player`, `winrar`, `java`, `photon`, `xp_tour`, `app_installer`, `webapp` (.svelte files) + `src/routes/api/webapp_info/` (only consumer is app_installer) |
 | Boot/installation | `src/routes/installation/` (Win95/DOS flows) + `boot_manager.svelte` (BIOS/boot-device menu); rewrite `src/routes/+page.svelte` (currently a hardcoded dynamic-import switch over boot_manager + every installation route) to mount the XP loading screen (`starting.svelte`) directly, **preserving the `load_page` event contract** (`starting.svelte` dispatches `./xp/desktop.svelte`; `desktop.svelte` dispatches shutdown/blackout). Also edit **kept** `starting.svelte:48-49` — it branches into the pruned installation flow via `utils.is_installing_windows()`; remove the branch and the now-dead `is_installing_windows`/`set_installing_windows` utils |
@@ -122,10 +122,10 @@ Gate: `npm run dev` boots loading → desktop; windows open/close/drag/resize; `
 | TS conversion introduces behavior changes | Conversion commits are type-only by policy; smoke E2E runs before/after; no logic edits mixed into conversion commits |
 | `componentApi: 4` removal cascades | Time-boxed evaluation; keeping the flag is an accepted outcome |
 | Netlify build differs from local (adapter, Node version) | Node pinned identically in netlify.toml + CI; deploy preview on the phase PR is the proving ground |
-| Upstream jspaint dir is 37MB | Acceptable for now; optional slimming task if deploy size/time becomes a problem |
+| Upstream jspaint dir is 45MB (measured) | Acceptable for now; optional slimming task if deploy size/time becomes a problem |
 
 ## Exit criteria (from SPECIFICATION.md §9 Phase 0)
 
-Lean, MIT-attributed, fully-TypeScript XP shell (~45MB static) on Netlify via the CI/CD pipeline;
+Lean, MIT-attributed, fully-TypeScript XP shell (~60MB static, measured) on Netlify via the CI/CD pipeline;
 boots straight to the XP loading screen → desktop; windows/taskbar/start menu work;
 `docs/phase-0-guide.md` written per §11; ends with "Phase 0 is complete."

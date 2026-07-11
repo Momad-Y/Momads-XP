@@ -1083,7 +1083,7 @@ All personal content lives in a single `src/lib/data/profile.json`. Components r
 - [ ] Clone win32.run.cf into the repo root (fresh copy, no upstream git history)
 - [ ] License reconciliation: add `LICENSE-win32.run` with the upstream MIT copyright + permission notice (required by MIT terms) alongside the project LICENSE
 - [ ] Execute the prune manifest — for every removal, also update `static/json/hard_drive.json` (VFS seed), the hardcoded preload arrays in `starting.svelte` (~170 image paths + `/html/*` iframe preloads), and start-menu/desktop entries:
-    - [ ] `static/html/*` third-party embeds **except `jspaint`** (serves the Paint app): koodo (28MB), notepad (26MB ace build), msword (8.4MB), foxit_reader (16MB — replaced by pdfjs-dist), minesweeper embed (licenseless, loads jQuery from CDN), visualizers
+    - [ ] `static/html/*` third-party embeds **except `jspaint`** (serves Paint) **and `visualizers`** (96KB, needed by the kept Media Player Classic): koodo (28MB), notepad (26MB ace build), msword (8.4MB), foxit_reader (16MB — replaced by pdfjs-dist), minesweeper embed (licenseless, loads jQuery from CDN)
     - [ ] Support libs orphaned by those prunes: `static/js/ace.js`, `static/js/mammoth.browser.min.js`, `static/js/libarchive.js` (5MB), vendored `src/lib/libarchive.js` and `src/lib/docx/`
     - [ ] Rewrite `src/routes/+page.svelte` — it is a hardcoded dynamic-import switch over `boot_manager` and every installation route; after the prune it goes straight to the XP loading screen
     - [ ] CrazyGames game embeds (~20 entries in `hard_drive.json`) and `static/files/*` demo media
@@ -1099,7 +1099,7 @@ All personal content lives in a single `src/lib/data/profile.json`. Components r
 - [ ] Migrate the remaining `public/assets/` production files into `static/assets/` and remove `public/` — avatar, xp-logo, and the about-me / contact-me / my-cv / chess / doom icons (the base's ~560-icon set + sounds + Bliss already cover everything else; those duplicates were moved to `design/asset-pool/`)
 - [ ] Verify: `npm run dev` boots straight to the XP loading screen → desktop; windows open/close/drag/resize; `npm run build` passes; skeleton deployed on Netlify
 
-**Exit criteria:** A lean, MIT-attributed, fully-TypeScript XP shell (~45MB static — mostly the kept jspaint; optionally slim its dist further) running locally and deployed on Netlify through the CI/CD pipeline. **Explicitly expected broken after pruning:** Notepad, Minesweeper, PDF viewing, Python REPL (all rebuilt in later phases). Working: loading screen → desktop, taskbar, start menu, My Computer, image viewer, Paint (jspaint), Media Player Classic.
+**Exit criteria:** A lean, MIT-attributed, fully-TypeScript XP shell (~60MB static — jspaint alone is 45MB; optionally slim its dist further) running locally and deployed on Netlify through the CI/CD pipeline. **Explicitly expected broken after pruning:** Notepad, Minesweeper, PDF viewing, Python REPL (all rebuilt in later phases). Working: loading screen → desktop, taskbar, start menu, My Computer, image viewer, Paint (jspaint), Media Player Classic.
 
 ### Phase 1: Core XP Shell
 
