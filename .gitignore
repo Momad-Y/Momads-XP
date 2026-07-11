@@ -33,3 +33,10 @@ CLAUDE.md
 # Research clones and browser artifacts
 .claude/research/
 .playwright-mcp/
+# SvelteKit / build
+.svelte-kit/
+build/
+.netlify/
+coverage/
+test-results/
+playwright-report/
