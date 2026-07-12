@@ -1,6 +1,6 @@
 <svelte:options accessors={true} />
 
-<script>
+<script lang="ts">
     import Window from '../../../lib/components/xp/Window.svelte';
     import RangeSlider from 'svelte-range-slider-pips';
     import { onMount, tick, unmount, mount } from 'svelte';
@@ -13,43 +13,56 @@
     import * as utils from '../../../lib/utils';
     import * as fs from '../../../lib/fs';
     import { tooltip } from '$lib/components/xp/tooltip';
-    import { get, set } from 'idb-keyval';
+    import { get } from 'idb-keyval';
     import toWebVTT from 'srt-webvtt';
     import _ from 'lodash';
+    import { required } from '../../../lib/types';
+    import type {
+        MountedComponent,
+        ProgramInstance,
+        VfsItem,
+        WindowController,
+        WindowOptions,
+    } from '../../../lib/types';
 
-    export let id;
-    export let window;
-    export let get_self = () => null;
-    export let parentNode;
-    export let fs_item;
-    export let exec_path;
+    export let id: string;
+    export let window: WindowController | undefined = undefined;
+    export let get_self: () => ProgramInstance | null = () => null;
+    export let parentNode: HTMLElement | undefined = undefined;
+    export let fs_item: VfsItem | undefined = undefined;
+    export let exec_path: string;
 
     let supported_audio_types = ['.mp3', '.wav', '.ogg'];
     let supported_video_types = ['.mp4', '.wmv', '.webm', '.ogg'];
 
-    let slider;
+    let slider: RangeSlider | undefined;
 
-    let file_type; //'audio' or 'video';
-    let player_node;
-    let currentTime;
-    let duration;
-    let paused;
+    let file_type: string | undefined; //'audio' or 'video';
+    let player_node: HTMLAudioElement | HTMLVideoElement | undefined;
+    let currentTime = 0;
+    let duration = NaN;
+    let paused: boolean | undefined;
     let wmp_volume = 0.8;
     let loop = true;
     $: audio_volume = wmp_volume * $systemVolume;
 
-    let subtitle_src;
+    let subtitle_src: string | null | undefined;
     let fullscreen = false;
     let idle = false;
-    let idle_timer;
-    let content_node;
-    let toast_node;
+    let idle_timer: ReturnType<typeof setTimeout> | undefined;
+    let content_node: HTMLDivElement;
+    let toast_node: HTMLParagraphElement;
+
+    /** The bound media element; only valid while a media type is loaded. */
+    function player(): HTMLAudioElement | HTMLVideoElement {
+        return required(player_node, 'media element');
+    }
 
     onMount(async () => {
         await load_media(fs_item);
     });
 
-    async function load_media(item) {
+    async function load_media(item: VfsItem | undefined) {
         if (item == null) return;
         if (supported_audio_types.includes(item.ext)) {
             file_type = 'audio';
@@ -60,28 +73,27 @@
         }
         await tick();
 
-        let url;
+        let url: string | undefined;
         if (item.storage_type == 'local') {
-            let file = await get(item.url);
-            url = URL.createObjectURL(file);
+            let file = await get<Blob>(required(item.url, 'media idb key'));
+            url = URL.createObjectURL(required(file, 'media blob'));
         } else if (item.storage_type == 'remote') {
             url = item.url;
         }
 
         subtitle_src = await find_subtitle(item);
         console.log({ subtitle_src });
-        player_node.src = url;
-        player_node.play();
-        window.update_title(item.name);
+        player().src = url ?? '';
+        void player().play();
+        window?.update_title(item.name);
     }
 
     async function open_file() {
         const OpenModal = (
             await import('../../../lib/components/xp/OpenModal.svelte')
         ).default;
-        let modal;
-        modal = mount(OpenModal, {
-            target: window.node_ref,
+        const modal: MountedComponent = mount(OpenModal, {
+            target: required(window?.node_ref, 'media player window element'),
             props: {
                 filetypes: [
                     '.mp3',
@@ -95,9 +107,10 @@
                 filetypes_desc: 'Audio and Video Files',
                 get_self: () => modal,
                 on_open: (items) => {
-                    let item = $hardDrive[items[0]];
-                    load_media(item);
-                    unmount(modal);
+                    let item =
+                        items[0] == null ? undefined : $hardDrive?.[items[0]];
+                    void load_media(item);
+                    void unmount(modal);
                 },
             },
         });
@@ -107,11 +120,11 @@
         runningPrograms.update((programs) =>
             programs.filter((p) => p != get_self()),
         );
-        unmount(get_self());
+        void unmount(required(get_self(), 'media player instance'));
         clearTimeout(idle_timer);
     }
 
-    export let options = {
+    export let options: WindowOptions = {
         title: 'Media Player Classic',
         min_width: 500,
         min_height: 400,
@@ -122,16 +135,16 @@
         exec_path,
     };
 
-    async function on_drop(e) {
+    async function on_drop(e: DragEvent) {
         e.preventDefault();
-        for (let file of e.dataTransfer.files) {
+        for (let file of required(e.dataTransfer, 'drop data transfer').files) {
             console.log(file);
             if (supported_audio_types.includes(utils.extname(file.name))) {
                 file_type = 'audio';
                 await tick();
                 let url = URL.createObjectURL(file);
-                player_node.src = url;
-                player_node.play();
+                player().src = url;
+                void player().play();
                 break;
             } else if (
                 supported_video_types.includes(utils.extname(file.name))
@@ -139,33 +152,33 @@
                 file_type = 'video';
                 await tick();
                 let url = URL.createObjectURL(file);
-                player_node.src = url;
-                player_node.play();
+                player().src = url;
+                void player().play();
                 break;
             }
         }
     }
 
-    function on_drop_over(e) {
+    function on_drop_over(e: DragEvent) {
         e.preventDefault();
     }
 
     function play() {
         if (paused == null || paused) {
-            player_node.play();
+            void player().play();
         } else {
-            player_node.pause();
+            player().pause();
         }
     }
 
     function stop() {
         // player_node.pause();
-        player_node.src = '';
+        player().src = '';
         file_type = '';
-        window.update_title('Media Player Classic');
+        window?.update_title('Media Player Classic');
     }
 
-    function seek(e) {
+    function seek(e: CustomEvent<{ value: number }>) {
         console.log(e);
         currentTime = e.detail.value;
     }
@@ -188,9 +201,9 @@
         currentTime = Math.max(currentTime - 15, 0);
     }
 
-    function on_key_pressed(e) {
+    function on_key_pressed(e: KeyboardEvent) {
         console.log('keyevent receive in wmp');
-        if (window.z_index != $zIndex || isNaN(duration)) return;
+        if (window?.z_index != $zIndex || isNaN(duration)) return;
         console.log('not skip');
         e.preventDefault();
         if (e.key == 'ArrowRight') {
@@ -201,27 +214,32 @@
             toast('Rewind 5s to ' + utils.format_time(currentTime));
         } else if (e.key == 'ArrowUp') {
             wmp_volume = Math.min(1, wmp_volume + 0.05);
-            toast('Volume: ' + _.round(wmp_volume * 100));
+            toast('Volume: ' + String(_.round(wmp_volume * 100)));
         } else if (e.key == 'ArrowDown') {
             wmp_volume = Math.max(0, wmp_volume - 0.05);
-            toast('Volume: ' + _.round(wmp_volume * 100));
+            toast('Volume: ' + String(_.round(wmp_volume * 100)));
         } else if (e.key == ' ') {
             play();
         }
     }
 
-    function change_volume(e) {
+    function change_volume(e: CustomEvent<{ value: number }>) {
         wmp_volume = e.detail.value;
     }
 
-    async function find_subtitle(item) {
+    async function find_subtitle(item: VfsItem) {
         try {
-            let vtt = $hardDrive[item.parent].children
-                .map((id) => $hardDrive[id])
+            const parent_id = required(item.parent, 'parent of ' + item.id);
+            let vtt = required($hardDrive?.[parent_id], 'fs item ' + parent_id)
+                .children.map((child_id) =>
+                    required($hardDrive?.[child_id], 'fs item ' + child_id),
+                )
                 .find((el) => el.basename == item.basename && el.ext == '.vtt');
 
-            let srt = $hardDrive[item.parent].children
-                .map((id) => $hardDrive[id])
+            let srt = required($hardDrive?.[parent_id], 'fs item ' + parent_id)
+                .children.map((child_id) =>
+                    required($hardDrive?.[child_id], 'fs item ' + child_id),
+                )
                 .find((el) => el.basename == item.basename && el.ext == '.srt');
 
             if (vtt) {
@@ -233,13 +251,13 @@
             } else {
                 return null;
             }
-        } catch (error) {
+        } catch {
             return null;
         }
     }
 
     function request_fullscreen() {
-        content_node.requestFullscreen();
+        void content_node.requestFullscreen();
         idle = true;
         document.removeEventListener('fullscreenchange', exit_full_screen);
         document.addEventListener('fullscreenchange', exit_full_screen);
@@ -259,7 +277,7 @@
         }
     }
 
-    function on_user_active(e) {
+    function on_user_active() {
         clearTimeout(idle_timer);
         idle = false;
 
@@ -268,8 +286,8 @@
         }, 3000);
     }
 
-    let toast_timeout;
-    function toast(msg) {
+    let toast_timeout: ReturnType<typeof setTimeout> | undefined;
+    function toast(msg: string) {
         clearTimeout(toast_timeout);
 
         toast_node.innerText = msg;
@@ -358,8 +376,8 @@
         >
             <div class="shrink-0 w-full">
                 <RangeSlider
-                    max={parseInt(duration)}
-                    values={[parseInt(currentTime)]}
+                    max={Math.trunc(duration)}
+                    values={[Math.trunc(currentTime)]}
                     bind:this={slider}
                     id="wmp-slider"
                     springValues={{ stiffness: 0.3, damping: 1 }}

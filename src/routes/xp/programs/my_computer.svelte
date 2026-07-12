@@ -1,38 +1,55 @@
-<script>
+<svelte:options accessors={true} />
+
+<script lang="ts">
     import Window from '../../../lib/components/xp/Window.svelte';
-    import {onMount, unmount } from 'svelte';
-    import { runningPrograms, zIndex, hardDrive, selectingItems, queueProgram } from '../../../lib/store'
-    import {recycle_bin_id, icons} from '../../../lib/system';
+    import { unmount } from 'svelte';
+    import {
+        runningPrograms,
+        hardDrive,
+        queueProgram,
+    } from '../../../lib/store';
+    import { recycle_bin_id, icons } from '../../../lib/system';
     import Menu from '../../../lib/components/xp/Menu.svelte';
     import RButton from '../../../lib/components/xp/RButton.svelte';
     import Viewer from './my_computer/viewer.svelte';
-    import * as finder from '../../../lib/finder'
+    import * as finder from '../../../lib/finder';
     import Sidebar from './my_computer/sidebar.svelte';
+    import { required } from '../../../lib/types';
+    import type {
+        MenuBarEntry,
+        ProgramInstance,
+        VfsItem,
+        WindowController,
+        WindowOptions,
+    } from '../../../lib/types';
 
-    export let id;//this is the program id, don' confuse with file/folder id
-    export let window;
-    export let get_self = () => null;
-    export let exec_path;
+    export let id: string; //this is the program id, don' confuse with file/folder id
+    export let window: WindowController | undefined = undefined;
+    export let get_self: () => ProgramInstance | null = () => null;
+    export let exec_path: string;
 
-    export let fs_item;//fs: file system, i.e, files and folder
-    let history = [fs_item?.id];
+    export let fs_item: Partial<VfsItem> | undefined = undefined; //fs: file system, i.e, files and folder
+    let history: (string | null | undefined)[] = [fs_item?.id];
     let page_index = 0;
     $: url = finder.to_url(history[page_index]) || 'My Computer';
+    $: current_history_id = history[page_index];
+    $: current_history_item =
+        current_history_id == null
+            ? null
+            : ($hardDrive?.[current_history_id] ?? null);
     $: {
         let curr_id = history[page_index];
-        
-        if(curr_id == null){
+
+        if (curr_id == null) {
             window?.update_icon('/images/xp/icons/MyComputer.png');
             window?.update_title('My Computer');
-
-        } else if(curr_id == recycle_bin_id) {
+        } else if (curr_id == recycle_bin_id) {
             window?.update_icon('/images/xp/icons/RecycleBinempty.png');
             window?.update_title('Recycle Bin');
-
         } else {
-            let curr_item = $hardDrive[curr_id];
-            if(curr_item){
-                if(curr_item.icon){
+            let curr_item = $hardDrive?.[curr_id];
+            if (curr_item) {
+                if (curr_item.icon) {
                     window?.update_icon(curr_item.icon);
                 } else {
                     window?.update_icon('/images/xp/icons/FolderClosed.png');
@@ -42,118 +59,120 @@
         }
     }
 
-    export let viewer;
+    export let viewer: Viewer | undefined = undefined;
 
-    let menu = [
+    let menu: MenuBarEntry[] = [
         {
             name: 'File',
             items: [
                 [
                     {
                         name: 'Create Shortcut',
-                        disabled: true
-                    }
+                        disabled: true,
+                    },
                 ],
                 [
                     {
                         name: 'Close',
-                        action: () => {destroy();}
-                    }
-                ]
-            ]
+                        action: () => {
+                            destroy();
+                        },
+                    },
+                ],
+            ],
         },
-        
+
         {
             name: 'View',
             items: [
                 [
                     {
-                        name: 'Toolbars'
+                        name: 'Toolbars',
                     },
                     {
-                        name: 'Status Bar'
+                        name: 'Status Bar',
                     },
                     {
-                        name: 'Explorer Bar'
-                    }
+                        name: 'Explorer Bar',
+                    },
                 ],
                 [
                     {
-                        name: 'Thumbnails'
+                        name: 'Thumbnails',
                     },
                     {
-                        name: 'Tiles'
+                        name: 'Tiles',
                     },
                     {
-                        name: 'Icons'
+                        name: 'Icons',
                     },
                     {
-                        name: 'List'
+                        name: 'List',
                     },
                     {
-                        name: 'Details'
-                    }
+                        name: 'Details',
+                    },
                 ],
                 [
                     {
-                        name: 'Choose Details...'
+                        name: 'Choose Details...',
                     },
                     {
-                        name: 'Go To'
+                        name: 'Go To',
                     },
                     {
-                        name: 'Refresh'
-                    }
-                ]
-            ]
+                        name: 'Refresh',
+                    },
+                ],
+            ],
         },
         {
             name: 'Favorites',
             items: [
                 [
                     {
-                        name: 'Add to Favorites...'
+                        name: 'Add to Favorites...',
                     },
                     {
-                        name: 'Organize Favorites'
-                    }
+                        name: 'Organize Favorites',
+                    },
                 ],
                 [
                     {
                         name: 'Links',
-                        icon: '/images/xp/icons/FolderClosed.png'
+                        icon: '/images/xp/icons/FolderClosed.png',
                     },
                     {
                         name: 'MSN.com',
-                        icon: '/images/xp/icons/URL.png'
+                        icon: '/images/xp/icons/URL.png',
                     },
                     {
                         name: 'Radio Station Guide',
-                        icon: '/images/xp/icons/URL.png'
-                    }
-                ]
-            ]
+                        icon: '/images/xp/icons/URL.png',
+                    },
+                ],
+            ],
         },
         {
             name: 'Tools',
             items: [
                 [
                     {
-                        name: 'Map Network Drive...'
+                        name: 'Map Network Drive...',
                     },
                     {
-                        name: 'Disconnect Network Drive...'
+                        name: 'Disconnect Network Drive...',
                     },
                     {
-                        name: 'Synchronize...'
-                    }
+                        name: 'Synchronize...',
+                    },
                 ],
                 [
                     {
-                        name: 'Folder Options...'
-                    }
-                ]
-            ]
+                        name: 'Folder Options...',
+                    },
+                ],
+            ],
         },
         {
             name: 'Help',
@@ -161,163 +180,204 @@
                 [
                     {
                         name: 'Help and Support Center',
-                        action: () => open_link('https://docs.win32.run')
+                        action: () => open_link('https://docs.win32.run'),
                     },
                     {
                         name: 'Is this copy legal?',
-                        action: () => open_link('https://docs.win32.run')
-                    }
+                        action: () => open_link('https://docs.win32.run'),
+                    },
                 ],
                 [
                     {
                         name: 'About Windows',
-                        action: () => open_link('https://docs.win32.run')
-                    }
-                ]
-            ]
-        }
-    ]
+                        action: () => open_link('https://docs.win32.run'),
+                    },
+                ],
+            ],
+        },
+    ];
 
     $: mc_interface = { window, up, open };
 
-    onMount(() => {
+    function on_user_input(e: KeyboardEvent) {
+        const target = e.target;
+        if (!(target instanceof HTMLInputElement)) return;
+        if (e.key == 'Enter') {
+            let id = finder.to_id(target.value);
 
-    })
-
-
-    function on_user_input(e){
-        if(e.key == 'Enter'){
-            let id = finder.to_id(e.target.value);
-            
-            if(id == null){
-                id = finder.to_id_nocase(e.target.value);
+            if (id == null) {
+                id = finder.to_id_nocase(target.value);
             }
             console.log('found id', id);
-            if(id){
+            if (id) {
                 open(id);
-                e.target.blur();
+                target.blur();
             }
         }
     }
-   
-    export function destroy(){
-        runningPrograms.update(programs => programs.filter(p => p != get_self()));
-        unmount(get_self());
+
+    export function destroy() {
+        runningPrograms.update((programs) =>
+            programs.filter((p) => p != get_self()),
+        );
+        void unmount(required(get_self(), 'my computer instance'));
     }
 
-    export let options = {
-        title:  'My Computer' ,
+    export let options: WindowOptions = {
+        title: 'My Computer',
         min_width: 500,
         min_height: 400,
         width: 700,
         height: 500,
         icon: '/images/xp/icons/MyComputer.png',
         id: id,
-        exec_path
+        exec_path,
     };
 
-    function file_icon(item){
-        if(item == null) return null;
-        if(item.icon != null){
-            return `url(${item.icon})`
+    function file_icon(item: VfsItem | null | undefined) {
+        if (item == null) return null;
+        if (item.icon != null) {
+            return `url(${item.icon})`;
         }
-        if(icons[item.ext] != null){ 
-            return `url(/images/xp/icons/${icons[item.ext]})`
+        if (icons[item.ext] != null) {
+            return `url(/images/xp/icons/${icons[item.ext]})`;
         }
-        if(item.id == recycle_bin_id){
+        if (item.id == recycle_bin_id) {
             return `url(/images/xp/icons/RecycleBinempty.png)`;
         }
         return null;
     }
 
-    export function open(fs_id){
-        if(fs_id == history[page_index]) return; 
+    export function open(fs_id: string | null | undefined) {
+        if (fs_id == history[page_index]) return;
         console.log('open', fs_id);
-        console.log($hardDrive[fs_id]);
-        history = [...history.slice(0, page_index+1), fs_id];
+        console.log(fs_id == null ? undefined : $hardDrive?.[fs_id]);
+        history = [...history.slice(0, page_index + 1), fs_id];
         page_index = history.length - 1;
     }
 
-    function back(){
+    function back() {
         page_index = Math.max(0, page_index - 1);
     }
 
-    function next(){
+    function next() {
         page_index = Math.min(history.length - 1, page_index + 1);
     }
 
-    export function up(){
-        let parent_id = $hardDrive[history[page_index]].parent;
+    export function up() {
+        const current_id = required(history[page_index], 'current folder id');
+        let parent_id = required(
+            $hardDrive?.[current_id],
+            'fs item ' + current_id,
+        ).parent;
         open(parent_id);
     }
 
-    function open_link(link){
+    function open_link(link: string) {
         queueProgram.set({
             path: './programs/internet_explorer.svelte',
-            fs_item: {url: link}
-        })
+            fs_item: { url: link },
+        });
     }
-
 </script>
 
-<Window options={options} bind:this={window} on_click_close={destroy}>
-    
-    <div slot="content" class="absolute inset-0.5 flex flex-col bg-xp-yellow overflow-hidden">
-        <div class="shrink-0 w-full border-b border-stone-300 flex flex-row items-center justify-between">
-            <Menu menu={menu}></Menu>
-            <div class="w-[40px] h-full bg-slate-50  flex items-center justify-center">
-                <div class="w-[20px] h-[20px] bg-[url(/images/ms.png)] bg-contain bg-center bg-no-repeat"></div>
+<Window {options} bind:this={window} on_click_close={destroy}>
+    <div
+        slot="content"
+        class="absolute inset-0.5 flex flex-col bg-xp-yellow overflow-hidden"
+    >
+        <div
+            class="shrink-0 w-full border-b border-stone-300 flex flex-row items-center justify-between"
+        >
+            <Menu {menu}></Menu>
+            <div
+                class="w-[40px] h-full bg-slate-50 flex items-center justify-center"
+            >
+                <div
+                    class="w-[20px] h-[20px] bg-[url(/images/ms.png)] bg-contain bg-center bg-no-repeat"
+                ></div>
             </div>
         </div>
-        <div class="shrink-0 flex flex-row items-center border-b border-stone-300">
-            <RButton icon="/images/xp/icons/Back.png" title="Back" 
-                    on_click={back}
-                    expandable={true} disabled={page_index == 0} tooltip_message="Back to Previous"></RButton>
-            <RButton icon="/images/xp/icons/Forward.png" 
-                    on_click={next}
-                    expandable={true} disabled={page_index == history.length-1}></RButton>
+        <div
+            class="shrink-0 flex flex-row items-center border-b border-stone-300"
+        >
+            <RButton
+                icon="/images/xp/icons/Back.png"
+                title="Back"
+                on_click={back}
+                expandable={true}
+                disabled={page_index == 0}
+                tooltip_message="Back to Previous"
+            ></RButton>
+            <RButton
+                icon="/images/xp/icons/Forward.png"
+                on_click={next}
+                expandable={true}
+                disabled={page_index == history.length - 1}
+            ></RButton>
 
-            <RButton icon="/images/xp/icons/Up.png" 
+            <RButton
+                icon="/images/xp/icons/Up.png"
                 on_click={up}
-                disabled={history[page_index] == null} ></RButton>
+                disabled={history[page_index] == null}
+            ></RButton>
 
             <div class="w-[1px] h-full py-1">
                 <div class=" w-full h-full border-l border-stone-300"></div>
             </div>
 
-            <RButton icon="/images/xp/icons/Search.png" title="Search"></RButton>
-            <RButton icon="/images/xp/icons/FolderView.png" title="Folders"></RButton>
+            <RButton icon="/images/xp/icons/Search.png" title="Search"
+            ></RButton>
+            <RButton icon="/images/xp/icons/FolderView.png" title="Folders"
+            ></RButton>
 
             <div class="w-[1px] h-full py-1">
                 <div class=" w-full h-full border-l border-stone-300"></div>
             </div>
 
-            <RButton icon="/images/xp/icons/FolderView-Classic.png" expandable={true}></RButton>
+            <RButton
+                icon="/images/xp/icons/FolderView-Classic.png"
+                expandable={true}
+            ></RButton>
         </div>
-        <div class="shrink-0 flex flex-row items-center border-b border-stone-300 text-[11px] items-center">
+        <div
+            class="shrink-0 flex flex-row items-center border-b border-stone-300 text-[11px] items-center"
+        >
             <span class="px-2 text-slate-800">Address</span>
             <div class="grow h-[25px] relative">
-                <input class="absolute inset-0 pl-7 outline-none" type="text" 
-                on:click={(e) => e.target.select()} on:keyup={on_user_input} value="{url}">
-                <div class="w-[17px] h-[17px] absolute top-[4px] left-[4px] 
-                    {history[page_index] == null ? 'bg-[url(/images/xp/icons/MyComputer.png)]' : 'bg-[url(/images/xp/icons/FolderClosed.png)]'} bg-contain"
-                    style:background-image="{file_icon($hardDrive[history[page_index]])}">
-                </div>
+                <input
+                    class="absolute inset-0 pl-7 outline-none"
+                    type="text"
+                    on:click={(e) => e.currentTarget.select()}
+                    on:keyup={on_user_input}
+                    value={url}
+                />
+                <div
+                    class="w-[17px] h-[17px] absolute top-[4px] left-[4px]
+                    {history[page_index] == null
+                        ? 'bg-[url(/images/xp/icons/MyComputer.png)]'
+                        : 'bg-[url(/images/xp/icons/FolderClosed.png)]'} bg-contain"
+                    style:background-image={file_icon(current_history_item)}
+                ></div>
             </div>
-            <div class="w-[30px] h-[20px] bg-[url(/images/xp/icons/Go.png)] bg-center bg-contain bg-no-repeat"></div>
+            <div
+                class="w-[30px] h-[20px] bg-[url(/images/xp/icons/Go.png)] bg-center bg-contain bg-no-repeat"
+            ></div>
         </div>
-        
+
         <div class="grow flex flex-row overflow-hidden">
-            <Sidebar my_computer_instance={mc_interface} id={history[page_index]} ></Sidebar>
+            <Sidebar
+                my_computer_instance={mc_interface}
+                id={history[page_index]}
+            ></Sidebar>
             <div class="grow relative bg-blue-100">
-                <Viewer bind:this={viewer} id={history[page_index]}
-                    on:open={(e) => open(e.detail.id)} my_computer_instance={mc_interface}>
-                </Viewer>
+                <Viewer
+                    bind:this={viewer}
+                    id={history[page_index]}
+                    on:open={(e) => open(e.detail.id)}
+                    my_computer_instance={mc_interface}
+                ></Viewer>
             </div>
         </div>
-        
     </div>
 </Window>
-
-
-<svelte:options accessors={true}></svelte:options>
