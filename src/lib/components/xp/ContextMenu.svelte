@@ -161,7 +161,7 @@
                                 class="fill-slate-900 group-hover:fill-slate-50 w-[10px] h-[10px]"
                                 xmlns="http://www.w3.org/2000/svg"
                                 viewBox="0 0 256 512"
-                                ><!--! Font Awesome Pro 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license (Commercial License) Copyright 2022 Fonticons, Inc. --><path
+                                ><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc. --><path
                                     d="M246.6 278.6c12.5-12.5 12.5-32.8 0-45.3l-128-128c-9.2-9.2-22.9-11.9-34.9-6.9s-19.8 16.6-19.8 29.6l0 256c0 12.9 7.8 24.6 19.8 29.6s25.7 2.2 34.9-6.9l128-128z"
                                 /></svg
                             >
@@ -211,8 +211,8 @@
                                                     class="fill-slate-800 w-1.5 h-1.5 group-sub-hover:fill-slate-50"
                                                     xmlns="http://www.w3.org/2000/svg"
                                                     viewBox="0 0 512 512"
-                                                    ><!--! Font Awesome Pro 6.3.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license (Commercial License) Copyright 2023 Fonticons, Inc. --><path
-                                                        d="M256 512c141.4 0 256-114.6 256-256S397.4 0 256 0S0 114.6 0 256S114.6 512 256 512z"
+                                                    ><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc. --><path
+                                                        d="M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512z"
                                                     />
                                                 </svg>
                                             {/if}

@@ -11,7 +11,7 @@
  *     sha256sum static/json/hard_drive.json | cut -c1-32
  * (Phase 2 replaces this hand stamp with the generate-vfs build step.)
  */
-export const SEED_VERSION = 'da245617202ea60c5a32c74f4a5e9df3';
+export const SEED_VERSION = '29365afea2023187083d902c0a225831';
 
 export function shouldReseed(stored: string | null | undefined): boolean {
     return stored !== SEED_VERSION;

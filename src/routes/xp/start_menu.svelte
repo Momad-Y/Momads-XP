@@ -1,10 +1,13 @@
 <script lang="ts">
     import { mount } from 'svelte';
     import { queueProgram } from '../../lib/store';
-    import { my_pictures_id, my_music_id } from '../../lib/system';
+    import { profile } from '../../lib/profile';
     import * as utils from '../../lib/utils';
     import { required } from '../../lib/types';
     import type { MountedComponent, VfsItem } from '../../lib/types';
+    import GitHubIcon from '../../lib/components/icons/GitHubIcon.svelte';
+    import LinkedInIcon from '../../lib/components/icons/LinkedInIcon.svelte';
+    import InstagramIcon from '../../lib/components/icons/InstagramIcon.svelte';
     const { click_outside } = utils;
 
     /** One start-menu entry; `null` renders as a separator. */
@@ -17,10 +20,31 @@
         /** CSS `top` offset of the level-2 flyout. */
         top?: string;
         link?: string;
+        /** External URL — renders as <a target="_blank" rel="noopener noreferrer"> instead of an app launch. */
+        href?: string;
+        /** Inline icon component (FA brands) — takes precedence over `icon`. */
+        icon_component?: typeof GitHubIcon;
         webapp?: unknown;
         items?: (StartMenuItem | null)[];
     }
 
+    /** Named placeholder launch (design decision 5): the literal fs_item
+     *  carries name + icon for placeholder.svelte's window chrome. */
+    const placeholder_entry = (name: string, icon: string): StartMenuItem => ({
+        name,
+        icon,
+        path: './programs/placeholder.svelte',
+        fs_item: { name, icon },
+    });
+
+    function social_url(platform: string): string {
+        return required(
+            profile.social.find((s) => s.platform === platform),
+            `social link ${platform}`,
+        ).url;
+    }
+
+    // ── Left column: pinned (§3.4) ──
     const col_1: (StartMenuItem | null)[] = [
         {
             name: 'Internet Explorer',
@@ -28,298 +52,113 @@
             path: './programs/internet_explorer.svelte',
             font: 'bold',
         },
-        null,
         {
-            name: 'Media Player Classic',
-            icon: '/images/xp/icons/MPC.png',
-            path: './programs/media_player_classic.svelte',
-        },
-        {
-            name: 'Paint',
-            icon: '/images/xp/icons/Paint.png',
-            path: './programs/paint.svelte',
+            name: 'Contact Me',
+            icon: '/assets/icons/contact-me.png',
+            path: './programs/placeholder.svelte',
+            fs_item: {
+                name: 'Contact Me',
+                icon: '/assets/icons/contact-me.png',
+            },
+            font: 'bold',
         },
     ];
 
+    // ── Right column (§3.4): apps | socials — Shut Down lives in the bottom
+    // bar (the existing flow, design decision 7; the Log Off row is removed) ──
     const col_2: (StartMenuItem | null)[] = [
-        {
-            name: 'My Pictures',
-            icon: '/images/xp/icons/MyPictures.png',
-            path: './programs/my_computer.svelte',
-            fs_item: { id: my_pictures_id },
-            font: 'bold',
-        },
-        {
-            name: 'My Music',
-            icon: '/images/xp/icons/MyMusic.png',
-            path: './programs/my_computer.svelte',
-            fs_item: { id: my_music_id },
-            font: 'bold',
-        },
         {
             name: 'My Computer',
             icon: '/images/xp/icons/MyComputer.png',
             path: './programs/my_computer.svelte',
             font: 'bold',
         },
-        null,
         {
-            name: 'Control Panel',
-            icon: '/images/xp/icons/ControlPanel.png',
-            path: './programs/my_computer.svelte',
+            name: 'My CV',
+            icon: '/assets/icons/my-cv.png',
+            path: './programs/placeholder.svelte',
+            fs_item: { name: 'My CV', icon: '/assets/icons/my-cv.png' },
+            font: 'bold',
         },
         {
-            name: 'Display Properties',
-            icon: '/images/xp/icons/DisplayProperties.png',
-            path: './programs/display_properties.svelte',
-        },
-        null,
-        {
-            name: 'Search',
-            icon: '/images/xp/icons/Search.png',
-            path: '',
+            name: 'About Me',
+            icon: '/assets/icons/about-me.png',
+            path: './programs/placeholder.svelte',
+            fs_item: { name: 'About Me', icon: '/assets/icons/about-me.png' },
+            font: 'bold',
         },
         {
-            name: 'Run...',
-            icon: '/images/xp/icons/Run.png',
-            path: '',
-        },
-    ];
-
-    const programs: (StartMenuItem | null)[] = [
-        {
-            name: 'Display Properties',
-            icon: '/images/xp/icons/DisplayProperties.png',
-            path: './programs/display_properties.svelte',
-        },
-        {
-            name: 'Windows Catalog',
-            icon: '/images/xp/icons/WindowsCatalog.png',
-            path: '',
-        },
-        {
-            name: 'Windows Update',
-            icon: '/images/xp/icons/WindowsUpdate.png',
-            path: '',
-        },
-        null,
-        {
-            name: 'Accessories',
-            icon: '/images/xp/icons/StartMenuPrograms.png',
-            top: '-100px',
-            items: [
-                {
-                    name: 'Accessibility',
-                    icon: '/images/xp/icons/StartMenuPrograms.png',
-                    items: [
-                        {
-                            name: 'Accessibility Wizard',
-                            icon: '/images/xp/icons/AccessibilityWizard.png',
-                            path: '',
-                        },
-                        {
-                            name: 'Magnifier',
-                            icon: '/images/xp/icons/Magnifier.png',
-                            path: '',
-                        },
-                        {
-                            name: 'Narrator',
-                            icon: '/images/xp/icons/Narrator.png',
-                            path: '',
-                        },
-                        {
-                            name: 'On-Screen Keyboard',
-                            icon: '/images/xp/icons/On-ScreenKeyboard.png',
-                            path: '',
-                        },
-                        {
-                            name: 'Utility Manager',
-                            icon: '/images/xp/icons/BAT.png',
-                            path: '',
-                        },
-                    ],
-                },
-                {
-                    name: 'Communications',
-                    icon: '/images/xp/icons/StartMenuPrograms.png',
-                    items: [
-                        {
-                            name: 'Hyper Terminal',
-                            icon: '/images/xp/icons/HyperTerminal.png',
-                            path: '',
-                        },
-                        {
-                            name: 'Network Connections',
-                            icon: '/images/xp/icons/NetworkConnections.png',
-                            path: '',
-                        },
-                        {
-                            name: 'Network Setup Wizard',
-                            icon: '/images/xp/icons/NetworkSetup.png',
-                            path: '',
-                        },
-                        {
-                            name: 'New Connection Wizard',
-                            icon: '/images/xp/icons/NewNetworkConnection.png',
-                            path: '',
-                        },
-                        {
-                            name: 'Wireless Network Setup Wizard',
-                            icon: '/images/xp/icons/WirelessNetworkSetup.png',
-                            path: '',
-                        },
-                    ],
-                },
-                {
-                    name: 'Entertainment',
-                    icon: '/images/xp/icons/StartMenuPrograms.png',
-                    items: [
-                        {
-                            name: 'Sound Recorder',
-                            icon: '/images/xp/icons/Volume.png',
-                            path: '',
-                        },
-                        {
-                            name: 'Volume Control',
-                            icon: '/images/xp/icons/VolumeLevel.png',
-                            path: '',
-                        },
-                        {
-                            name: 'Windows Media Player',
-                            icon: '/images/xp/icons/WindowsMediaPlayer9.png',
-                            path: '',
-                        },
-                    ],
-                },
-                {
-                    name: 'System Tools',
-                    icon: '/images/xp/icons/StartMenuPrograms.png',
-                    items: [
-                        {
-                            name: 'Backup',
-                            icon: '/images/xp/icons/BackupWizard.png',
-                            path: '',
-                        },
-                        {
-                            name: 'Character Map',
-                            icon: '/images/xp/icons/Charmap.png',
-                            path: '',
-                        },
-                        {
-                            name: 'Disk Cleanup',
-                            icon: '/images/xp/icons/DiskCleanup.png',
-                            path: '',
-                        },
-                        {
-                            name: 'Disk Defragmenter',
-                            icon: '/images/xp/icons/DiskDefragmenter.png',
-                            path: '',
-                        },
-                        {
-                            name: 'Files and Settings Transfer Wizard',
-                            icon: '/images/xp/icons/FileandSettingsTransferWizard.png',
-                            path: '',
-                        },
-                        {
-                            name: 'Scheduled Tasks',
-                            icon: '/images/xp/icons/ScheduledTasks.png',
-                            path: '',
-                        },
-                        {
-                            name: 'Security Center',
-                            icon: '/images/xp/icons/SecurityCenter.png',
-                            path: '',
-                        },
-                        {
-                            name: 'System Information',
-                            icon: '/images/xp/icons/SystemInformation.png',
-                            path: '',
-                        },
-                        {
-                            name: 'System Restore',
-                            icon: '/images/xp/icons/SystemRestore.png',
-                            path: '',
-                        },
-                    ],
-                },
-                {
-                    name: 'Address Book',
-                    icon: '/images/xp/icons/AddressBook.png',
-                    path: '',
-                },
-                {
-                    name: 'Calculator',
-                    icon: '/images/xp/icons/Calculator.png',
-                    path: '',
-                },
-                {
-                    name: 'Command Prompt',
-                    icon: '/images/xp/icons/CommandPrompt.png',
-                    path: '',
-                },
-                {
-                    name: 'Notepad',
-                    icon: '/images/xp/icons/Notepad.png',
-                    path: '',
-                },
-                {
-                    name: 'Paint',
-                    icon: '/images/xp/icons/Paint.png',
-                    path: '',
-                },
-                {
-                    name: 'Program Compatibility Wizard',
-                    icon: '/images/xp/icons/HelpandSupport.png',
-                    path: '',
-                },
-                {
-                    name: 'Remote Desktop Connection',
-                    icon: '/images/xp/icons/RemoteDesktop.png',
-                    path: '',
-                },
-                {
-                    name: 'Synchronize',
-                    icon: '/images/xp/icons/Synchronize.png',
-                    path: '',
-                },
-                {
-                    name: 'Tour Windows Xp',
-                    icon: '/images/xp/icons/TourXP.png',
-                    path: '',
-                },
-                {
-                    name: 'Windows Explorer',
-                    icon: '/images/xp/icons/Explorer.png',
-                    path: '',
-                },
-                {
-                    name: 'Wordpad',
-                    icon: '/images/xp/icons/Wordpad.png',
-                    path: '',
-                },
-            ],
-        },
-        {
-            name: 'Startup',
-            icon: '/images/xp/icons/StartMenuPrograms.png',
-            items: [],
-        },
-        {
-            name: 'Internet Explorer',
-            icon: '/images/xp/icons/InternetExplorer6.png',
-            path: './programs/internet_explorer.svelte',
+            name: 'Contact Me',
+            icon: '/assets/icons/contact-me.png',
+            path: './programs/placeholder.svelte',
+            fs_item: {
+                name: 'Contact Me',
+                icon: '/assets/icons/contact-me.png',
+            },
             font: 'bold',
         },
         null,
+        // Socials open new tabs (design decision 7 — stated deviation from the
+        // base's open-in-IE `link` semantics). Inline FA Free brand icons
+        // (plan Part 4, Task 19).
         {
-            name: 'Media Player Classic',
-            icon: '/images/xp/icons/MPC.png',
-            path: './programs/media_player_classic.svelte',
+            name: 'GitHub',
+            icon: '',
+            icon_component: GitHubIcon,
+            href: social_url('GitHub'),
         },
+        {
+            name: 'LinkedIn',
+            icon: '',
+            icon_component: LinkedInIcon,
+            href: social_url('LinkedIn'),
+        },
+        {
+            name: 'Instagram',
+            icon: '',
+            icon_component: InstagramIcon,
+            href: social_url('Instagram'),
+        },
+    ];
+
+    // ── All Programs flyout (§3.4) ──
+    const programs: (StartMenuItem | null)[] = [
+        {
+            name: 'My Computer',
+            icon: '/images/xp/icons/MyComputer.png',
+            path: './programs/my_computer.svelte',
+        },
+        placeholder_entry('About Me', '/assets/icons/about-me.png'),
+        placeholder_entry(
+            'Command Prompt',
+            '/images/xp/icons/CommandPrompt.png',
+        ),
+        placeholder_entry('Python', '/images/xp/icons/ApplicationWindow.png'),
         {
             name: 'Paint',
             icon: '/images/xp/icons/Paint.png',
             path: './programs/paint.svelte',
+        },
+        {
+            // §3.4 label; launches the real inherited MPC — the custom player
+            // arrives in Phase 3 (design decision 7)
+            name: 'Music Player',
+            icon: '/images/xp/icons/MPC.png',
+            path: './programs/media_player_classic.svelte',
+        },
+        {
+            name: 'Games',
+            icon: '/images/xp/icons/StartMenuPrograms.png',
+            top: '-40px',
+            items: [
+                placeholder_entry(
+                    'Minesweeper',
+                    '/assets/icons/minesweeper.png',
+                ),
+                placeholder_entry('Solitaire', '/assets/icons/solitaire.png'),
+                placeholder_entry('Chess', '/assets/icons/chess.png'),
+                placeholder_entry('DOOM', '/assets/icons/doom.png'),
+            ],
         },
     ];
 
@@ -396,9 +235,20 @@
 
     <!-- eslint-disable svelte/no-useless-mustaches -- a plain quoted value this long gets line-wrapped by prettier, and svelte2tsx cannot parse multi-line style: text -->
     <div
-        class="w-full h-[70px] rounded-t-md shrink-0"
+        class="w-full h-[70px] rounded-t-md shrink-0 flex flex-row items-center px-2"
         style:background-image={'linear-gradient(rgb(24, 104, 206) 0%, rgb(14, 96, 203) 12%, rgb(14, 96, 203) 20%, rgb(17, 100, 207) 32%, rgb(22, 103, 207) 33%, rgb(27, 108, 211) 47%, rgb(30, 112, 217) 54%, rgb(36, 118, 220) 60%, rgb(41, 122, 224) 65%, rgb(52, 130, 227) 77%, rgb(55, 134, 229) 79%, rgb(66, 142, 233) 90%, rgb(71, 145, 235) 100%)'}
-    ></div>
+    >
+        <img
+            src={profile.meta.avatar}
+            alt={profile.meta.name}
+            class="w-12 h-12 rounded border-2 border-white/70 object-cover shadow"
+        />
+        <span
+            class="ml-2 text-slate-50 text-[14px] font-bold"
+            style="text-shadow: 1px 1px 1px rgba(0,0,0,0.5);"
+            >{profile.meta.name}</span
+        >
+    </div>
     <!-- eslint-enable svelte/no-useless-mustaches -->
 
     <!-- eslint-disable svelte/no-useless-mustaches -- a plain quoted value this long gets line-wrapped by prettier, and svelte2tsx cannot parse multi-line style: text -->
@@ -642,6 +492,7 @@
                 <!-- Desktop flyout: JS state, hidden on mobile -->
                 {#if ap_open}
                     <div
+                        id="all-programs-flyout"
                         class="hidden sm:block absolute z-10 bottom-0 left-[90%] w-[250px] shadow-xl border-t border-l-4 border-blue-500 bg-slate-50"
                     >
                         <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
@@ -818,6 +669,37 @@
                     <div
                         class="my-0.5 mx-auto w-5/6 h-[1px] bg-blue-100 shrink-0"
                     ></div>
+                {:else if item.href != null}
+                    <!-- eslint-disable svelte/no-navigation-without-resolve -- external social URL opened in a new tab, not an app route -->
+                    <a
+                        href={item.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="flex flex-row items-center shrink-0 p-1 group/c2 hover:bg-blue-500 no-underline"
+                        on:click={hide}
+                    >
+                        <!-- eslint-enable svelte/no-navigation-without-resolve -->
+                        {#if item.icon_component != null}
+                            <span
+                                class="w-7 h-7 mr-1 flex items-center justify-center text-slate-700 group-hover/c2:text-white"
+                            >
+                                <svelte:component
+                                    this={item.icon_component}
+                                    size={18}
+                                />
+                            </span>
+                        {:else}
+                            <div
+                                class="w-7 h-7 bg-contain mr-1"
+                                style:background-image="url({item.icon})"
+                            ></div>
+                        {/if}
+                        <div
+                            class="text-[11px] group-hover/c2:text-white text-slate-800"
+                        >
+                            {item.name}
+                        </div>
+                    </a>
                 {:else}
                     <div
                         class="flex flex-row items-center shrink-0 p-1 group/c2 hover:bg-blue-500"
@@ -849,15 +731,6 @@
         style:background-image={'linear-gradient(rgb(66, 130, 214) 0%, rgb(59, 133, 224) 3%, rgb(65, 138, 227) 5%, rgb(65, 138, 227) 17%, rgb(60, 135, 226) 21%, rgb(55, 134, 228) 26%, rgb(52, 130, 227) 29%, rgb(46, 126, 225) 39%, rgb(35, 116, 223) 49%, rgb(32, 114, 219) 57%, rgb(25, 110, 219) 62%, rgb(23, 107, 216) 72%, rgb(20, 104, 213) 75%, rgb(17, 101, 210) 83%, rgb(15, 97, 203) 88%)'}
     >
         <!-- eslint-enable svelte/no-useless-mustaches -->
-        <div
-            class="p-1 rounded-sm hover:brightness-110 flex flex-row items-center"
-            on:click={show_shutdown_panel}
-        >
-            <div
-                class="w-6 h-6 bg-[url(/images/xp/icons/Logout.png)] bg-contain"
-            ></div>
-            <span class="text-slate-50 text-[11px] ml-1">Log Off</span>
-        </div>
         <div
             class="p-1 ml-2 rounded-sm hover:brightness-110 flex flex-row items-center"
             on:click={show_shutdown_panel}

@@ -1,0 +1,214 @@
+{
+    "meta": {
+        "name": "Mohamed Abdelnasser",
+        "shortName": "Momad",
+        "title": "AI Engineer",
+        "tagline": "AI Engineer | Automation Systems | Robotics | RoboCup @Home Champion",
+        "location": "Dubai, United Arab Emirates",
+        "email": "Mohamed.Y.Abdelnasser@gmail.com",
+        "avatar": "/assets/images/avatar.png",
+        "resumePdf": "/assets/Mohamed_Abdelnasser_Resume.pdf"
+    },
+    "about": {
+        "bio": [
+            "Hi, I'm Mohamed Abdelnasser, an AI Engineer with a B.Sc. in Artificial Intelligence (Intelligent Systems, Excellent with Honors) from AAST. I build production-ready AI systems, with a strong focus on automation and real-world impact.",
+            "I currently work at Printerpix, where I design and deploy AI-powered production systems across 9 international markets. Previously, I worked with Mentorness, Corporatica, and Udacity in research, development, and mentoring roles. I've built AI assistants, NLP pipelines, computer vision systems, and intelligent automations, and I led the AI and robotics stack for RoboCup @Home, earning 1st place nationally and 3rd place internationally."
+        ]
+    },
+    "social": [
+        {
+            "platform": "GitHub",
+            "url": "https://github.com/Momad-Y",
+            "icon": "github"
+        },
+        {
+            "platform": "LinkedIn",
+            "url": "https://www.linkedin.com/in/mohamed-y-abdelnasser/",
+            "icon": "linkedin"
+        },
+        {
+            "platform": "Instagram",
+            "url": "https://instagram.com/7.zsjj",
+            "icon": "instagram"
+        }
+    ],
+    "experience": [
+        {
+            "company": "Printerpix",
+            "role": "AI Engineer",
+            "period": "October 2025 – Present",
+            "location": "Dubai, United Arab Emirates",
+            "description": [
+                "Architected an AI analytics pipeline using Python, BigQuery, and Gemini LLMs, automating marketing reporting and anomaly detection across 9 international markets, reducing manual analysis by ~80%.",
+                "Developed ML-powered pricing optimisation using scikit-learn and Monte Carlo simulation (10,000+ scenarios) with 95% CI statistical validation via SciPy.",
+                "Designed LangChain multi-chain LLM architecture with Gemini for automated multilingual content generation across 6 languages, with Pydantic validation and multi-platform API integration.",
+                "Deployed AI-powered QA system using Gemini Vision, Playwright, and FastAPI, automating cross-platform validation across 7 regional markets."
+            ],
+            "images": []
+        },
+        {
+            "company": "Udacity",
+            "role": "Session Lead",
+            "period": "July 2025 – September 2025",
+            "location": "Remote",
+            "description": [
+                "Led the DECI Summer Cohort (Level 1), delivering 3 weekly live online sessions to 30+ students.",
+                "Covered Python, HTML, CSS, fundamentals of AI, and data science, along with introductions to networks, cybersecurity, multimedia, and encoding/decoding.",
+                "Mentored students through hands-on projects and activities, achieving an 80%+ graduation rate."
+            ],
+            "images": []
+        },
+        {
+            "company": "Robotics Club — AASTMT",
+            "role": "Vice President of Software Development",
+            "period": "October 2022 – June 2025",
+            "location": "El Alameen, Egypt",
+            "description": [
+                "Organized RoboCup-inspired line-tracking and CPC-inspired programming competitions.",
+                "Conducted sessions teaching Python, C/C++, Competitive Programming, and Arduino to over 300 students.",
+                "Attended the 2023 Maker Faire in Cairo representing the Robotics Club."
+            ],
+            "images": []
+        },
+        {
+            "company": "Corporatica",
+            "role": "Natural Language Processing Intern",
+            "period": "September 2024 – November 2024",
+            "location": "Wyoming, USA (Remote)",
+            "description": [
+                "Optimized LangChain and LangGraph RAG pipelines, improving retrieval efficiency and reducing response time by ~15%.",
+                "Developed a LangChain-based ReAct agent with custom and pre-built tools to fix LLM-generated code errors, decreasing failure rates and hallucinations by 20%.",
+                "Contributed to all stages of NLP pipelines—pre/post-processing, LLM integration, monitoring, and evaluation."
+            ],
+            "images": []
+        },
+        {
+            "company": "RoboCup Federation",
+            "role": "AI & Robotics Engineer",
+            "period": "December 2023 – August 2024",
+            "location": "Alexandria, Egypt & Eindhoven, Netherlands",
+            "description": [
+                "Led Team 3arfeen Hollanda to 1st place in the 2024 RoboCup @Home Education Competition (Egypt).",
+                "Led Team Wingardium Levioso to 3rd place in the RoboCup @Home Education Major Competition (Netherlands)."
+            ],
+            "images": []
+        },
+        {
+            "company": "Mentorness",
+            "role": "Machine Learning Intern",
+            "period": "April 2024 – May 2024",
+            "location": "Ahmedabad, India (Remote)",
+            "description": [
+                "Built predictive models for disease diagnosis (Anemia, Diabetes, Thalassemia) and stock market forecasting using Scikit-learn, TensorFlow, and PyTorch.",
+                "Developed classifiers (Naive Bayes, Random Forest, Logistic Regression) and sequence models (LSTM, GRU).",
+                "Compared multiple models and selected top performers (90%+ accuracy) for deployment."
+            ],
+            "images": []
+        }
+    ],
+    "education": [
+        {
+            "institution": "Arab Academy for Science, Technology and Maritime Transport",
+            "degree": "Bachelor's degree, Artificial Intelligence (Intelligent Systems)",
+            "period": "October 2021 – July 2025",
+            "honors": "GPA 3.94 — Excellent with Honors",
+            "images": []
+        },
+        {
+            "institution": "Al Ma'arifa International Private School",
+            "degree": "High School Diploma",
+            "period": "September 2017 – July 2021",
+            "images": []
+        }
+    ],
+    "skills": {
+        "AI & Machine Learning": [
+            "TensorFlow",
+            "PyTorch",
+            "Scikit-learn",
+            "Computer Vision",
+            "Predictive Modeling"
+        ],
+        "NLP & LLMs": [
+            "LangChain",
+            "LangGraph",
+            "RAG Pipelines",
+            "ReAct Agents",
+            "Prompt Engineering"
+        ],
+        "Robotics & Automation": [
+            "ROS",
+            "Arduino",
+            "RoboCup @Home",
+            "Production Automation"
+        ],
+        "Data Engineering": [
+            "Google BigQuery",
+            "Microsoft SQL Server",
+            "Supabase",
+            "ETL Pipelines"
+        ],
+        "Software Development": [
+            "Python",
+            "TypeScript",
+            "React",
+            "Node.js",
+            "REST APIs"
+        ]
+    },
+    "awards": [
+        {
+            "title": "1st Place – RoboCup @Home Education Competition (Egypt)",
+            "year": "2024",
+            "images": []
+        },
+        {
+            "title": "3rd Place – RoboCup @Home Education Major Competition (Netherlands)",
+            "year": "2024",
+            "images": []
+        },
+        {
+            "title": "Honorary Award – Smart White Cane (AISC), White Cane Conference",
+            "year": "",
+            "images": []
+        },
+        {
+            "title": "Certificate of Excellence – Graduation Honors",
+            "year": "2025",
+            "images": []
+        }
+    ],
+    "certifications": [
+        {
+            "title": "Certificate of Achievement – Mentorness Machine Learning Internship",
+            "images": []
+        },
+        {
+            "title": "Certificate of Excellence – Graduation Honors",
+            "images": []
+        },
+        {
+            "title": "3rd Place – RoboCup @Home Education Major Competition (Netherlands)",
+            "images": []
+        },
+        {
+            "title": "Certificate of Participation – RoboCup Junior",
+            "images": []
+        },
+        {
+            "title": "IELTS Academic Certificate",
+            "images": []
+        }
+    ],
+    "projects": [],
+    "languages": [
+        {
+            "language": "Arabic",
+            "level": "Native"
+        },
+        {
+            "language": "English",
+            "level": "Full Professional"
+        }
+    ]
+}

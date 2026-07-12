@@ -1,43 +1,37 @@
 <script lang="ts">
     import { onMount, createEventDispatcher } from 'svelte';
 
-    // eslint-disable-next-line @typescript-eslint/no-deprecated -- legacy component-event dispatcher kept as-is; migrating to callback props is a behavior change outside the type-only conversion
+    // eslint-disable-next-line @typescript-eslint/no-deprecated -- legacy component-event dispatcher kept as-is; matches the sibling boot screens
     const dispatcher = createEventDispatcher<{ done: null }>();
-    let fallback_timer: ReturnType<typeof setTimeout> | undefined;
-    let destroyed = false;
 
-    function done() {
-        if (destroyed) return;
-        destroyed = true;
-        clearTimeout(fallback_timer);
-        dispatcher('done');
-    }
+    /** §2.3: ~1.5s, auto-advances. */
+    const WELCOME_MS = 1500;
+    /** §2 transitions table: Welcome → Desktop fade ~600ms. */
+    const FADE_MS = 600;
+
+    let fading = false;
 
     onMount(() => {
-        const welcome_audio = new Audio('/audio/xp_startup.mp3');
-        welcome_audio.addEventListener('canplaythrough', () => {
-            welcome_audio.play().catch(() => {
-                done();
-            }); // autoplay blocked → skip immediately
-        });
-        welcome_audio.addEventListener('ended', () => {
-            done();
-        });
-        welcome_audio.addEventListener('error', () => {
-            done();
-        });
-        fallback_timer = setTimeout(() => {
-            done();
-        }, 7000);
+        // The startup sound is NOT played here: it belongs to the login-card
+        // click (design decision 2). It keeps playing over this splash.
+        const fade_timer = setTimeout(() => {
+            fading = true;
+        }, WELCOME_MS);
+        const done_timer = setTimeout(() => {
+            dispatcher('done');
+        }, WELCOME_MS + FADE_MS);
         return () => {
-            welcome_audio.pause();
-            welcome_audio.src = '';
+            clearTimeout(fade_timer);
+            clearTimeout(done_timer);
         };
     });
 </script>
 
 <div
-    class="absolute inset-0 z-50 overflow-hidden flex flex-col bg-[#5a7edc] font-sans"
+    id="welcome-overlay"
+    class="absolute inset-0 z-50 overflow-hidden flex flex-col bg-[#5a7edc] font-sans transition-opacity duration-[600ms] {fading
+        ? 'opacity-0'
+        : 'opacity-100'}"
 >
     <div
         class="h-[70px] bg-[#00309c] flex flex-row items-center shrink-0"

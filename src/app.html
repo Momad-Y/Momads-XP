@@ -2,7 +2,7 @@
 <html lang="en" data-theme="" style="background: black">
     <head>
         <meta charset="utf-8" />
-        <title>Microsoft Windows XP Professional</title>
+        <title>Momad's XP</title>
         <link rel="icon" href="%sveltekit.assets%/favicon.png" />
         <link rel="stylesheet" id="theme" href="" />
         <meta
@@ -30,6 +30,9 @@
             integrity="sha384-4D3G3GikQs6hLlLZGdz5wLFzuqE9v4yVGAcOH86y23JqBDPzj9viv0EqyfIa6YUL"
             crossorigin="anonymous"
         ></script>
+        <!-- maps touch events onto jQuery UI's mouse handlers so window
+             drag/resize works on >=1024px touch devices (§4.6 note) -->
+        <script src="/js/jquery.ui.touch-punch.min.js"></script>
 
         <style>
             html,
@@ -218,8 +221,7 @@
 
             load_assets(
                 [
-                    '/images/xp_loading_logo.jpg',
-                    '/images/xp_loading_mslogo.jpg',
+                    '/assets/images/xp-logo.png',
                     '/images/xp_logo_horizontal.png',
                     '/images/xp_logo.png',
                     '/fonts/levi.ttf',
