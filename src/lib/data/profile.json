@@ -6,7 +6,6 @@
         "tagline": "AI Engineer | Automation Systems | Robotics | RoboCup @Home Champion",
         "location": "Dubai, United Arab Emirates",
         "email": "Mohamed.Y.Abdelnasser@gmail.com",
-        "phone": "+971503429805",
         "avatar": "/assets/images/avatar.png",
         "resumePdf": "/assets/Mohamed_Abdelnasser_Resume.pdf"
     },
@@ -203,7 +202,13 @@
     ],
     "projects": [],
     "languages": [
-        { "language": "Arabic", "level": "Native" },
-        { "language": "English", "level": "Full Professional" }
+        {
+            "language": "Arabic",
+            "level": "Native"
+        },
+        {
+            "language": "English",
+            "level": "Full Professional"
+        }
     ]
 }
