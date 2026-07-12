@@ -5,15 +5,15 @@ export default defineConfig({
         include: ['src/**/*.test.ts'],
         coverage: {
             provider: 'v8',
-            // Phase 0 coverage scope: new modules only (grows per phase — see
-            // SPECIFICATION.md §5; diff-based patch coverage starts Phase 1)
-            include: ['src/lib/seed.ts'],
-            thresholds: {
-                lines: 80,
-                functions: 80,
-                branches: 80,
-                statements: 80,
-            },
+            reporter: ['text', 'lcov'],
+            // Phase 1 ratchet (design decision 10): every typed module is
+            // instrumented; the gate is diff-cover in CI (>=80% on changed
+            // lines vs origin/dev). `.svelte` components are deliberately
+            // exempt from line coverage — they are owned by the Playwright
+            // E2E suite. Phase 0's glob thresholds retire with this switch
+            // (phase-0-guide §10).
+            include: ['src/**/*.ts'],
+            exclude: ['src/**/*.test.ts', 'src/**/*.d.ts'],
         },
     },
 });
