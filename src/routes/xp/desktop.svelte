@@ -1,47 +1,45 @@
-<script>
-    import TaskBar from "./task_bar.svelte";
-    import WorkSpace from "./work_space.svelte";
-    import ContextMenu from "../../lib/components/xp/ContextMenu.svelte";
-    import axios from "axios";
-    import { get, set, keys } from "idb-keyval";
-    import { onMount, onDestroy, createEventDispatcher } from "svelte";
+<script lang="ts">
+    import TaskBar from './task_bar.svelte';
+    import WorkSpace from './work_space.svelte';
+    import ContextMenu from '../../lib/components/xp/ContextMenu.svelte';
+    import { set } from 'idb-keyval';
+    import { onMount, onDestroy, createEventDispatcher } from 'svelte';
     import {
-        zIndex,
         hardDrive,
         wallpaper,
         queueCommand,
         crtEffect,
-    } from "../../lib/store";
-    import Welcome from "./welcome.svelte";
-    import * as utils from "../../lib/utils";
-    let dispatcher = createEventDispatcher();
+    } from '../../lib/store';
+    import Welcome from './welcome.svelte';
+    import type { LoadPageEvent } from '../../lib/types';
+    let dispatcher = createEventDispatcher<{ load_page: LoadPageEvent }>();
 
-    let io_worker;
+    let io_worker: ReturnType<typeof setTimeout> | undefined;
 
     let unsubscribers = [
-        hardDrive.subscribe(async (value) => {
+        hardDrive.subscribe(() => {
             clearInterval(io_worker);
-            io_worker = setTimeout(async () => {
+            io_worker = setTimeout(() => {
                 console.log('update hardDrive');
-                await set("hard_drive", $hardDrive);
+                void set('hard_drive', $hardDrive);
             }, 1000);
         }),
-        wallpaper.subscribe(async (value) => {
+        wallpaper.subscribe((value) => {
             if (value == null) return;
-            await set("wallpaper", value);
+            void set('wallpaper', value);
         }),
         queueCommand.subscribe((cmd) => {
-            if (cmd != null && cmd != "") {
+            if (cmd != null) {
                 switch (cmd) {
-                    case "shutdown":
-                        dispatcher("load_page", {
-                            url: "./xp/shutdown.svelte",
+                    case 'shutdown':
+                        dispatcher('load_page', {
+                            url: './xp/shutdown.svelte',
                         });
                         queueCommand.set(null);
                         break;
-                    case "restart":
-                        dispatcher("load_page", {
-                            url: "./xp/shutdown.svelte",
+                    case 'restart':
+                        dispatcher('load_page', {
+                            url: './xp/shutdown.svelte',
                         });
                         break;
 
@@ -54,14 +52,18 @@
 
     let show_welcome = true;
 
-    onMount(async () => {
+    onMount(() => {
         crtEffect.set(localStorage.getItem('crt_effect') === 'true');
-        unsubscribers.push(crtEffect.subscribe(v => localStorage.setItem('crt_effect', String(v))));
+        unsubscribers.push(
+            crtEffect.subscribe((v) =>
+                localStorage.setItem('crt_effect', String(v)),
+            ),
+        );
 
         //load other pure js lib
         loadjs([
-            "https://www.gstatic.com/charts/loader.js",
-            "https://unpkg.com/panzoom@9.4.0/dist/panzoom.min.js"
+            'https://www.gstatic.com/charts/loader.js',
+            'https://unpkg.com/panzoom@9.4.0/dist/panzoom.min.js',
         ]);
     });
 
@@ -74,7 +76,10 @@
 </script>
 
 <div id="desktop" class="absolute inset-0 p-0">
-    <div class="absolute z-0 left-0 right-0 top-0 overflow-hidden" style:bottom="calc(30px + env(safe-area-inset-bottom))">
+    <div
+        class="absolute z-0 left-0 right-0 top-0 overflow-hidden"
+        style:bottom="calc(30px + env(safe-area-inset-bottom))"
+    >
         <WorkSpace />
     </div>
 
@@ -82,10 +87,13 @@
     <ContextMenu />
 </div>
 
-{#if show_welcome}<Welcome on:done={() => show_welcome = false} />{/if}
+{#if show_welcome}<Welcome on:done={() => (show_welcome = false)} />{/if}
 
 {#if $crtEffect}
-<div class="pointer-events-none fixed inset-0 z-[9999]" style="
+    <div
+        class="pointer-events-none fixed inset-0 z-[9999]"
+        style="
     background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.04) 2px, rgba(0,0,0,0.04) 4px);
-"></div>
+"
+    ></div>
 {/if}

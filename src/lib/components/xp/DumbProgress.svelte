@@ -1,5 +1,5 @@
-<script>
-    import ProgressBar from "./ProgressBar.svelte";
+<script lang="ts">
+    import ProgressBar from './ProgressBar.svelte';
     import * as utils from '../../utils';
     import { onMount, onDestroy } from 'svelte';
 
@@ -10,16 +10,18 @@
     let running = true;
 
     onMount(async () => {
-        while(running){
+        while (running) {
             value = value + increment;
-            if(value >= 100) value = 0;
+            if (value >= 100) value = 0;
             await utils.sleep(500);
         }
-    })
+    });
 
-    onDestroy(() => { running = false; })
+    onDestroy(() => {
+        running = false;
+    });
 </script>
 
-<div style="{style}">
+<div {style}>
     <ProgressBar {value} style="width:100%;height:100%;"></ProgressBar>
 </div>

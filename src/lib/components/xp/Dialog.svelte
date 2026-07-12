@@ -1,23 +1,22 @@
 <svelte:options accessors={true} />
 
-<script>
+<script lang="ts">
     import { unmount } from 'svelte';
-    import * as utils from '../../utils';
+    import { required } from '../../types';
+    import type { DialogButton, MountedComponent } from '../../types';
 
-    import _, { find, isEqual } from 'lodash';
     import TitleBar from './TitleBar.svelte';
     import Button from './Button.svelte';
 
-    /** @type {() => unknown} */
-    export let get_self = () => null;
+    export let get_self: () => MountedComponent | null = () => null;
     export let title = '';
     export let message = '';
     export let icon = '';
-    export let buttons = [];
+    export let buttons: DialogButton[] = [];
     export let button_align = 'right'; //center, right
 
     export function destroy() {
-        unmount(get_self());
+        void unmount(required(get_self(), 'dialog instance'));
     }
 </script>
 
@@ -25,9 +24,11 @@
     class="dialog absolute inset-0 bg-slate-50/10 rounded-t-lg"
     style:z-index="100000"
     on:click|self={(e) => {
-        e.target.querySelector('div').classList.add('animate-blink');
+        const target = e.target;
+        if (!(target instanceof HTMLElement)) return;
+        target.querySelector('div')?.classList.add('animate-blink');
         setTimeout(() => {
-            e.target.querySelector('div').classList.remove('animate-blink');
+            target.querySelector('div')?.classList.remove('animate-blink');
         }, 400);
     }}
 >

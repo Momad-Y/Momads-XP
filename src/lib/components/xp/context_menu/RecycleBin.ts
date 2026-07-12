@@ -80,9 +80,9 @@ interface ConfirmDeleteOptions {
     no_action: () => void;
 }
 
-interface DialogHandle {
+type DialogHandle = {
     destroy: () => void;
-}
+};
 
 async function confirm_delete({
     node_ref,

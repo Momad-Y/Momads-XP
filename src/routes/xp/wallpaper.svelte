@@ -1,45 +1,56 @@
-<script>
-    import { contextMenu, wallpaper, hardDrive } from '../../lib/store';
+<script lang="ts">
+    import { wallpaper, hardDrive } from '../../lib/store';
     import { get as store_get } from 'svelte/store';
-    import { bliss_wallpaper, wallpapers_folder } from '../../lib/system';
-    import * as utils from '../../lib/utils';
-    import {get, set} from 'idb-keyval';
-    import {onMount} from 'svelte';
+    import { get } from 'idb-keyval';
+    import { required } from '../../lib/types';
 
+    let cached_url: string | null = '';
 
-    let cached_url = '';
+    async function get_wallpaper_url(w: string | null) {
+        let fs_item = required(
+            w == null
+                ? undefined
+                : required(store_get(hardDrive), 'hard drive')[w], // read without subscribing — avoids re-render on hardDrive changes
+            'wallpaper item ' + String(w),
+        );
+        console.log(fs_item);
+        let url: string | null = null;
 
-    async function get_wallpaper_url(w){
-        let fs_item = store_get(hardDrive)[w]; // read without subscribing — avoids re-render on hardDrive changes
-        console.log(fs_item)
-        let url = null;
-
-        if(fs_item.storage_type == 'remote'){
-            url = fs_item.url;
-        } else if (fs_item.storage_type == 'local'){
-            let file = await get(fs_item.url);
-            url = URL.createObjectURL(file);
+        if (fs_item.storage_type == 'remote') {
+            url = fs_item.url ?? null;
+        } else if (fs_item.storage_type == 'local') {
+            let file = await get<Blob>(
+                required(fs_item.url, 'wallpaper idb key'),
+            );
+            url = URL.createObjectURL(required(file, 'wallpaper blob'));
         }
-        
+
         await load_image_url(url);
         cached_url = url;
         return url;
     }
 
-    function load_image_url(url){
-        return new Promise(resolve => {
+    function load_image_url(url: string | null) {
+        return new Promise<void>((resolve) => {
             let image = new Image();
-            image.src = url;
-            image.onload = () => resolve();
-        })
+            if (url != null) {
+                image.src = url;
+            }
+            image.onload = () => {
+                resolve();
+            };
+        });
     }
-    
 </script>
 
 {#await get_wallpaper_url($wallpaper)}
-    <div class="absolute inset-0 bg-cover bg-black" style:background-image="url({cached_url})">
-    </div>
-{:then url} 
-    <div class="absolute inset-0 bg-cover" style:background-image="url({url})">
-    </div>
+    <div
+        class="absolute inset-0 bg-cover bg-black"
+        style:background-image="url({cached_url})"
+    ></div>
+{:then url}
+    <div
+        class="absolute inset-0 bg-cover"
+        style:background-image="url({url})"
+    ></div>
 {/await}

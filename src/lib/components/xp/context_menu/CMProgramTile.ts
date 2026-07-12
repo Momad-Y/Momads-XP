@@ -1,4 +1,5 @@
 import type { ContextMenuSpec, ProgramInstance } from '../../../types';
+import { required } from '../../../types';
 
 export const make = ({
     originator,
@@ -7,6 +8,7 @@ export const make = ({
     originator: ProgramInstance;
 }): ContextMenuSpec => {
     //originator: program
+    const win = required(originator.window, 'program window');
     return {
         required_width: 180 + 20,
         required_height: 27 * 4 + 20,
@@ -15,9 +17,9 @@ export const make = ({
                 {
                     name: 'Minimize',
                     action: () => {
-                        originator.window.on_click_minimize();
+                        win.on_click_minimize();
                     },
-                    disabled: originator.window.minimized,
+                    disabled: win.minimized,
                     icon: '/images/xp/icons/tile_minimize.png',
                     icon_size: 10,
                     icon_type: 'monotone',
@@ -25,11 +27,9 @@ export const make = ({
                 {
                     name: 'Restore',
                     action: () => {
-                        originator.window.restore();
+                        win.restore();
                     },
-                    disabled:
-                        !originator.window.maximized &&
-                        !originator.window.minimized,
+                    disabled: !win.maximized && !win.minimized,
                     icon: '/images/xp/icons/tile_restore.png',
                     icon_size: 10,
                     icon_type: 'monotone',
@@ -37,11 +37,9 @@ export const make = ({
                 {
                     name: 'Maximize',
                     action: () => {
-                        originator.window.on_click_maximize();
+                        win.on_click_maximize();
                     },
-                    disabled:
-                        originator.window.maximized ||
-                        !originator.window.options.resizable,
+                    disabled: win.maximized || !win.options.resizable,
                     icon: '/images/xp/icons/tile_maximize.png',
                     icon_size: 10,
                     icon_type: 'monotone',
@@ -50,7 +48,7 @@ export const make = ({
                     name: 'Close',
                     font: 'bold',
                     action: () => {
-                        originator.window.on_click_close();
+                        win.on_click_close();
                     },
                     icon: '/images/xp/icons/tile_close.png',
                     icon_size: 10,

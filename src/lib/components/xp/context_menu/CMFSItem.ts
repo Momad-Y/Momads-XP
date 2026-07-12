@@ -266,7 +266,7 @@ export const make = ({
                                   void confirm_delete({
                                       node_ref:
                                           originator.my_computer_instance
-                                              ?.window.node_ref ||
+                                              ?.window?.node_ref ||
                                           document.body,
                                       title: 'Confirm Delete File',
                                       icon,
@@ -326,9 +326,9 @@ interface ConfirmDeleteOptions {
     no_action: () => void;
 }
 
-interface DialogHandle {
+type DialogHandle = {
     destroy: () => void;
-}
+};
 
 async function confirm_delete({
     node_ref,
