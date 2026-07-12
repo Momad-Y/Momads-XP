@@ -38,8 +38,14 @@
         free_space: number;
     }
 
-    const disk = required(fs_item, 'disk properties fs item');
-    let details: DiskDetails = {
+    // widened back from the `undefined` initializer: eslint's TS service
+    // narrows `export let` props to their default in top-level flow (Svelte
+    // injects the real prop value before this code runs)
+    const disk = required(
+        fs_item as VfsItem | undefined,
+        'disk properties fs item',
+    );
+    const details: DiskDetails = {
         type: disk.type == 'drive' ? 'Local Disk' : 'Removable Storage',
         format: 'FAT32',
         used_space: size_cal(disk.id),
@@ -85,11 +91,11 @@
                 .map((el) => el.size),
         );
 
-        let folders = drive_item(item_id).children.filter(
+        const folders = drive_item(item_id).children.filter(
             (el) => drive_item(el).type == 'folder',
         );
 
-        for (let folder of folders) {
+        for (const folder of folders) {
             total_size += size_cal(folder);
         }
         return total_size;
@@ -98,13 +104,13 @@
     function draw_chart() {
         google.charts.load('current', { packages: ['corechart'] });
         google.charts.setOnLoadCallback(() => {
-            var data = google.visualization.arrayToDataTable([
+            const data = google.visualization.arrayToDataTable([
                 ['space', 'size'],
                 ['Used space', details.used_space],
                 ['Free space', details.free_space],
             ]);
 
-            var options = {
+            const options = {
                 is3D: true,
                 enableInteractivity: false,
                 backgroundColor: 'transparent',
@@ -115,7 +121,7 @@
                 legend: { position: 'none' },
             };
 
-            var chart = new google.visualization.PieChart(
+            const chart = new google.visualization.PieChart(
                 document.querySelector(`.window[program-id="${id}"] .chart`),
             );
             chart.draw(data, options);

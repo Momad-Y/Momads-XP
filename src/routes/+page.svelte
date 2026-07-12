@@ -1,6 +1,7 @@
 <script lang="ts">
     import { onMount } from 'svelte';
     import type { LoadPageEvent } from '../lib/types';
+    /* eslint-disable @typescript-eslint/no-duplicate-type-constituents -- eslint's TS service resolves .svelte imports as `any`, so the union members look identical to it; svelte-check types them precisely */
     import type Starting from './xp/starting.svelte';
     import type Desktop from './xp/desktop.svelte';
     import type Shutdown from './xp/shutdown.svelte';
@@ -8,6 +9,7 @@
 
     type PageComponent =
         typeof Starting | typeof Desktop | typeof Shutdown | typeof Blackout;
+    /* eslint-enable @typescript-eslint/no-duplicate-type-constituents */
 
     let page: PageComponent | undefined = undefined;
 
@@ -37,6 +39,7 @@
 
 <svelte:component
     this={page}
-    on:load_page={(e: CustomEvent<LoadPageEvent>) =>
-        void load_page(e.detail.url)}
+    on:load_page={(e: CustomEvent<LoadPageEvent>) => {
+        void load_page(e.detail.url);
+    }}
 ></svelte:component>

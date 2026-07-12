@@ -12,7 +12,11 @@
 
     export let selected_items: string[] = [];
 
-    export let viewer: Viewer2 | undefined = undefined;
+    /** Viewer2 instance (typed structurally so eslint's TS service, which
+     * resolves .svelte imports as `any`, still type-checks the calls). */
+    export let viewer:
+        { open: (id: string | null | undefined) => void } | undefined =
+        undefined;
     export let filetypes: string[] = [];
     export let filetypes_desc = 'All Files';
     export let multiple = true;
@@ -23,7 +27,7 @@
         icon: string;
     }
 
-    let left_side_places: SidePlace[] = [
+    const left_side_places: SidePlace[] = [
         {
             id: desktop_folder,
             name: 'Desktop',
@@ -86,10 +90,13 @@
                 <div
                     class="bg-xp-yellow-light shadow rounded w-full overflow-y-auto"
                 >
+                    <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
                     {#each left_side_places as place}
                         <div
                             class="w-full flex flex-col items-center py-2 px-1 hover:bg-slate-100 rounded"
-                            on:click={() => viewer?.open(place.id)}
+                            on:click={() => {
+                                viewer?.open(place.id);
+                            }}
                         >
                             <div
                                 class="w-10 h-10 bg-contain bg-no-repeat bg-center"
@@ -110,7 +117,7 @@
                     {filetypes_desc}
                     filetypes={filetypes.map((el) => el.toLowerCase())}
                     {multiple}
-                    on_open={(items) => {
+                    on_open={(items: string[]) => {
                         selected_items = items;
                         on_open(items);
                     }}

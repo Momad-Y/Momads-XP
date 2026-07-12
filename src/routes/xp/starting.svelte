@@ -11,7 +11,8 @@
         LoadPageEvent,
         VfsItem,
     } from '../../lib/types';
-    let dispatcher = createEventDispatcher<{ load_page: LoadPageEvent }>();
+    // eslint-disable-next-line @typescript-eslint/no-deprecated -- legacy component-event dispatcher kept as-is; migrating to callback props is a behavior change outside the type-only conversion
+    const dispatcher = createEventDispatcher<{ load_page: LoadPageEvent }>();
 
     /**
      * The persisted hard drive as it may exist in IndexedDB from older
@@ -25,7 +26,7 @@
 
     let assets_loaded = false;
 
-    let images = [
+    const images = [
         '/images/ms.png',
         '/images/radio_check.png',
         '/images/xp_loading_logo.jpg',
@@ -177,16 +178,16 @@
         '/images/xp/icons/tile_restore.png',
     ];
 
-    let audios = ['/audio/xp_shutdown.mp3', '/audio/xp_startup.mp3'];
+    const audios = ['/audio/xp_shutdown.mp3', '/audio/xp_startup.mp3'];
 
-    let fonts = [
+    const fonts = [
         '/fonts/levi.ttf',
         '/fonts/ms_sans_serif.ttf',
         '/fonts/ms_sans_serif_bold.ttf',
         '/fonts/trebuchet.ttf',
     ];
 
-    let empties = ['/empty/empty.png', '/empty/empty.txt'];
+    const empties = ['/empty/empty.png', '/empty/empty.txt'];
 
     onMount(async () => {
         await load_hard_drive();
@@ -237,9 +238,10 @@
     }
 
     function migrate_files_format(drive: StoredHardDrive) {
-        let now = new Date().getTime();
-        for (let key of Object.keys(drive)) {
-            let obj = required(drive[key], 'fs item ' + key);
+        const now = new Date().getTime();
+        for (const key of Object.keys(drive)) {
+            const obj = required(drive[key], 'fs item ' + key);
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- persisted pre-migration data may genuinely miss this field despite the type
             if (obj.children == null) {
                 obj.children = [
                     ...required(obj.files, 'legacy files of ' + key),
@@ -248,15 +250,19 @@
                 delete obj.files;
                 delete obj.folders;
             }
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- persisted pre-migration data may genuinely miss this field despite the type
             if (obj.date_created == null) {
                 obj.date_created = now;
             }
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- persisted pre-migration data may genuinely miss this field despite the type
             if (obj.date_modified == null) {
                 obj.date_modified = now;
             }
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- persisted pre-migration data may genuinely miss this field despite the type
             if (obj.sort_option == null) {
                 obj.sort_option = SortOptions.NONE;
             }
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- persisted pre-migration data may genuinely miss this field despite the type
             if (obj.sort_order == null) {
                 obj.sort_order = SortOrders.ASCENDING;
             }
@@ -272,13 +278,13 @@
     }
 
     function preload_iframes() {
-        let urls = ['/html/jspaint/index.html'];
-        let parent = required(
+        const urls = ['/html/jspaint/index.html'];
+        const parent = required(
             document.querySelector('#iframe-preload'),
             'iframe preload element',
         );
-        for (let url of urls) {
-            let iframe = document.createElement('iframe');
+        for (const url of urls) {
+            const iframe = document.createElement('iframe');
             iframe.style.position = 'absolute';
             iframe.style.inset = '0';
             iframe.src = url;
@@ -326,7 +332,7 @@
             },
             { x: -1000, y: -1000, type: 'RecycleBin', originator: null },
         ];
-        for (let request of requests) {
+        for (const request of requests) {
             contextMenu.set(request);
         }
         contextMenu.set(null);

@@ -9,7 +9,7 @@
     import { icons, hidden_items, previewable_exts } from '../../system';
     import { required } from '../../types';
     import type { SaveAsFiletype, SaveAsSelection, VfsItem } from '../../types';
-    const { click_outside, double_tap } = utils;
+    const { double_tap } = utils;
     import Button from './Button.svelte';
     import SelectBox from './SelectBox.svelte';
     import Previewable from './Previewable.svelte';
@@ -28,14 +28,16 @@
                   .filter((el) => el != null)
                   .filter((el) => !hidden_items.includes(el.id));
 
-    let computer = my_computer.map((el) =>
+    const computer = my_computer.map((el) =>
         required($hardDrive?.[el], `fs item ${el}`),
     );
 
     export let selected_filetype: SaveAsFiletype | undefined = undefined;
     export let filetypes: SaveAsFiletype[] = [];
     export let filename = '';
-    export let select_box: SelectBox | undefined = undefined;
+    /** SelectBox instance (typed structurally so eslint's TS service, which
+     * resolves .svelte imports as `any`, still type-checks the reads). */
+    export let select_box: { selected_index: number } | undefined = undefined;
 
     function is_desired(item: VfsItem) {
         void item;
@@ -47,7 +49,7 @@
         const now = Date.now();
         if (now - _last_open < 400) return;
         _last_open = now;
-        let fs_item = item_id == null ? null : $hardDrive?.[item_id];
+        const fs_item = item_id == null ? null : $hardDrive?.[item_id];
         if (fs_item?.type == 'file') {
             // files are not selectable in the save dialog
         } else {
@@ -69,7 +71,7 @@
 
     function up() {
         const current_id = required(history[page_index], 'current folder id');
-        let parent_id = required(
+        const parent_id = required(
             $hardDrive?.[current_id],
             `fs item ${current_id}`,
         ).parent;
@@ -82,7 +84,7 @@
             return `url(${item.icon})`;
         }
         if (icons[item.ext] != null) {
-            return `url(/images/xp/icons/${icons[item.ext]})`;
+            return `url(/images/xp/icons/${icons[item.ext] ?? ''})`;
         }
         return null;
     }
@@ -128,7 +130,9 @@
             <input
                 class="absolute inset-0 w-[300px] pl-7 border border-blue-300 outline-none"
                 type="text"
-                on:click={(e) => e.currentTarget.select()}
+                on:click={(e) => {
+                    e.currentTarget.select();
+                }}
                 on:keyup={on_user_input}
                 value={url}
             />
@@ -172,9 +176,13 @@
                 fs-id={item.id}
                 class="w-[100px] overflow-hidden m-2 inline-flex flex-row items-center font-MSSS relative
                 {is_desired(item) ? '' : 'opacity-50'}"
-                on:dblclick={() => open(item.id)}
+                on:dblclick={() => {
+                    open(item.id);
+                }}
                 use:double_tap
-                on:double_tap={() => open(item.id)}
+                on:double_tap={() => {
+                    open(item.id);
+                }}
             >
                 {#if previewable_exts.includes(item.ext)}
                     <Previewable
@@ -210,12 +218,17 @@
         <div
             class="mb-4 w-[300px] h-[2px] bg-gradient-to-r from-blue-500 to-slate-50"
         ></div>
+        <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
         {#each computer.filter((el) => el.type == 'folder') as item}
             <div
                 class="w-[150px] ml-4 mr-8 overflow-hidden inline-flex flex-row items-center font-MSSS"
-                on:dblclick={() => open(item.id)}
+                on:dblclick={() => {
+                    open(item.id);
+                }}
                 use:double_tap
-                on:double_tap={() => open(item.id)}
+                on:double_tap={() => {
+                    open(item.id);
+                }}
             >
                 <div
                     class="w-[40px] h-[40px] shrink-0 bg-[url(/images/xp/icons/FolderClosed.png)] bg-contain bg-no-repeat bg-center"
@@ -237,12 +250,17 @@
         <div
             class="mb-4 w-[300px] h-[2px] bg-gradient-to-r from-blue-500 to-slate-50"
         ></div>
+        <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
         {#each computer.filter((el) => el.type == 'drive') as item}
             <div
                 class="w-[150px] ml-4 mr-8 overflow-hidden inline-flex flex-row items-center font-MSSS"
-                on:dblclick={() => open(item.id)}
+                on:dblclick={() => {
+                    open(item.id);
+                }}
                 use:double_tap
-                on:double_tap={() => open(item.id)}
+                on:double_tap={() => {
+                    open(item.id);
+                }}
             >
                 <div
                     class="w-[50px] h-[50px] shrink-0 bg-[url(/images/xp/icons/LocalDisk.png)] bg-contain bg-no-repeat bg-center"
@@ -261,12 +279,17 @@
         <div
             class="mb-4 w-[300px] h-[2px] bg-gradient-to-r from-blue-500 to-slate-50"
         ></div>
+        <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
         {#each computer.filter((el) => el.type == 'removable_storage') as item}
             <div
                 class="w-[150px] ml-4 mr-8 overflow-hidden inline-flex flex-row items-center font-MSSS"
-                on:dblclick={() => open(item.id)}
+                on:dblclick={() => {
+                    open(item.id);
+                }}
                 use:double_tap
-                on:double_tap={() => open(item.id)}
+                on:double_tap={() => {
+                    open(item.id);
+                }}
             >
                 <div
                     class="w-[50px] h-[50px] shrink-0 bg-[url(/images/xp/icons/RemovableMedia.png)] bg-contain bg-no-repeat bg-center"
@@ -310,12 +333,13 @@
             <div class="w-[100px] shrink-0 flex flex-row justify-end">
                 <Button
                     title="Save"
-                    on_click={() =>
+                    on_click={() => {
                         on_save({
                             parent_id: required(id, 'save folder id'),
                             filename,
                             selected_filetype: chosen_filetype(),
-                        })}
+                        });
+                    }}
                     disabled={filename.length == 0 || id == null}
                 ></Button>
             </div>

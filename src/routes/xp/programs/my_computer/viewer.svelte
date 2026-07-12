@@ -32,7 +32,8 @@
         MyComputerInstance,
         VfsItem,
     } from '../../../../lib/types';
-    let dispatch = createEventDispatcher<{ open: { id: string | null } }>();
+    // eslint-disable-next-line @typescript-eslint/no-deprecated -- legacy component-event dispatcher kept as-is; migrating to callback props is a behavior change outside the type-only conversion
+    const dispatch = createEventDispatcher<{ open: { id: string | null } }>();
     import Previewable from '../../../../lib/components/xp/Previewable.svelte';
     import hash_sum from 'hash-sum';
 
@@ -69,7 +70,7 @@
     $: if (id !== undefined) {
         $selectingItems = [];
     }
-    let worker = new Worker(new URL('./sort.js', import.meta.url), {
+    const worker = new Worker(new URL('./sort.js', import.meta.url), {
         type: 'module',
     });
     worker.onmessage = ({ data }: MessageEvent<SortMessage>) => {
@@ -82,26 +83,28 @@
     let last_sort_tx_hash: string | null | undefined;
     $: {
         if (current_folder) {
-            let hash_object = {
+            const hash_object = {
                 id,
                 items,
                 sort_option: current_folder.sort_option,
                 sort_order: current_folder.sort_order,
             };
 
-            let hash = hash_sum(hash_object);
+            const hash = hash_sum(hash_object);
             console.log({ hash });
             if (hash != last_sort_tx_hash) {
+                // eslint-disable-next-line no-useless-assignment -- read on the next run of this reactive block
                 last_sort_tx_hash = hash;
                 worker.postMessage({ type: 'sort', hash, ...hash_object });
             }
         } else {
+            // eslint-disable-next-line no-useless-assignment -- read on the next run of this reactive block
             last_sort_tx_hash = null;
         }
     }
 
     $: is_focus = $zIndex == my_computer_instance.window?.z_index;
-    let computer = my_computer.map((el) =>
+    const computer = my_computer.map((el) =>
         required($hardDrive?.[el], 'fs item ' + el),
     );
 
@@ -135,19 +138,19 @@
 
     function on_mousemove(e: MouseEvent) {
         if (!_drag_start) return;
-        let dx = e.clientX - _drag_start.x,
+        const dx = e.clientX - _drag_start.x,
             dy = e.clientY - _drag_start.y;
         if (!_drag_moved && dx * dx + dy * dy < 25) return;
         _drag_moved = true;
         rb_visible = true;
-        let cr = node_ref.getBoundingClientRect();
-        let [sx, sy, cx, cy] = [
+        const cr = node_ref.getBoundingClientRect();
+        const [sx, sy, cx, cy] = [
             _drag_start.x,
             _drag_start.y,
             e.clientX,
             e.clientY,
         ];
-        let rbc = {
+        const rbc = {
             left: Math.min(sx, cx),
             right: Math.max(sx, cx),
             top: Math.min(sy, cy),
@@ -157,16 +160,16 @@
         rb_top = rbc.top - cr.top + node_ref.scrollTop;
         rb_width = rbc.right - rbc.left;
         rb_height = rbc.bottom - rbc.top;
-        let sel: string[] = [];
-        for (let el of node_ref.querySelectorAll('.fs-item')) {
-            let r = el.getBoundingClientRect();
+        const sel: string[] = [];
+        for (const el of node_ref.querySelectorAll('.fs-item')) {
+            const r = el.getBoundingClientRect();
             if (
                 r.left < rbc.right &&
                 r.right > rbc.left &&
                 r.top < rbc.bottom &&
                 r.bottom > rbc.top
             ) {
-                let fid = el.getAttribute('fs-id');
+                const fid = el.getAttribute('fs-id');
                 if (fid != null && $hardDrive?.[fid] != null) sel.push(fid);
             }
         }
@@ -180,7 +183,7 @@
     }
 
     function on_rightclick(ev: MenuTrigger, item: VfsItem) {
-        let selected = $selectingItems.includes(item.id);
+        const selected = $selectingItems.includes(item.id);
         if (!selected) {
             if (ev.metaKey || ev.ctrlKey) {
                 $selectingItems = [...$selectingItems, item.id];
@@ -229,7 +232,7 @@
         if (now - _last_open < 400) return;
         _last_open = now;
         clear_selection();
-        let fs_item = required($hardDrive?.[item_id], 'fs item ' + item_id);
+        const fs_item = required($hardDrive?.[item_id], 'fs item ' + item_id);
         if (fs_item.parent == recycle_bin_id) return;
 
         const handlers = doctypes[fs_item.ext];
@@ -262,11 +265,11 @@
     function rename() {
         renaming = true;
         void tick().then(() => {
-            let item_id = required($selectingItems[0], 'renaming selection');
-            let el = document.querySelector<HTMLTextAreaElement>(
+            const item_id = required($selectingItems[0], 'renaming selection');
+            const el = document.querySelector<HTMLTextAreaElement>(
                 `div[fs-id="${item_id}"] textarea`,
             );
-            let end_range = required(
+            const end_range = required(
                 $hardDrive?.[item_id],
                 'fs item ' + item_id,
             ).basename.length;
@@ -277,10 +280,10 @@
     function end_renaming(e: Event, item: VfsItem) {
         const target = e.target;
         if (!(target instanceof HTMLTextAreaElement)) return;
-        let name = utils.sanitize_filename(target.value);
+        const name = utils.sanitize_filename(target.value);
 
-        let ext = utils.extname(name);
-        let seedname = utils.basename(name, ext);
+        const ext = utils.extname(name);
+        const seedname = utils.basename(name, ext);
         let basename = seedname;
 
         item.ext = ext.toLowerCase();
@@ -291,7 +294,7 @@
         }
 
         const parent_id = required(item.parent, 'parent of ' + item.id);
-        let parent_items_names = [
+        const parent_items_names = [
             ...required($hardDrive?.[parent_id], 'fs item ' + parent_id)
                 .children.filter((el) => el != item.id)
                 .map((el) => required($hardDrive?.[el], 'fs item ' + el).name),
@@ -336,7 +339,7 @@
         e.preventDefault();
         if (id == null) return;
 
-        let copying_obj = await parse_dir({ dataTransfer: e.dataTransfer });
+        const copying_obj = await parse_dir({ dataTransfer: e.dataTransfer });
         queueProgram.set({
             path: './programs/copier.svelte',
             copying_obj,
@@ -353,13 +356,13 @@
             return `url(${item.icon})`;
         }
         if (icons[item.ext] != null) {
-            return `url(/images/xp/icons/${icons[item.ext]})`;
+            return `url(/images/xp/icons/${icons[item.ext] ?? ''})`;
         }
         return null;
     }
 
     async function show_guide() {
-        let read_transfer_guide = await get<boolean>(
+        const read_transfer_guide = await get<boolean>(
             'my_computer::read_transfer_guide',
         );
 
@@ -419,7 +422,7 @@
             if (!_drag_moved) clear_selection();
         }}
         use:long_press
-        on:long_press|self={(e) => {
+        on:long_press|self={(e: CustomEvent<{ x: number; y: number }>) => {
             if (!_item_long_pressed)
                 show_void_menu({ x: e.detail.x, y: e.detail.y });
         }}
@@ -432,11 +435,15 @@
                     {$clipboard.includes(item.id) && $clipboard_op == 'cut'
                         ? 'opacity-70'
                         : ''}"
-                    on:dblclick={() => open(item.id)}
-                    on:contextmenu={(e) => on_rightclick(e, item)}
+                    on:dblclick={() => {
+                        open(item.id);
+                    }}
+                    on:contextmenu={(e) => {
+                        on_rightclick(e, item);
+                    }}
                     on:click={(e) => {
                         if (_drag_moved) return;
-                        let fs_id = e.currentTarget.getAttribute('fs-id');
+                        const fs_id = e.currentTarget.getAttribute('fs-id');
                         if (fs_id == null) return;
                         if (e.ctrlKey || e.metaKey) {
                             $selectingItems = $selectingItems.includes(fs_id)
@@ -447,9 +454,13 @@
                         }
                     }}
                     use:double_tap
-                    on:double_tap={() => open(item.id)}
+                    on:double_tap={() => {
+                        open(item.id);
+                    }}
                     use:long_press
-                    on:long_press={(e) => {
+                    on:long_press={(
+                        e: CustomEvent<{ x: number; y: number }>,
+                    ) => {
                         _item_long_pressed = true;
                         setTimeout(() => (_item_long_pressed = false), 100);
                         on_rightclick({ x: e.detail.x, y: e.detail.y }, item);
@@ -471,7 +482,7 @@
                     {/if}
                     <p
                         class="px-1 mx-0.5 text-[11px] break-words line-clamp-2 text-ellipsis leading-tight
-                        {$selectingItems?.includes(item.id) && is_focus
+                        {$selectingItems.includes(item.id) && is_focus
                             ? 'bg-blue-600 text-slate-50'
                             : ''}"
                     >
@@ -480,9 +491,12 @@
                     {#if $selectingItems.includes(item.id) && renaming}
                         <textarea
                             autofocus
-                            on:keydown={(e) =>
-                                e.key == 'Enter' && end_renaming(e, item)}
-                            on:blur={(e) => end_renaming(e, item)}
+                            on:keydown={(e) => {
+                                if (e.key == 'Enter') end_renaming(e, item);
+                            }}
+                            on:blur={(e) => {
+                                end_renaming(e, item);
+                            }}
                             class="absolute max-h-[40px] right-0 top-2 left-[50px] overflow-hidden
                             outline-none border border-slate-900 text-[11px] font-MSSS z-50 resize-none"
                             >{item.name}</textarea
@@ -504,15 +518,22 @@
         <div
             class="mb-4 w-[300px] h-[2px] bg-gradient-to-r from-blue-500 to-slate-50"
         ></div>
+        <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
         {#each computer.filter((el) => el.type == 'folder') as item}
             <div
                 class="w-[150px] ml-4 mr-8 overflow-hidden inline-flex flex-row items-center font-MSSS"
-                on:dblclick={() => open(item.id)}
-                on:contextmenu={(e) => on_rightclick(e, item)}
+                on:dblclick={() => {
+                    open(item.id);
+                }}
+                on:contextmenu={(e) => {
+                    on_rightclick(e, item);
+                }}
                 use:double_tap
-                on:double_tap={() => open(item.id)}
+                on:double_tap={() => {
+                    open(item.id);
+                }}
                 use:long_press
-                on:long_press={(e) => {
+                on:long_press={(e: CustomEvent<{ x: number; y: number }>) => {
                     _item_long_pressed = true;
                     setTimeout(() => (_item_long_pressed = false), 100);
                     on_rightclick({ x: e.detail.x, y: e.detail.y }, item);
@@ -538,15 +559,22 @@
         <div
             class="mb-4 w-[300px] h-[2px] bg-gradient-to-r from-blue-500 to-slate-50"
         ></div>
+        <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
         {#each computer.filter((el) => el.type == 'drive') as item}
             <div
                 class="w-[150px] ml-4 mr-8 overflow-hidden inline-flex flex-row items-center font-MSSS"
-                on:dblclick={() => open(item.id)}
-                on:contextmenu={(e) => on_rightclick(e, item)}
+                on:dblclick={() => {
+                    open(item.id);
+                }}
+                on:contextmenu={(e) => {
+                    on_rightclick(e, item);
+                }}
                 use:double_tap
-                on:double_tap={() => open(item.id)}
+                on:double_tap={() => {
+                    open(item.id);
+                }}
                 use:long_press
-                on:long_press={(e) => {
+                on:long_press={(e: CustomEvent<{ x: number; y: number }>) => {
                     _item_long_pressed = true;
                     setTimeout(() => (_item_long_pressed = false), 100);
                     on_rightclick({ x: e.detail.x, y: e.detail.y }, item);
@@ -569,15 +597,22 @@
         <div
             class="mb-4 w-[300px] h-[2px] bg-gradient-to-r from-blue-500 to-slate-50"
         ></div>
+        <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
         {#each computer.filter((el) => el.type == 'removable_storage') as item}
             <div
                 class="w-[150px] ml-4 mr-8 overflow-hidden inline-flex flex-row items-center font-MSSS"
-                on:dblclick={() => open(item.id)}
-                on:contextmenu={(e) => on_rightclick(e, item)}
+                on:dblclick={() => {
+                    open(item.id);
+                }}
+                on:contextmenu={(e) => {
+                    on_rightclick(e, item);
+                }}
                 use:double_tap
-                on:double_tap={() => open(item.id)}
+                on:double_tap={() => {
+                    open(item.id);
+                }}
                 use:long_press
-                on:long_press={(e) => {
+                on:long_press={(e: CustomEvent<{ x: number; y: number }>) => {
                     _item_long_pressed = true;
                     setTimeout(() => (_item_long_pressed = false), 100);
                     on_rightclick({ x: e.detail.x, y: e.detail.y }, item);

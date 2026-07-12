@@ -10,7 +10,7 @@
             : 'url(/images/xp/icons/RecycleBinempty.png)';
 
     function on_dbclick() {
-        let fs_item = $hardDrive?.[recycle_bin_id];
+        const fs_item = $hardDrive?.[recycle_bin_id];
         queueProgram.set({
             path: './programs/my_computer.svelte',
             fs_item: fs_item,

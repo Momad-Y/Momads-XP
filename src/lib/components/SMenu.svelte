@@ -8,6 +8,7 @@
 <div
     class="absolute left-[90%] bottom-0 w-[250px] shadow-xl border-t border-l-4 border-blue-500 hidden group-sub1-hover:block bg-slate-50"
 >
+    <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
     {#each items as item}
         {#if item == null}
             <div

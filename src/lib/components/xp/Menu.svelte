@@ -45,6 +45,7 @@
     use:click_outside
     on:click_outside={() => (active = false)}
 >
+    <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
     {#each menu as menu_group}
         <div
             class="text-[11px] text-slate-900 hover:bg-blue-600 hover:text-slate-50 relative group"
@@ -58,6 +59,7 @@
                         ? 'group-hover:block'
                         : 'inactive-class'} border border-slate-200 bg-slate-50 left-0 top-[25px]"
                 >
+                    <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
                     {#each menu_group.items as item_group, group_index}
                         <div
                             class="w-full border-slate-200 {group_index ==
@@ -65,6 +67,7 @@
                                 ? ''
                                 : 'border-b'}"
                         >
+                            <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
                             {#each item_group as item}
                                 <div
                                     class="py-1 w-full flex flex-row items-center {item.disabled

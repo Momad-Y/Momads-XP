@@ -11,8 +11,8 @@
 
     export let get_self: () => MountedComponent | null = () => null;
     export let position: { bottom: number; left: number };
-    let height = 180;
-    let width = 80;
+    const height = 180;
+    const width = 80;
 
     function destroy() {
         void unmount(required(get_self(), 'volume adjust instance'));

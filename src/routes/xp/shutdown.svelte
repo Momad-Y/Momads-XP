@@ -7,14 +7,15 @@
     import { set } from 'idb-keyval';
     import { required } from '../../lib/types';
     import type { LoadPageEvent, MountedComponent } from '../../lib/types';
-    let dispatcher = createEventDispatcher<{ load_page: LoadPageEvent }>();
+    // eslint-disable-next-line @typescript-eslint/no-deprecated -- legacy component-event dispatcher kept as-is; migrating to callback props is a behavior change outside the type-only conversion
+    const dispatcher = createEventDispatcher<{ load_page: LoadPageEvent }>();
 
     export let self: MountedComponent | undefined = undefined;
 
     onMount(async () => {
         await set('hard_drive', $hardDrive);
 
-        let shutdown_audio = new Audio('/audio/xp_shutdown.mp3');
+        const shutdown_audio = new Audio('/audio/xp_shutdown.mp3');
         shutdown_audio.addEventListener('canplaythrough', () => {
             void shutdown_audio.play();
         });

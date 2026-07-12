@@ -32,8 +32,8 @@
     export let fs_item: VfsItem | undefined = undefined;
     export let exec_path: string;
 
-    let supported_audio_types = ['.mp3', '.wav', '.ogg'];
-    let supported_video_types = ['.mp4', '.wmv', '.webm', '.ogg'];
+    const supported_audio_types = ['.mp3', '.wav', '.ogg'];
+    const supported_video_types = ['.mp4', '.wmv', '.webm', '.ogg'];
 
     let slider: RangeSlider | undefined;
 
@@ -75,7 +75,7 @@
 
         let url: string | undefined;
         if (item.storage_type == 'local') {
-            let file = await get<Blob>(required(item.url, 'media idb key'));
+            const file = await get<Blob>(required(item.url, 'media idb key'));
             url = URL.createObjectURL(required(file, 'media blob'));
         } else if (item.storage_type == 'remote') {
             url = item.url;
@@ -106,8 +106,8 @@
                 ],
                 filetypes_desc: 'Audio and Video Files',
                 get_self: () => modal,
-                on_open: (items) => {
-                    let item =
+                on_open: (items: string[]) => {
+                    const item =
                         items[0] == null ? undefined : $hardDrive?.[items[0]];
                     void load_media(item);
                     void unmount(modal);
@@ -134,34 +134,6 @@
         id: id,
         exec_path,
     };
-
-    async function on_drop(e: DragEvent) {
-        e.preventDefault();
-        for (let file of required(e.dataTransfer, 'drop data transfer').files) {
-            console.log(file);
-            if (supported_audio_types.includes(utils.extname(file.name))) {
-                file_type = 'audio';
-                await tick();
-                let url = URL.createObjectURL(file);
-                player().src = url;
-                void player().play();
-                break;
-            } else if (
-                supported_video_types.includes(utils.extname(file.name))
-            ) {
-                file_type = 'video';
-                await tick();
-                let url = URL.createObjectURL(file);
-                player().src = url;
-                void player().play();
-                break;
-            }
-        }
-    }
-
-    function on_drop_over(e: DragEvent) {
-        e.preventDefault();
-    }
 
     function play() {
         if (paused == null || paused) {
@@ -230,23 +202,29 @@
     async function find_subtitle(item: VfsItem) {
         try {
             const parent_id = required(item.parent, 'parent of ' + item.id);
-            let vtt = required($hardDrive?.[parent_id], 'fs item ' + parent_id)
+            const vtt = required(
+                $hardDrive?.[parent_id],
+                'fs item ' + parent_id,
+            )
                 .children.map((child_id) =>
                     required($hardDrive?.[child_id], 'fs item ' + child_id),
                 )
                 .find((el) => el.basename == item.basename && el.ext == '.vtt');
 
-            let srt = required($hardDrive?.[parent_id], 'fs item ' + parent_id)
+            const srt = required(
+                $hardDrive?.[parent_id],
+                'fs item ' + parent_id,
+            )
                 .children.map((child_id) =>
                     required($hardDrive?.[child_id], 'fs item ' + child_id),
                 )
                 .find((el) => el.basename == item.basename && el.ext == '.srt');
 
             if (vtt) {
-                let vtt_file = await fs.get_file(vtt.id);
+                const vtt_file = await fs.get_file(vtt.id);
                 return URL.createObjectURL(vtt_file);
             } else if (srt) {
-                let srt_file = await fs.get_file(srt.id);
+                const srt_file = await fs.get_file(srt.id);
                 return await toWebVTT(srt_file);
             } else {
                 return null;
@@ -290,6 +268,7 @@
     function toast(msg: string) {
         clearTimeout(toast_timeout);
 
+        // eslint-disable-next-line svelte/no-dom-manipulating -- imperative toast inherited from the base; the node's content is not otherwise managed by Svelte
         toast_node.innerText = msg;
         toast_node.classList.remove('hidden');
 
@@ -312,6 +291,7 @@
         ></p>
 
         {#if file_type == 'audio'}
+            <!-- eslint-disable svelte/no-reactive-reassign -- inherited one-way volume wiring (`bind:volume` to a computed value); the element never writes the volume back -->
             <audio
                 src=""
                 bind:this={player_node}
@@ -321,9 +301,11 @@
                 bind:paused
                 bind:volume={audio_volume}
             ></audio>
+            <!-- eslint-enable svelte/no-reactive-reassign -->
         {:else if file_type == 'video'}
             <div class="grow overflow-hidden bg-black">
-                <!-- svelte-ignore a11y-media-has-caption -->
+                <!-- svelte-ignore a11y_media_has_caption -->
+                <!-- eslint-disable svelte/no-reactive-reassign -- inherited one-way volume wiring (`bind:volume` to a computed value); the element never writes the volume back -->
                 <video
                     class="w-full h-full"
                     src=""
@@ -336,6 +318,7 @@
                 >
                     <track kind="subtitles" src={subtitle_src} default />
                 </video>
+                <!-- eslint-enable svelte/no-reactive-reassign -->
             </div>
         {/if}
 

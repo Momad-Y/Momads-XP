@@ -27,7 +27,7 @@
                   .filter((el) => el != null)
                   .filter((el) => !hidden_items.includes(el.id));
 
-    let computer = my_computer.map((el) =>
+    const computer = my_computer.map((el) =>
         required($hardDrive?.[el], `fs item ${el}`),
     );
 
@@ -40,7 +40,7 @@
         if (!is_desired(item)) return;
         if (item.type != 'file') return;
 
-        let selected = selectingItems.includes(item.id);
+        const selected = selectingItems.includes(item.id);
         if ((ev.ctrlKey || ev.metaKey) && multiple) {
             console.log('ctrl key pressed');
             if (selected) {
@@ -71,7 +71,7 @@
         if (now - _last_open < 400) return;
         _last_open = now;
         clear_selection();
-        let fs_item = item_id == null ? null : $hardDrive?.[item_id];
+        const fs_item = item_id == null ? null : $hardDrive?.[item_id];
         if (fs_item?.type == 'file' && item_id != null) {
             selectingItems = [item_id];
             on_open([item_id]);
@@ -94,7 +94,7 @@
 
     function up() {
         const current_id = required(history[page_index], 'current folder id');
-        let parent_id = required(
+        const parent_id = required(
             $hardDrive?.[current_id],
             `fs item ${current_id}`,
         ).parent;
@@ -107,7 +107,7 @@
             return `url(${item.icon})`;
         }
         if (icons[item.ext] != null) {
-            return `url(/images/xp/icons/${icons[item.ext]})`;
+            return `url(/images/xp/icons/${icons[item.ext] ?? ''})`;
         }
         return null;
     }
@@ -136,14 +136,18 @@
 <div
     class="absolute inset-0 overflow-auto bg-xp-yellow flex flex-col"
     use:click_outside
-    on:click_outside={() => clear_selection()}
+    on:click_outside={() => {
+        clear_selection();
+    }}
 >
     <div class="h-6 mb-2 flex flex-row items-center text-[11px]">
         <div class="h-full w-[300px] relative">
             <input
                 class="absolute inset-0 w-[300px] pl-7 border border-blue-300 outline-none"
                 type="text"
-                on:click={(e) => e.currentTarget.select()}
+                on:click={(e) => {
+                    e.currentTarget.select();
+                }}
                 on:keyup={on_user_input}
                 value={url}
             />
@@ -188,14 +192,20 @@
                 fs-id={item.id}
                 class="w-[100px] overflow-hidden m-2 inline-flex flex-row items-center font-MSSS relative
                 {is_desired(item) ? '' : 'opacity-50'}"
-                on:dblclick={() => open(item.id)}
-                on:click={(e) => on_click(e, item)}
+                on:dblclick={() => {
+                    open(item.id);
+                }}
+                on:click={(e) => {
+                    on_click(e, item);
+                }}
                 on:touchend={(e) => {
                     e.preventDefault();
                     on_click(e, item);
                 }}
                 use:double_tap
-                on:double_tap={() => open(item.id)}
+                on:double_tap={() => {
+                    open(item.id);
+                }}
             >
                 {#if previewable_exts.includes(item.ext)}
                     <Previewable
@@ -214,7 +224,7 @@
                 {/if}
                 <p
                     class="px-1 text-[11px] break-words line-clamp-2 text-ellipsis leading-tight
-                    {selectingItems?.includes(item.id)
+                    {selectingItems.includes(item.id)
                         ? 'bg-blue-600 text-slate-50'
                         : ''}"
                 >
@@ -234,12 +244,17 @@
         <div
             class="mb-4 w-[300px] h-[2px] bg-gradient-to-r from-blue-500 to-slate-50"
         ></div>
+        <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
         {#each computer.filter((el) => el.type == 'folder') as item}
             <div
                 class="w-[150px] ml-4 mr-8 overflow-hidden inline-flex flex-row items-center font-MSSS"
-                on:dblclick={() => open(item.id)}
+                on:dblclick={() => {
+                    open(item.id);
+                }}
                 use:double_tap
-                on:double_tap={() => open(item.id)}
+                on:double_tap={() => {
+                    open(item.id);
+                }}
             >
                 <div
                     class="w-[40px] h-[40px] shrink-0 bg-[url(/images/xp/icons/FolderClosed.png)] bg-contain bg-no-repeat bg-center"
@@ -261,12 +276,17 @@
         <div
             class="mb-4 w-[300px] h-[2px] bg-gradient-to-r from-blue-500 to-slate-50"
         ></div>
+        <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
         {#each computer.filter((el) => el.type == 'drive') as item}
             <div
                 class="w-[150px] ml-4 mr-8 overflow-hidden inline-flex flex-row items-center font-MSSS"
-                on:dblclick={() => open(item.id)}
+                on:dblclick={() => {
+                    open(item.id);
+                }}
                 use:double_tap
-                on:double_tap={() => open(item.id)}
+                on:double_tap={() => {
+                    open(item.id);
+                }}
             >
                 <div
                     class="w-[50px] h-[50px] shrink-0 bg-[url(/images/xp/icons/LocalDisk.png)] bg-contain bg-no-repeat bg-center"
@@ -285,12 +305,17 @@
         <div
             class="mb-4 w-[300px] h-[2px] bg-gradient-to-r from-blue-500 to-slate-50"
         ></div>
+        <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
         {#each computer.filter((el) => el.type == 'removable_storage') as item}
             <div
                 class="w-[150px] ml-4 mr-8 overflow-hidden inline-flex flex-row items-center font-MSSS"
-                on:dblclick={() => open(item.id)}
+                on:dblclick={() => {
+                    open(item.id);
+                }}
                 use:double_tap
-                on:double_tap={() => open(item.id)}
+                on:double_tap={() => {
+                    open(item.id);
+                }}
             >
                 <div
                     class="w-[50px] h-[50px] shrink-0 bg-[url(/images/xp/icons/RemovableMedia.png)] bg-contain bg-no-repeat bg-center"
@@ -324,7 +349,9 @@
             <div class="w-[100px] shrink-0 flex flex-row justify-end">
                 <Button
                     title="Open"
-                    on_click={() => on_open(selectingItems)}
+                    on_click={() => {
+                        on_open(selectingItems);
+                    }}
                     disabled={selectingItems.length == 0}
                 ></Button>
             </div>

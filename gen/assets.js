@@ -15,14 +15,20 @@ let source_files = [
     'static/json/hard_drive.json',
     'svelte.config.js',
     'tailwind.config.cjs',
-    'vite.config.js'
+    'vite.config.js',
 ]
-    .filter((el) => ['.js', '.json', '.svelte', '.css', '.cjs', '.html'].includes(path.extname(el)))
+    .filter((el) =>
+        ['.js', '.json', '.svelte', '.css', '.cjs', '.html'].includes(
+            path.extname(el),
+        ),
+    )
     .map((el) => el.replace(/\\/g, '/'))
     .filter((el) => !excluded_source_files.includes(el));
 
 let images = walk('./static/images/')
-    .filter((file) => ['.png', '.jpg', '.svg', '.gif'].includes(path.extname(file)))
+    .filter((file) =>
+        ['.png', '.jpg', '.svg', '.gif'].includes(path.extname(file)),
+    )
     .filter((file) => included(file))
     .map((file) => '/' + path.relative('static', file).replace(/\\/g, '/'));
 

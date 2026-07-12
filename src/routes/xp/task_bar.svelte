@@ -5,7 +5,7 @@
     import { required } from '../../lib/types';
 
     function start_menu() {
-        let el = required(
+        const el = required(
             document.querySelector('#start-menu'),
             'start menu element',
         );

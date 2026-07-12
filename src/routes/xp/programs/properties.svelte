@@ -31,40 +31,50 @@
         return required($hardDrive?.[item_id], 'fs item ' + item_id);
     }
 
-    let details: [string, string | null][] =
-        fs_item == null
+    // widened back from the `undefined` initializer: eslint's TS service
+    // narrows `export let` props to their default in top-level flow (Svelte
+    // injects the real prop value before this code runs)
+    const initial_item = fs_item as VfsItem | undefined;
+
+    const details: [string, string | null][] =
+        initial_item == null
             ? []
             : [
                   [
                       'Type',
-                      fs_item.type
+                      initial_item.type
                           .split('_')
                           .map((el) => _.upperFirst(el))
                           .join(' '),
                   ],
-                  ['Location', finder.to_url(fs_item.id)],
+                  ['Location', finder.to_url(initial_item.id)],
 
-                  ...(fs_item.type == 'file'
+                  ...(initial_item.type == 'file'
                       ? [
                             [
                                 'Size',
-                                utils.formatBytes((fs_item.size ?? NaN) * 1024),
+                                utils.formatBytes(
+                                    (initial_item.size ?? NaN) * 1024,
+                                ),
                             ] satisfies [string, string],
                         ]
                       : [
                             [
                                 'Size',
-                                utils.formatBytes(size_cal(fs_item.id) * 1024),
+                                utils.formatBytes(
+                                    size_cal(initial_item.id) * 1024,
+                                ),
                             ] satisfies [string, string],
                         ]),
 
-                  ...(fs_item.type == 'file'
+                  ...(initial_item.type == 'file'
                       ? [
                             [
                                 'Size on disk',
                                 utils.formatBytes(
                                     Math.ceil(
-                                        ((fs_item.size ?? NaN) * 1024) / 4096,
+                                        ((initial_item.size ?? NaN) * 1024) /
+                                            4096,
                                     ) * 4096,
                                 ),
                             ] satisfies [string, string],
@@ -74,27 +84,28 @@
                                 'Size on disk',
                                 utils.formatBytes(
                                     Math.ceil(
-                                        (size_cal(fs_item.id) * 1024) / 4096,
+                                        (size_cal(initial_item.id) * 1024) /
+                                            4096,
                                     ) * 4096,
                                 ),
                             ] satisfies [string, string],
                         ]),
 
-                  ...(fs_item.type == 'file'
+                  ...(initial_item.type == 'file'
                       ? []
                       : [
                             [
                                 'Contains',
-                                `${String(fs_item.children.filter((el) => drive_item(el).type == 'file').length)} Files, ${String(fs_item.children.filter((el) => drive_item(el).type == 'folder').length)} Folders`,
+                                `${String(initial_item.children.filter((el) => drive_item(el).type == 'file').length)} Files, ${String(initial_item.children.filter((el) => drive_item(el).type == 'folder').length)} Folders`,
                             ] satisfies [string, string],
                         ]),
                   [
                       'Date Created',
-                      utils.timestamp_to_readable(fs_item.date_created),
+                      utils.timestamp_to_readable(initial_item.date_created),
                   ],
                   [
                       'Last Modified',
-                      utils.timestamp_to_readable(fs_item.date_modified),
+                      utils.timestamp_to_readable(initial_item.date_modified),
                   ],
               ];
 
@@ -132,10 +143,10 @@
                 .map((el) => el.size),
         );
 
-        let folders = drive_item(item_id).children.filter(
+        const folders = drive_item(item_id).children.filter(
             (el) => drive_item(el).type == 'folder',
         );
-        for (let folder of folders) {
+        for (const folder of folders) {
             total_size += size_cal(folder);
         }
         return total_size;
@@ -146,7 +157,7 @@
             return `url(${item.icon})`;
         }
         if (icons[item.ext] != null) {
-            return `url(/images/xp/icons/${icons[item.ext]})`;
+            return `url(/images/xp/icons/${icons[item.ext] ?? ''})`;
         }
         return null;
     }
@@ -192,6 +203,7 @@
                 </div>
             </div>
 
+            <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
             {#each details as detail}
                 <div class="flex flex-row px-2 my-3 text-[12px] text-slate-800">
                     <div class="shrink-0 w-[70px]">

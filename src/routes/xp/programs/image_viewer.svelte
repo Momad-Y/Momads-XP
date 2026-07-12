@@ -22,7 +22,7 @@
     let img_node: HTMLImageElement;
     let panzoom_instance: PanzoomInstance | undefined;
 
-    let supported_exts = ['.bmp', '.jpg', '.jpeg', '.png', '.webp'];
+    const supported_exts = ['.bmp', '.jpg', '.jpeg', '.png', '.webp'];
 
     $: {
         if (fs_item && window) {
@@ -48,15 +48,20 @@
         });
     });
 
-    export async function destroy() {
+    export function destroy() {
         runningPrograms.update((programs) =>
             programs.filter((p) => p != get_self()),
         );
         void unmount(required(get_self(), 'image viewer instance'));
     }
 
+    // widened back from the `undefined` initializer: eslint's TS service
+    // narrows `export let` props to their default in top-level flow (Svelte
+    // injects the real prop value before this code runs)
+    const initial_item = fs_item as VfsItem | undefined;
+
     export let options: WindowOptions = {
-        title: fs_item == null ? 'Image Viewer' : fs_item.name,
+        title: initial_item == null ? 'Image Viewer' : initial_item.name,
         min_width: 300,
         min_height: 300,
         width: 600,
@@ -67,14 +72,14 @@
     };
 
     async function load_image(item_id: string) {
-        let item = drive_item(item_id);
+        const item = drive_item(item_id);
 
         let url: string | null = null;
 
         if (item.storage_type == 'remote') {
             url = item.url ?? null;
         } else if (item.storage_type == 'local') {
-            let file = await get<Blob>(required(item.url, 'image idb key'));
+            const file = await get<Blob>(required(item.url, 'image idb key'));
             url = URL.createObjectURL(required(file, 'image blob'));
         }
         if (url != null) {
@@ -127,10 +132,10 @@
             'parent of ' + curr_item.id,
         );
         console.log($hardDrive?.[parent_id]);
-        let siblings = drive_item(parent_id).children.filter((child_id) =>
+        const siblings = drive_item(parent_id).children.filter((child_id) =>
             supported_exts.includes(drive_item(child_id).ext),
         );
-        let curr_index = siblings.indexOf(curr_item.id);
+        const curr_index = siblings.indexOf(curr_item.id);
 
         if (curr_index == siblings.length - 1) {
             return drive_item(required(siblings[0], 'sibling image'));
@@ -146,10 +151,10 @@
             curr_item.parent,
             'parent of ' + curr_item.id,
         );
-        let siblings = drive_item(parent_id).children.filter((child_id) =>
+        const siblings = drive_item(parent_id).children.filter((child_id) =>
             supported_exts.includes(drive_item(child_id).ext),
         );
-        let curr_index = siblings.indexOf(curr_item.id);
+        const curr_index = siblings.indexOf(curr_item.id);
 
         if (curr_index == 0) {
             return drive_item(

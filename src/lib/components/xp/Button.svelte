@@ -20,7 +20,9 @@
 
 <button
     bind:this={node_ref}
-    on:click={(event) => on_click(event)}
+    on:click={(event) => {
+        on_click(event);
+    }}
     {disabled}
     style="{style};"
     class="button disabled:opacity-30"

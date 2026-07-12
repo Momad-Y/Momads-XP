@@ -28,7 +28,11 @@
 
     let iframe: HTMLIFrameElement | undefined;
     let address_input: HTMLInputElement;
-    let homepage = url ? url : 'https://wiby.me/';
+    // widened back from the `undefined` initializer: eslint's TS service
+    // narrows `export let` props to their default in top-level flow (Svelte
+    // injects the real prop value before this code runs)
+    const initial_url = url as string | null | undefined;
+    const homepage = initial_url ? initial_url : 'https://wiby.me/';
 
     let nav_history = [homepage];
     let page_index = 0;
@@ -251,7 +255,7 @@
 
     async function to_real_url(target_url: string) {
         if (/^[A-Z]:\\/.test(target_url)) {
-            let file = await fs.get_file(
+            const file = await fs.get_file(
                 required(finder.to_id(target_url), 'fs id for ' + target_url),
             );
             return URL.createObjectURL(file);
@@ -270,7 +274,7 @@
         document.querySelector<HTMLElement>('#work-space'),
         'work-space element',
     );
-    let ws_size = {
+    const ws_size = {
         width: workspace.offsetWidth,
         height: workspace.offsetHeight,
     };
@@ -294,7 +298,14 @@
             name: 'File',
             items: [
                 [{ name: 'Create Shortcut', disabled: true, action: () => {} }],
-                [{ name: 'Close', action: () => destroy() }],
+                [
+                    {
+                        name: 'Close',
+                        action: () => {
+                            destroy();
+                        },
+                    },
+                ],
             ],
         },
         {
@@ -314,7 +325,9 @@
                     { name: 'Add to Favorites...', action: start_add_favorite },
                     {
                         name: 'Organize Favorites',
-                        action: () => toggle_sidebar('favorites'),
+                        action: () => {
+                            toggle_sidebar('favorites');
+                        },
                     },
                 ],
                 ...favorites.map((fav) => [
@@ -419,19 +432,25 @@
             <RButton
                 icon="/images/xp/icons/Search.png"
                 title="Search"
-                on_click={() => toggle_sidebar('search')}
+                on_click={() => {
+                    toggle_sidebar('search');
+                }}
                 tooltip_message="Search the Web"
             ></RButton>
             <RButton
                 icon="/images/xp/icons/Favorites.png"
                 title="Favorites"
-                on_click={() => toggle_sidebar('favorites')}
+                on_click={() => {
+                    toggle_sidebar('favorites');
+                }}
                 tooltip_message="View Favorites"
             ></RButton>
             <RButton
                 icon="/images/xp/icons/IEHistory.png"
                 title="History"
-                on_click={() => toggle_sidebar('history')}
+                on_click={() => {
+                    toggle_sidebar('history');
+                }}
                 tooltip_message="View History"
             ></RButton>
 
@@ -452,7 +471,9 @@
                     type="text"
                     bind:this={address_input}
                     bind:value={address_text}
-                    on:click={(e) => e.currentTarget.select()}
+                    on:click={(e) => {
+                        e.currentTarget.select();
+                    }}
                     on:keydown={on_address_keydown}
                 />
                 <div
@@ -508,8 +529,9 @@
                                 type="text"
                                 placeholder="Search..."
                                 bind:value={search_query}
-                                on:keydown={(e) =>
-                                    e.key === 'Enter' && do_search()}
+                                on:keydown={(e) => {
+                                    if (e.key === 'Enter') do_search();
+                                }}
                             />
                             <!-- svelte-ignore a11y-click-events-have-key-events -->
                             <!-- svelte-ignore a11y-no-static-element-interactions -->
@@ -542,9 +564,10 @@
                                         class="w-full border border-slate-400 px-1 py-[2px] outline-none text-[11px] font-MSSS"
                                         type="text"
                                         bind:value={pending_fav_name}
-                                        on:keydown={(e) =>
-                                            e.key === 'Enter' &&
-                                            confirm_add_favorite()}
+                                        on:keydown={(e) => {
+                                            if (e.key === 'Enter')
+                                                confirm_add_favorite();
+                                        }}
                                     />
                                     <div class="flex gap-1 mt-1">
                                         <!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -577,6 +600,7 @@
                                         Favorites..." to save the current page.
                                     </p>
                                 {:else}
+                                    <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
                                     {#each favorites as fav, i}
                                         <div
                                             class="flex items-center group hover:bg-blue-600 px-1 py-[3px] cursor-pointer"
@@ -585,8 +609,6 @@
                                                 sidebar_mode = null;
                                             }}
                                         >
-                                            <!-- svelte-ignore a11y-click-events-have-key-events -->
-                                            <!-- svelte-ignore a11y-no-static-element-interactions -->
                                             <img
                                                 src="/images/xp/icons/URL.png"
                                                 class="w-[14px] h-[14px] mr-1 shrink-0"
@@ -599,8 +621,9 @@
                                             <!-- svelte-ignore a11y-click-events-have-key-events -->
                                             <!-- svelte-ignore a11y-no-static-element-interactions -->
                                             <div
-                                                on:click|stopPropagation={() =>
-                                                    remove_favorite(i)}
+                                                on:click|stopPropagation={() => {
+                                                    remove_favorite(i);
+                                                }}
                                                 class="text-[10px] text-slate-400 group-hover:text-white px-1 hover:text-red-300 shrink-0"
                                             >
                                                 ✕
@@ -629,6 +652,7 @@
                                     No history yet.
                                 </p>
                             {:else}
+                                <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
                                 {#each nav_history as h_url, i}
                                     <!-- svelte-ignore a11y-click-events-have-key-events -->
                                     <!-- svelte-ignore a11y-no-static-element-interactions -->

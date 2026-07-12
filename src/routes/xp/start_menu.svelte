@@ -21,7 +21,7 @@
         items?: (StartMenuItem | null)[];
     }
 
-    let col_1: (StartMenuItem | null)[] = [
+    const col_1: (StartMenuItem | null)[] = [
         {
             name: 'Internet Explorer',
             icon: '/images/xp/icons/InternetExplorer6.png',
@@ -41,7 +41,7 @@
         },
     ];
 
-    let col_2: (StartMenuItem | null)[] = [
+    const col_2: (StartMenuItem | null)[] = [
         {
             name: 'My Pictures',
             icon: '/images/xp/icons/MyPictures.png',
@@ -86,7 +86,7 @@
         },
     ];
 
-    let programs: (StartMenuItem | null)[] = [
+    const programs: (StartMenuItem | null)[] = [
         {
             name: 'Display Properties',
             icon: '/images/xp/icons/DisplayProperties.png',
@@ -331,7 +331,7 @@
     let l3_timer: ReturnType<typeof setTimeout> | undefined;
 
     function hide() {
-        let el = required(
+        const el = required(
             document.querySelector('#start-menu'),
             'start menu element',
         );
@@ -348,7 +348,7 @@
 
     function launch(item: StartMenuItem) {
         console.log(item);
-        let { path, fs_item, webapp, link } = item;
+        const { path, fs_item, webapp, link } = item;
         if (link) {
             open_link(link);
         } else if (path) {
@@ -394,15 +394,19 @@
     box-shadow: rgb(14 96 203) 0px -1px 1px inset;"
     ></div>
 
+    <!-- eslint-disable svelte/no-useless-mustaches -- a plain quoted value this long gets line-wrapped by prettier, and svelte2tsx cannot parse multi-line style: text -->
     <div
         class="w-full h-[70px] rounded-t-md shrink-0"
-        style:background-image="linear-gradient(rgb(24, 104, 206) 0%, rgb(14, 96, 203) 12%, rgb(14, 96, 203) 20%, rgb(17, 100, 207) 32%, rgb(22, 103, 207) 33%, rgb(27, 108, 211) 47%, rgb(30, 112, 217) 54%, rgb(36, 118, 220) 60%, rgb(41, 122, 224) 65%, rgb(52, 130, 227) 77%, rgb(55, 134, 229) 79%, rgb(66, 142, 233) 90%, rgb(71, 145, 235) 100%)"
+        style:background-image={'linear-gradient(rgb(24, 104, 206) 0%, rgb(14, 96, 203) 12%, rgb(14, 96, 203) 20%, rgb(17, 100, 207) 32%, rgb(22, 103, 207) 33%, rgb(27, 108, 211) 47%, rgb(30, 112, 217) 54%, rgb(36, 118, 220) 60%, rgb(41, 122, 224) 65%, rgb(52, 130, 227) 77%, rgb(55, 134, 229) 79%, rgb(66, 142, 233) 90%, rgb(71, 145, 235) 100%)'}
     ></div>
+    <!-- eslint-enable svelte/no-useless-mustaches -->
 
+    <!-- eslint-disable svelte/no-useless-mustaches -- a plain quoted value this long gets line-wrapped by prettier, and svelte2tsx cannot parse multi-line style: text -->
     <div
         class="shrink-0 h-[2px] w-full"
-        style:background-image="linear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgb(218, 136, 74) 50%, rgba(0, 0, 0, 0) 100%)"
+        style:background-image={'linear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgb(218, 136, 74) 50%, rgba(0, 0, 0, 0) 100%)'}
     ></div>
+    <!-- eslint-enable svelte/no-useless-mustaches -->
 
     <div class="bg-slate-50 mx-0.5 relative flex flex-row">
         <!-- ── Mobile: All Programs full-panel accordion overlay ── -->
@@ -439,6 +443,7 @@
                     >
                 </div>
                 <div class="overflow-y-auto flex-1">
+                    <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
                     {#each programs as item}
                         {#if item == null}
                             <div
@@ -486,6 +491,7 @@
                                 </div>
                                 {#if item.items && open_l2 === item.name}
                                     <div class="bg-[#eef3fb]">
+                                        <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
                                         {#each item.items as subitem}
                                             {#if subitem == null}
                                                 <div
@@ -535,13 +541,15 @@
                                                         <div
                                                             class="bg-[#dce8f8]"
                                                         >
+                                                            <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
                                                             {#each subitem.items.filter((el) => el != null) as subsubitem}
                                                                 <div
                                                                     class="flex items-center pl-11 pr-3 py-2 group/mpss hover:bg-blue-500 cursor-pointer border-b border-[#cdd9ec]"
-                                                                    on:click|stopPropagation={() =>
+                                                                    on:click|stopPropagation={() => {
                                                                         launch(
                                                                             subsubitem,
-                                                                        )}
+                                                                        );
+                                                                    }}
                                                                 >
                                                                     <div
                                                                         class="w-4 h-4 bg-contain mr-2 shrink-0"
@@ -570,6 +578,7 @@
 
         <!-- ── Left column ── -->
         <div class="w-1/2 flex flex-col shrink-0 px-1">
+            <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
             {#each col_1 as item}
                 {#if item == null}
                     <div
@@ -583,7 +592,9 @@
                             open_l2 = null;
                             open_l3 = null;
                         }}
-                        on:click={() => launch(item)}
+                        on:click={() => {
+                            launch(item);
+                        }}
                     >
                         <div
                             class="w-8 h-8 bg-contain mr-1"
@@ -633,6 +644,7 @@
                     <div
                         class="hidden sm:block absolute z-10 bottom-0 left-[90%] w-[250px] shadow-xl border-t border-l-4 border-blue-500 bg-slate-50"
                     >
+                        <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
                         {#each programs as item}
                             {#if item == null}
                                 <div
@@ -693,6 +705,7 @@
                                                     (Empty)
                                                 </div>
                                             {/if}
+                                            <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
                                             {#each item.items as subitem}
                                                 {#if subitem == null}
                                                     <div
@@ -755,6 +768,7 @@
                                                             <div
                                                                 class="absolute z-30 top-0 left-full w-[220px] shadow-xl border-t border-b border-l-4 border-blue-500 bg-slate-50"
                                                             >
+                                                                <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
                                                                 {#each subitem.items as subsubitem}
                                                                     {#if subsubitem == null}
                                                                         <div
@@ -763,10 +777,11 @@
                                                                     {:else}
                                                                         <div
                                                                             class="flex flex-row items-center grow p-1 group/l3 hover:bg-blue-500 cursor-pointer"
-                                                                            on:click={() =>
+                                                                            on:click={() => {
                                                                                 launch(
                                                                                     subsubitem,
-                                                                                )}
+                                                                                );
+                                                                            }}
                                                                         >
                                                                             <div
                                                                                 class="w-5 h-5 bg-contain mr-1 shrink-0"
@@ -797,6 +812,7 @@
 
         <!-- ── Right column ── -->
         <div class="w-1/2 flex flex-col shrink-0 px-1 bg-blue-200">
+            <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
             {#each col_2 as item}
                 {#if item == null}
                     <div
@@ -805,7 +821,9 @@
                 {:else}
                     <div
                         class="flex flex-row items-center shrink-0 p-1 group/c2 hover:bg-blue-500"
-                        on:click={() => launch(item)}
+                        on:click={() => {
+                            launch(item);
+                        }}
                     >
                         <div
                             class="w-7 h-7 bg-contain mr-1"
@@ -825,10 +843,12 @@
         </div>
     </div>
 
+    <!-- eslint-disable svelte/no-useless-mustaches -- a plain quoted value this long gets line-wrapped by prettier, and svelte2tsx cannot parse multi-line style: text -->
     <div
         class="w-full h-[40px] shrink-0 flex items-center justify-end px-2"
-        style:background-image="linear-gradient(rgb(66, 130, 214) 0%, rgb(59, 133, 224) 3%, rgb(65, 138, 227) 5%, rgb(65, 138, 227) 17%, rgb(60, 135, 226) 21%, rgb(55, 134, 228) 26%, rgb(52, 130, 227) 29%, rgb(46, 126, 225) 39%, rgb(35, 116, 223) 49%, rgb(32, 114, 219) 57%, rgb(25, 110, 219) 62%, rgb(23, 107, 216) 72%, rgb(20, 104, 213) 75%, rgb(17, 101, 210) 83%, rgb(15, 97, 203) 88%)"
+        style:background-image={'linear-gradient(rgb(66, 130, 214) 0%, rgb(59, 133, 224) 3%, rgb(65, 138, 227) 5%, rgb(65, 138, 227) 17%, rgb(60, 135, 226) 21%, rgb(55, 134, 228) 26%, rgb(52, 130, 227) 29%, rgb(46, 126, 225) 39%, rgb(35, 116, 223) 49%, rgb(32, 114, 219) 57%, rgb(25, 110, 219) 62%, rgb(23, 107, 216) 72%, rgb(20, 104, 213) 75%, rgb(17, 101, 210) 83%, rgb(15, 97, 203) 88%)'}
     >
+        <!-- eslint-enable svelte/no-useless-mustaches -->
         <div
             class="p-1 rounded-sm hover:brightness-110 flex flex-row items-center"
             on:click={show_shutdown_panel}

@@ -12,11 +12,12 @@
     } from '../../lib/store';
     import Welcome from './welcome.svelte';
     import type { LoadPageEvent } from '../../lib/types';
-    let dispatcher = createEventDispatcher<{ load_page: LoadPageEvent }>();
+    // eslint-disable-next-line @typescript-eslint/no-deprecated -- legacy component-event dispatcher kept as-is; migrating to callback props is a behavior change outside the type-only conversion
+    const dispatcher = createEventDispatcher<{ load_page: LoadPageEvent }>();
 
     let io_worker: ReturnType<typeof setTimeout> | undefined;
 
-    let unsubscribers = [
+    const unsubscribers = [
         hardDrive.subscribe(() => {
             clearInterval(io_worker);
             io_worker = setTimeout(() => {
@@ -55,9 +56,9 @@
     onMount(() => {
         crtEffect.set(localStorage.getItem('crt_effect') === 'true');
         unsubscribers.push(
-            crtEffect.subscribe((v) =>
-                localStorage.setItem('crt_effect', String(v)),
-            ),
+            crtEffect.subscribe((v) => {
+                localStorage.setItem('crt_effect', String(v));
+            }),
         );
 
         //load other pure js lib
@@ -68,7 +69,7 @@
     });
 
     onDestroy(() => {
-        for (let fn of unsubscribers) {
+        for (const fn of unsubscribers) {
             fn();
         }
         clearInterval(io_worker);

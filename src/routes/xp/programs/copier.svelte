@@ -26,9 +26,13 @@
 
     let cancelled = false;
     let current_item = '';
-    let target_folder_name = required(
-        target_folder_id == null ? undefined : $hardDrive?.[target_folder_id],
-        'fs item ' + String(target_folder_id),
+    // widened back from the `undefined` initializer: eslint's TS service
+    // narrows `export let` props to their default in top-level flow (Svelte
+    // injects the real prop value before this code runs)
+    const initial_target_id = target_folder_id as string | undefined;
+    const target_folder_name = required(
+        initial_target_id == null ? undefined : $hardDrive?.[initial_target_id],
+        'fs item ' + String(initial_target_id),
     ).name;
 
     export let options: WindowOptions = {
@@ -47,7 +51,7 @@
     onMount(async () => {
         if (copying_obj && target_folder_id) {
             console.log(copying_obj);
-            for (let key of Object.keys(copying_obj)) {
+            for (const key of Object.keys(copying_obj)) {
                 console.log(key);
                 await save_to_disk(
                     required(copying_obj[key], 'copy entry ' + key),
@@ -55,11 +59,11 @@
                     key,
                 );
             }
-            await destroy();
+            destroy();
         }
     });
 
-    export async function destroy() {
+    export function destroy() {
         cancelled = true;
         runningPrograms.update((programs) =>
             programs.filter((p) => p != get_self()),
@@ -76,7 +80,7 @@
 
         if (obj instanceof File) {
             current_item = obj.name;
-            let file = new File([obj], obj.name, {
+            const file = new File([obj], obj.name, {
                 type: utils.ext_to_mime(obj.name) || obj.type,
             });
             await fs.new_fs_item(
@@ -87,14 +91,14 @@
                 file,
             );
         } else {
-            let folder_id = await fs.new_fs_item(
+            const folder_id = await fs.new_fs_item(
                 'folder',
                 '',
                 key,
                 parent_id ?? null,
                 null,
             );
-            for (let k of Object.keys(obj)) {
+            for (const k of Object.keys(obj)) {
                 await save_to_disk(
                     required(obj[k], 'copy entry ' + k),
                     folder_id,

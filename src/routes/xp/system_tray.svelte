@@ -6,7 +6,7 @@
 
     let time = get_time();
 
-    let interval = setInterval(() => {
+    const interval = setInterval(() => {
         time = get_time();
     }, 1000);
 

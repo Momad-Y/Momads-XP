@@ -29,12 +29,12 @@
         if (!program.window?.minimized) {
             if (program.window?.z_index == $zIndex) {
                 console.log('minimize');
-                program.window?.on_click_minimize();
+                program.window.on_click_minimize();
             } else {
                 program.window?.focus();
             }
         } else {
-            program.window?.restore();
+            program.window.restore();
         }
     }
 </script>
@@ -45,7 +45,9 @@
     on:mousedown={on_mousedown}
     on:click={on_click}
     use:long_press
-    on:long_press={(e) => on_rightclick({ x: e.detail.x, y: e.detail.y })}
+    on:long_press={(e: CustomEvent<{ x: number; y: number }>) => {
+        on_rightclick({ x: e.detail.x, y: e.detail.y });
+    }}
     program-id={program.id}
     class="program-tile h-full w-[150px] min-w-[70px] flex flex-row items-center max-w-[200px] overflow-hidden rounded-sm hover:brightness-125"
     style:background={program.window?.z_index == $zIndex

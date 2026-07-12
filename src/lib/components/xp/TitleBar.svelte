@@ -5,7 +5,7 @@
 
     export let options: WindowOptions = {};
 
-    let {
+    const {
         close_btn = true,
         maximize_btn = true,
         minimize_btn = true,

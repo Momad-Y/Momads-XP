@@ -1,7 +1,8 @@
 <script lang="ts">
     import { onMount, createEventDispatcher } from 'svelte';
 
-    let dispatcher = createEventDispatcher<{ done: null }>();
+    // eslint-disable-next-line @typescript-eslint/no-deprecated -- legacy component-event dispatcher kept as-is; migrating to callback props is a behavior change outside the type-only conversion
+    const dispatcher = createEventDispatcher<{ done: null }>();
     let fallback_timer: ReturnType<typeof setTimeout> | undefined;
     let destroyed = false;
 
@@ -13,7 +14,7 @@
     }
 
     onMount(() => {
-        let welcome_audio = new Audio('/audio/xp_startup.mp3');
+        const welcome_audio = new Audio('/audio/xp_startup.mp3');
         welcome_audio.addEventListener('canplaythrough', () => {
             welcome_audio.play().catch(() => {
                 done();

@@ -6,6 +6,7 @@
 </script>
 
 <div class="w-min shrink-0 flex flex-row items-center justify-evenly" {style}>
+    <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
     {#each items as item}
         <div
             on:click={() => (selected = item)}

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { MenuItem } from '../../types';
+    import type { ContextMenuRequest, MenuItem } from '../../types';
 
     let menu: MenuItem[][] = [];
     let required_width = 0;
@@ -15,7 +15,11 @@
     let screenWidth = 700;
     let screenHeight = 700;
 
-    let unsubscriber = contextMenu.subscribe(async (obj) => {
+    const unsubscriber = contextMenu.subscribe((obj) => {
+        void handle_menu_request(obj);
+    });
+
+    async function handle_menu_request(obj: ContextMenuRequest | null) {
         if (obj == null) {
             visible = false;
             return;
@@ -57,9 +61,9 @@
         left = Math.min(x, screenWidth - required_width);
         top = Math.min(y, screenHeight - required_height);
         visible = true;
-    });
+    }
 
-    let menu_el: HTMLDivElement;
+    let menu_el: HTMLDivElement | undefined;
 
     // On mobile, `click` events are unreliable for dismissal; use touchstart instead.
     function handle_touch_outside(e: TouchEvent) {
@@ -94,19 +98,23 @@
 <div
     bind:this={menu_el}
     use:click_outside
-    on:click_outside={() => hide()}
+    on:click_outside={() => {
+        hide();
+    }}
     class="context-menu z-20 pt-0.5 absolute border-2 border-slate-200 bg-slate-50 text-slate-900 w-[180px] text-[11px] {visible
         ? ''
         : 'hidden'}"
     style:top="{top}px"
     style:left="{left}px"
 >
+    <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
     {#each menu.filter((el) => el.length > 0) as group, group_index}
         <div
             class="w-full border-slate-200 {group_index == menu.length - 1
                 ? ''
                 : 'border-b'}"
         >
+            <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
             {#each group as item}
                 <div
                     class="py-1 w-full flex flex-row items-center {item.disabled
@@ -168,10 +176,11 @@
                                 : 'left-full'} 
                         py-0.5 hidden group-hover:flex flex-col w-[180px] bg-slate-50 border-slate-200 border-2"
                             style:top="{top > screenHeight - 2 * required_height
-                                ? `-${(item.items.length - 2) * 100}%`
+                                ? `-${String((item.items.length - 2) * 100)}%`
                                 : '0'}
                             "
                         >
+                            <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
                             {#each item.items as sub_item}
                                 {#if sub_item}
                                     <div

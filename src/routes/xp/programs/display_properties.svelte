@@ -35,7 +35,7 @@
 
     let preview = $wallpaper;
     let crt_preview = $crtEffect;
-    let wallpapers = drive_item(wallpapers_folder).children.filter(
+    const wallpapers = drive_item(wallpapers_folder).children.filter(
         (el) => drive_item(el).type == 'file',
     );
 
@@ -69,7 +69,7 @@
     };
 
     async function get_wallpaper_url(w: string | null) {
-        let fs_item = required(
+        const fs_item = required(
             w == null ? undefined : $hardDrive?.[w],
             'wallpaper item ' + String(w),
         );
@@ -77,7 +77,7 @@
         if (fs_item.storage_type == 'remote') {
             return fs_item.url;
         } else if (fs_item.storage_type == 'local') {
-            let file = await get<Blob>(
+            const file = await get<Blob>(
                 required(fs_item.url, 'wallpaper idb key'),
             );
             return URL.createObjectURL(required(file, 'wallpaper blob'));
@@ -136,6 +136,7 @@
                     <div
                         class="grow p-1 overflow-y-scroll overflow-x-hidden border border-slate-700"
                     >
+                        <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
                         {#each wallpapers as wallpaper}
                             <div
                                 class="w-full flex flex-row"

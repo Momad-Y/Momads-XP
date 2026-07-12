@@ -9,7 +9,7 @@
     export let style = '';
     export let direction: 'top' | 'bottom' | undefined = undefined;
 
-    let item_height = 24;
+    const item_height = 24;
     let expand = false;
     let node_ref: HTMLDivElement;
     let dropbox_pos = '';
@@ -54,6 +54,7 @@
             : 0}px"
         style={dropbox_pos}
     >
+        <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
         {#each items as item, index}
             <div
                 class="box-border w-full flex flex-row p-0.5 pl-2 items-center hover:bg-blue-600 hover:text-slate-50

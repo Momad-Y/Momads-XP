@@ -10,6 +10,7 @@ export default ts.config(
             'build/',
             '.svelte-kit/',
             '.netlify/',
+            '.claude/',
             'static/',
             'coverage/',
             'node_modules/',
@@ -18,28 +19,30 @@ export default ts.config(
         ],
     },
     js.configs.recommended,
+    // typed, strict rules for all src code — TS modules AND svelte components
+    // (the whole tree is strict TS since Task 13). NOTE: this block sits
+    // before the svelte configs so that svelte-eslint-parser (registered
+    // there) wins as the file-level parser for *.svelte; ts.parser only
+    // parses <script> blocks via parserOptions.parser below.
+    {
+        files: ['src/**/*.ts', 'src/**/*.svelte'],
+        extends: [...ts.configs.strictTypeChecked],
+        rules: {
+            '@typescript-eslint/no-explicit-any': 'error',
+            '@typescript-eslint/no-unsafe-type-assertion': 'error',
+        },
+    },
     ...svelte.configs.recommended,
     prettier,
     ...svelte.configs.prettier,
-    // typed, strict rules — src TS modules only (the generated project covers
-    // src/** and tests/**). NOTE: .svelte files join this block in the Task 13
-    // conversion; extending strictTypeChecked over *.svelte replaces
-    // svelte-eslint-parser with the TS parser (parse errors on every
-    // component), and typed rules on still-JS svelte scripts flood
-    // no-unsafe-* errors, blocking every svelte-touching commit.
     {
-        files: ['src/**/*.ts'],
-        extends: [...ts.configs.strictTypeChecked],
+        files: ['src/**/*.ts', 'src/**/*.svelte'],
         languageOptions: {
             parserOptions: {
                 projectService: true,
                 extraFileExtensions: ['.svelte'],
                 svelteConfig,
             },
-        },
-        rules: {
-            '@typescript-eslint/no-explicit-any': 'error',
-            '@typescript-eslint/no-unsafe-type-assertion': 'error',
         },
     },
     {
@@ -49,19 +52,17 @@ export default ts.config(
             // Script blocks are parsed by the TS parser; undefined references
             // are caught by svelte-check, and browser globals are expected.
             'no-undef': 'off',
-            // Inherited win32.run base components pre-date linting. These are
-            // real findings, kept visible as warnings; the Task 13 TypeScript
-            // conversion of the .svelte tree fixes them and DELETES this
-            // downgrade block (restoring them to errors).
-            'no-unused-vars': 'warn',
-            'no-empty': 'warn',
-            'no-useless-assignment': 'warn',
-            'no-async-promise-executor': 'warn',
-            'svelte/require-each-key': 'warn',
-            'svelte/no-useless-mustaches': 'warn',
-            'svelte/no-unused-svelte-ignore': 'warn',
-            'svelte/no-reactive-reassign': 'warn',
-            'svelte/no-dom-manipulating': 'warn',
+        },
+    },
+    // web-worker source (my_computer's sort worker runs off the main thread)
+    {
+        files: ['src/**/sort.js'],
+        languageOptions: {
+            globals: {
+                onmessage: 'writable',
+                postMessage: 'readonly',
+                console: 'readonly',
+            },
         },
     },
     // untyped zone: root configs, e2e specs, gen scripts (node context)

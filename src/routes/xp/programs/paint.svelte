@@ -71,15 +71,20 @@
         }
     }
 
-    export async function destroy() {
+    export function destroy() {
         runningPrograms.update((programs) =>
             programs.filter((p) => p != get_self()),
         );
         void unmount(required(get_self(), 'paint instance'));
     }
 
+    // widened back from the `undefined` initializer: eslint's TS service
+    // narrows `export let` props to their default in top-level flow (Svelte
+    // injects the real prop value before this code runs)
+    const initial_item = fs_item as VfsItem | undefined;
+
     export let options: WindowOptions = {
-        title: fs_item == null ? 'Paint' : fs_item.name,
+        title: initial_item == null ? 'Paint' : initial_item.name,
         min_width: 500,
         min_height: 400,
         width: 700,
@@ -100,12 +105,12 @@
     }
 
     async function open_in_new_window() {
-        let selected_items = await pick_file_dialog({
+        const selected_items = await pick_file_dialog({
             node_ref: window_el(),
             filetypes_desc: 'Image Files',
             filetypes: supported_types.map((el) => el.ext),
         });
-        let item =
+        const item =
             selected_items[0] == null
                 ? undefined
                 : $hardDrive?.[selected_items[0]];
@@ -116,14 +121,14 @@
     }
 
     async function pick_file() {
-        let selected_items = await pick_file_dialog({
+        const selected_items = await pick_file_dialog({
             node_ref: window_el(),
             filetypes_desc: 'Image Files',
             filetypes: supported_types.map((el) => el.ext),
         });
         const selected_id = required(selected_items[0], 'picked file');
         fs_item = $hardDrive?.[selected_id];
-        let file = await fs.get_file(selected_id);
+        const file = await fs.get_file(selected_id);
         console.log({ fs_item });
         return file;
     }
@@ -147,7 +152,7 @@
                     filetypes,
                     filetypes_desc,
                     get_self: () => modal,
-                    on_open: (items) => {
+                    on_open: (items: string[]) => {
                         resolve(items);
                         void unmount(modal);
                     },
@@ -168,7 +173,7 @@
             );
         }
 
-        let { parent_id, filename, selected_filetype } =
+        const { parent_id, filename, selected_filetype } =
             await save_file_as_dialog({
                 id: fs_item?.parent,
                 node_ref: window_el(),
@@ -177,14 +182,17 @@
             });
         console.log(selected_filetype);
 
-        let canvas = required(
+        const canvas = required(
             paint_document().querySelector<HTMLCanvasElement>('.main-canvas'),
             'paint canvas',
         );
         canvas.toBlob((blob) => {
             void (async () => {
-                let file = new File([required(blob, 'canvas blob')], filename);
-                let new_id = short.generate();
+                const file = new File(
+                    [required(blob, 'canvas blob')],
+                    filename,
+                );
+                const new_id = short.generate();
                 await fs.save_file_as(
                     filename,
                     selected_filetype.ext,
@@ -221,7 +229,7 @@
                     selected_filetype: current_filetype,
                     id,
                     get_self: () => modal,
-                    on_save: (data) => {
+                    on_save: (data: SaveAsSelection) => {
                         resolve(data);
                         void unmount(modal);
                     },
@@ -232,7 +240,7 @@
 
     async function setup_paint() {
         iframe_loaded = true;
-        var jspaint = required(iframe.contentWindow, 'paint iframe window');
+        const jspaint = required(iframe.contentWindow, 'paint iframe window');
         jspaint.set_theme?.('classic.css');
         jspaint.open_in_new_window = open_in_new_window;
         jspaint.open_empty_window = () => {
@@ -243,7 +251,7 @@
 
         if (fs_item != null) {
             console.log({ fs_item });
-            let file = await fs.get_file(fs_item.id);
+            const file = await fs.get_file(fs_item.id);
             console.log(file);
             jspaint.open_from_file?.(file);
         }
@@ -262,18 +270,18 @@
                 };
 
                 hooks.showOpenFileDialog = async () => {
-                    let file = await pick_file();
+                    const file = await pick_file();
                     return { file, file_handle: file };
                 };
 
                 hooks.writeBlobToHandle = () => {
                     console.log('writeBlobtoHandle');
                     if (fs_item != null) {
-                        let ext = fs_item.ext || '.png';
-                        let mimetype = utils.ext_to_mime(ext, 'image/png');
+                        const ext = fs_item.ext || '.png';
+                        const mimetype = utils.ext_to_mime(ext, 'image/png');
                         console.log({ mimetype });
 
-                        let canvas = required(
+                        const canvas = required(
                             paint_document().querySelector<HTMLCanvasElement>(
                                 '.main-canvas',
                             ),
@@ -281,7 +289,7 @@
                         );
                         canvas.toBlob((blob) => {
                             const item = required(fs_item, 'paint fs item');
-                            let file = new File(
+                            const file = new File(
                                 [required(blob, 'canvas blob')],
                                 item.name,
                             );
@@ -319,7 +327,6 @@
         slot="content"
         class="absolute inset-1 top-0 flex flex-col bg-[rgb(192,192,192)] overflow-hidden"
     >
-        <!-- svelte-ignore a11y-missing-attribute -->
         {#if !iframe_loaded}
             <div
                 class="absolute top-1/2 -translate-y-1/2 left-1/2 -translate-x-1/2 text-slate-500 text-sm p-2 rounded font-mono"

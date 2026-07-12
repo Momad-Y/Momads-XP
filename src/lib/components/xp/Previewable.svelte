@@ -16,9 +16,9 @@
         observer.observe(node_ref);
     });
 
-    let intersect_callback: IntersectionObserverCallback = (entries) => {
+    const intersect_callback: IntersectionObserverCallback = (entries) => {
         entries.forEach((entry) => {
-            let { isIntersecting } = entry;
+            const { isIntersecting } = entry;
 
             if (isIntersecting) {
                 void load_preview();
@@ -30,10 +30,10 @@
         console.log(preview_url);
         if (preview_url != null) return;
         if (fs_id == null) return;
-        let url = await fs.get_url(fs_id);
+        const url = await fs.get_url(fs_id);
         if (url == null) return;
 
-        let image = new Image();
+        const image = new Image();
         image.src = url;
         image.onload = () => (preview_url = `url(${url})`);
     }

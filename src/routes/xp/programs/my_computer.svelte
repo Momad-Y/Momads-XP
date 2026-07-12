@@ -29,7 +29,11 @@
     export let exec_path: string;
 
     export let fs_item: Partial<VfsItem> | undefined = undefined; //fs: file system, i.e, files and folder
-    let history: (string | null | undefined)[] = [fs_item?.id];
+    // widened back from the `undefined` initializer: eslint's TS service
+    // narrows `export let` props to their default in top-level flow (Svelte
+    // injects the real prop value before this code runs)
+    const initial_item = fs_item as Partial<VfsItem> | undefined;
+    let history: (string | null | undefined)[] = [initial_item?.id];
     let page_index = 0;
     $: url = finder.to_url(history[page_index]) || 'My Computer';
     $: current_history_id = history[page_index];
@@ -38,7 +42,7 @@
             ? null
             : ($hardDrive?.[current_history_id] ?? null);
     $: {
-        let curr_id = history[page_index];
+        const curr_id = history[page_index];
 
         if (curr_id == null) {
             window?.update_icon('/images/xp/icons/MyComputer.png');
@@ -47,7 +51,7 @@
             window?.update_icon('/images/xp/icons/RecycleBinempty.png');
             window?.update_title('Recycle Bin');
         } else {
-            let curr_item = $hardDrive?.[curr_id];
+            const curr_item = $hardDrive?.[curr_id];
             if (curr_item) {
                 if (curr_item.icon) {
                     window?.update_icon(curr_item.icon);
@@ -61,7 +65,7 @@
 
     export let viewer: Viewer | undefined = undefined;
 
-    let menu: MenuBarEntry[] = [
+    const menu: MenuBarEntry[] = [
         {
             name: 'File',
             items: [
@@ -180,17 +184,23 @@
                 [
                     {
                         name: 'Help and Support Center',
-                        action: () => open_link('https://docs.win32.run'),
+                        action: () => {
+                            open_link('https://docs.win32.run');
+                        },
                     },
                     {
                         name: 'Is this copy legal?',
-                        action: () => open_link('https://docs.win32.run'),
+                        action: () => {
+                            open_link('https://docs.win32.run');
+                        },
                     },
                 ],
                 [
                     {
                         name: 'About Windows',
-                        action: () => open_link('https://docs.win32.run'),
+                        action: () => {
+                            open_link('https://docs.win32.run');
+                        },
                     },
                 ],
             ],
@@ -240,7 +250,7 @@
             return `url(${item.icon})`;
         }
         if (icons[item.ext] != null) {
-            return `url(/images/xp/icons/${icons[item.ext]})`;
+            return `url(/images/xp/icons/${icons[item.ext] ?? ''})`;
         }
         if (item.id == recycle_bin_id) {
             return `url(/images/xp/icons/RecycleBinempty.png)`;
@@ -266,7 +276,7 @@
 
     export function up() {
         const current_id = required(history[page_index], 'current folder id');
-        let parent_id = required(
+        const parent_id = required(
             $hardDrive?.[current_id],
             'fs item ' + current_id,
         ).parent;
@@ -348,7 +358,9 @@
                 <input
                     class="absolute inset-0 pl-7 outline-none"
                     type="text"
-                    on:click={(e) => e.currentTarget.select()}
+                    on:click={(e) => {
+                        e.currentTarget.select();
+                    }}
                     on:keyup={on_user_input}
                     value={url}
                 />
@@ -374,7 +386,9 @@
                 <Viewer
                     bind:this={viewer}
                     id={history[page_index]}
-                    on:open={(e) => open(e.detail.id)}
+                    on:open={(e: CustomEvent<{ id: string | null }>) => {
+                        open(e.detail.id);
+                    }}
                     my_computer_instance={mc_interface}
                 ></Viewer>
             </div>

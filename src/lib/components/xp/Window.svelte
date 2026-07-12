@@ -19,7 +19,10 @@
 
     export let options: WindowOptions = {};
 
-    let titlebar: TitleBar;
+    let titlebar: {
+        update_icon: (icon: string) => void;
+        update_title: (title: string) => void;
+    };
     export let node_ref: HTMLElement | undefined = undefined;
 
     /** The window's root element; only valid after mount (bind:this). */
@@ -39,19 +42,19 @@
 
     onMount(async () => {
         if (options.exec_path != null) {
-            let saved = await get<WindowRect>(options.exec_path);
+            const saved = await get<WindowRect>(options.exec_path);
             if (saved) {
-                let rect = {
+                const rect = {
                     top: saved.top,
                     left: saved.left,
                     width: saved.width,
                     height: saved.height,
                 };
-                let workspace = required(
+                const workspace = required(
                     document.querySelector<HTMLElement>('#work-space'),
                     'work-space element',
                 );
-                let nudge = calc_nudges(rect);
+                const nudge = calc_nudges(rect);
                 rect.top = rect.top + nudge.top;
                 rect.left = rect.left + nudge.left;
 
@@ -152,8 +155,8 @@
     };
 
     export let on_click_minimize: () => void = () => {
-        let window_center = get_center_point(win().getBoundingClientRect());
-        let tile_center = get_center_point(
+        const window_center = get_center_point(win().getBoundingClientRect());
+        const tile_center = get_center_point(
             document
                 .querySelector(
                     `.program-tile[program-id="${String(options.id)}"]`,
@@ -161,8 +164,8 @@
                 ?.getBoundingClientRect(),
         );
 
-        translateX = `translateX(${tile_center.x - window_center.x}px)`;
-        translateY = `translateY(${tile_center.y - window_center.y}px)`;
+        translateX = `translateX(${String(tile_center.x - window_center.x)}px)`;
+        translateY = `translateY(${String(tile_center.y - window_center.y)}px)`;
         console.log(`${translateX} ${translateY} scale(0.1)`);
 
         minimized = true;
@@ -194,7 +197,7 @@
     }
 
     function calc_nudges({ top, left, width, height }: WindowRect) {
-        let existing_window = $runningPrograms.findLast((el) => {
+        const existing_window = $runningPrograms.findLast((el) => {
             return (
                 el.options.id != options.id &&
                 el.options.exec_path == options.exec_path
@@ -202,19 +205,19 @@
         });
         if (existing_window == null) return { top: 0, left: 0 };
 
-        let pad = 10;
-        let nudges: [number, number][] = [
+        const pad = 10;
+        const nudges: [number, number][] = [
             [pad, pad],
             [pad, -pad],
             [-pad, pad],
             [-pad, -pad],
             [0, 0],
         ];
-        let workspace = required(
+        const workspace = required(
             document.querySelector<HTMLElement>('#work-space'),
             'work-space element',
         );
-        for (let nudge of nudges) {
+        for (const nudge of nudges) {
             if (
                 top + nudge[0] >= 0 &&
                 left + nudge[1] >= 0 &&
@@ -283,7 +286,7 @@
                         'ui-icon ui-icon-gripsmall-diagonal-se opacity-0',
                 },
                 start: () => {
-                    let iframe = el.querySelector('iframe');
+                    const iframe = el.querySelector('iframe');
                     if (iframe) {
                         iframe.style.pointerEvents = 'none';
                     }
@@ -295,7 +298,7 @@
                             el.getBoundingClientRect(),
                         );
                     }
-                    let iframe = el.querySelector('iframe');
+                    const iframe = el.querySelector('iframe');
                     if (iframe) {
                         iframe.style.removeProperty('pointer-events');
                     }
@@ -310,7 +313,7 @@
 
     export function update_title(title: string) {
         runningPrograms.update((values) => {
-            let program = values.find((el) => el.options.id == options.id);
+            const program = values.find((el) => el.options.id == options.id);
             if (program != null) {
                 program.options.title = title;
             }
@@ -327,7 +330,7 @@
         theme?: string;
         message: string;
     }) {
-        let toast = document.createElement('div');
+        const toast = document.createElement('div');
         toast.style.position = 'absolute';
         toast.style.transform = 'translate(-50%)';
         toast.style.left = '50%';

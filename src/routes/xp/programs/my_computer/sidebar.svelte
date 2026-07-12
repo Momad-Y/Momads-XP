@@ -6,7 +6,7 @@
 
     export let id: string | null | undefined = undefined;
 
-    let hidden: Record<string, boolean> = {};
+    const hidden: Record<string, boolean> = {};
 
     interface SidebarItem {
         name: string;
@@ -135,12 +135,15 @@
     class="w-[220px] shrink-0 overflow-auto p-2"
     style:background="linear-gradient(rgb(137 155 253) 0%, rgb(84 104 212) 100%)"
 >
+    <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
     {#each menu as section}
+        <!-- eslint-disable svelte/no-useless-mustaches -- a plain quoted value this long gets line-wrapped by prettier, and svelte2tsx cannot parse multi-line style: text -->
         <div
             class="w-full overflow-hidden flex flex-col bg-blue-50 mt-2
         {hidden[section.name] ? 'rounded' : 'rounded-t'}"
-            style:background="linear-gradient(rgb(246 246 246) 0%, rgb(210 216 252) 100%)"
+            style:background={'linear-gradient(rgb(246 246 246) 0%, rgb(210 216 252) 100%)'}
         >
+            <!-- eslint-enable svelte/no-useless-mustaches -->
             <div
                 class="grow-0 h-7 flex flex-row items-center justify-between bg-gradient-to-r from-blue-600 to-blue-700"
                 on:click={() => (hidden[section.name] = !hidden[section.name])}
@@ -180,6 +183,7 @@
                     ? 'h-0'
                     : 'grow p-2'}"
             >
+                <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
                 {#each section.items as item}
                     <div
                         class="flex flex-row items-center mt-2"

@@ -60,6 +60,7 @@
                     ? 'justify-center'
                     : 'justify-end'}"
             >
+                <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
                 {#each buttons as button}
                     <Button
                         title={button.name}

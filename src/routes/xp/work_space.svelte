@@ -15,7 +15,8 @@
     let node_ref: HTMLDivElement;
     let workSpaceHeight: number;
 
-    let unsubscribers = [
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- the inherited base never unsubscribes (work_space lives for the whole session); wiring these into onDestroy would be a behavior change
+    const unsubscribers = [
         queueProgram.subscribe((program) => {
             if (program == null) {
                 return;
@@ -29,7 +30,7 @@
     onDestroy(() => {});
 
     async function launch(program: ProgramLaunchRequest) {
-        let { fs_item, copying_obj, target_folder_id, path } = program;
+        const { fs_item, copying_obj, target_folder_id, path } = program;
 
         if (path == './programs/my_computer.svelte') {
             const Program = (await import('./programs/my_computer.svelte'))
@@ -64,7 +65,7 @@
             //     return [...values, program];
             // })
         } else if (path == './programs/internet_explorer.svelte') {
-            let url = await get_url(fs_item);
+            const url = get_url(fs_item);
             const Program = (
                 await import('./programs/internet_explorer.svelte')
             ).default;
@@ -207,7 +208,7 @@
         queueProgram.set(null);
     }
 
-    async function get_url(item: Partial<VfsItem> | undefined) {
+    function get_url(item: Partial<VfsItem> | undefined) {
         if (item == null) return 'https://wiby.me/';
 
         if (item.storage_type == 'local') {

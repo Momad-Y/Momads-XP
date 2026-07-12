@@ -7,7 +7,7 @@
     let cached_url: string | null = '';
 
     async function get_wallpaper_url(w: string | null) {
-        let fs_item = required(
+        const fs_item = required(
             w == null
                 ? undefined
                 : required(store_get(hardDrive), 'hard drive')[w], // read without subscribing — avoids re-render on hardDrive changes
@@ -19,7 +19,7 @@
         if (fs_item.storage_type == 'remote') {
             url = fs_item.url ?? null;
         } else if (fs_item.storage_type == 'local') {
-            let file = await get<Blob>(
+            const file = await get<Blob>(
                 required(fs_item.url, 'wallpaper idb key'),
             );
             url = URL.createObjectURL(required(file, 'wallpaper blob'));
@@ -32,7 +32,7 @@
 
     function load_image_url(url: string | null) {
         return new Promise<void>((resolve) => {
-            let image = new Image();
+            const image = new Image();
             if (url != null) {
                 image.src = url;
             }

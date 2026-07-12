@@ -44,7 +44,7 @@
         }
     });
 
-    export async function destroy() {
+    export function destroy() {
         cancelled = true;
         runningPrograms.update((programs) =>
             programs.filter((p) => p != get_self()),
@@ -53,11 +53,11 @@
     }
 
     async function compress(item: VfsItem) {
-        let zip = new JSZip();
+        const zip = new JSZip();
         await add_to_archive(zip, item);
         void zip.generateAsync({ type: 'blob' }).then(async (content) => {
-            let filename = item.basename + '.zip';
-            let file = new File([content], filename, {
+            const filename = item.basename + '.zip';
+            const file = new File([content], filename, {
                 type: utils.ext_to_mime(filename) ?? undefined,
             });
             await fs.new_fs_item(
@@ -67,26 +67,26 @@
                 item.parent ?? null,
                 file,
             );
-            await destroy();
+            destroy();
         });
     }
 
     async function add_to_archive(parent: JSZip, item: VfsItem) {
         if (cancelled) return;
         if (item.type == 'folder') {
-            let folder = required(
+            const folder = required(
                 parent.folder(item.name),
                 'zip folder ' + item.name,
             );
-            for (let child_id of [...item.children]) {
-                let child_item = required(
+            for (const child_id of [...item.children]) {
+                const child_item = required(
                     $hardDrive?.[child_id],
                     'fs item ' + child_id,
                 );
                 await add_to_archive(folder, child_item);
             }
         } else if (item.type == 'file') {
-            let file = await fs.get_file(item.id);
+            const file = await fs.get_file(item.id);
             parent.file(item.name, file);
         }
     }

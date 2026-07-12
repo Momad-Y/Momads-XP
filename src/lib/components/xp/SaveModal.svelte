@@ -16,7 +16,11 @@
 
     export let id: string | null | undefined = undefined;
 
-    export let viewer: Viewer3 | undefined = undefined;
+    /** Viewer3 instance (typed structurally so eslint's TS service, which
+     * resolves .svelte imports as `any`, still type-checks the calls). */
+    export let viewer:
+        { open: (id: string | null | undefined) => void } | undefined =
+        undefined;
     export let filetypes: SaveAsFiletype[] = [];
     export let selected_filetype: SaveAsFiletype | undefined = undefined;
 
@@ -26,7 +30,7 @@
         icon: string;
     }
 
-    let left_side_places: SidePlace[] = [
+    const left_side_places: SidePlace[] = [
         {
             id: desktop_folder,
             name: 'Desktop',
@@ -90,10 +94,13 @@
                 <div
                     class="bg-xp-yellow-light shadow rounded w-full overflow-y-auto"
                 >
+                    <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
                     {#each left_side_places as place}
                         <div
                             class="w-full flex flex-col items-center py-2 px-1 hover:bg-slate-100 rounded"
-                            on:click={() => viewer?.open(place.id)}
+                            on:click={() => {
+                                viewer?.open(place.id);
+                            }}
                         >
                             <div
                                 class="w-10 h-10 bg-contain bg-no-repeat bg-center"
@@ -114,7 +121,9 @@
                     {id}
                     {filetypes}
                     {selected_filetype}
-                    on_save={(data) => on_save(data)}
+                    on_save={(data: SaveAsSelection) => {
+                        on_save(data);
+                    }}
                     on_cancel={destroy}
                 ></Viewer3>
             </div>

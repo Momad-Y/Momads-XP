@@ -26,7 +26,7 @@
     import { required } from '../../lib/types';
     import type { FSItemOriginator, VfsItem } from '../../lib/types';
 
-    let id = desktop_folder;
+    const id = desktop_folder;
 
     $: desktop_item = $hardDrive?.[id] ?? null;
     $: items =
@@ -39,7 +39,7 @@
     let is_focus = true;
     let item_long_pressed = false;
     let node_ref: HTMLDivElement;
-    let cell_size = 80;
+    const cell_size = 80;
 
     export let renaming = false;
 
@@ -73,7 +73,7 @@
 
     function parse_translate(str: string) {
         if (!str) return { x: 0, y: 0 };
-        let m = str.match(/translate(?:3d)?\(([^,]+)px,\s*([^,)]+)px/);
+        const m = str.match(/translate(?:3d)?\(([^,]+)px,\s*([^,)]+)px/);
         return m
             ? { x: parseFloat(m[1] ?? ''), y: parseFloat(m[2] ?? '') }
             : { x: 0, y: 0 };
@@ -82,12 +82,12 @@
     function on_mousedown(e: MouseEvent) {
         if (e.button !== 0) return;
         _drag_moved = false;
-        let item_el =
+        const item_el =
             e.target instanceof Element
                 ? e.target.closest<HTMLElement>('.fs-item')
                 : null;
         if (item_el) {
-            let t = parse_translate(item_el.style.transform);
+            const t = parse_translate(item_el.style.transform);
             _drag_start = {
                 x: e.clientX,
                 y: e.clientY,
@@ -104,7 +104,7 @@
 
     function on_mousemove(e: MouseEvent) {
         if (!_drag_start) return;
-        let dx = e.clientX - _drag_start.x,
+        const dx = e.clientX - _drag_start.x,
             dy = e.clientY - _drag_start.y;
         if (!_drag_moved && dx * dx + dy * dy < 25) return;
         _drag_moved = true;
@@ -112,14 +112,14 @@
             _drag_start.item_el.style.transform = `translate(${String(_drag_start.item_tx + dx)}px, ${String(_drag_start.item_ty + dy)}px)`;
         } else {
             rb_visible = true;
-            let cr = node_ref.getBoundingClientRect();
-            let [sx, sy, cx, cy] = [
+            const cr = node_ref.getBoundingClientRect();
+            const [sx, sy, cx, cy] = [
                 _drag_start.x,
                 _drag_start.y,
                 e.clientX,
                 e.clientY,
             ];
-            let rbc = {
+            const rbc = {
                 left: Math.min(sx, cx),
                 right: Math.max(sx, cx),
                 top: Math.min(sy, cy),
@@ -129,16 +129,16 @@
             rb_top = rbc.top - cr.top;
             rb_width = rbc.right - rbc.left;
             rb_height = rbc.bottom - rbc.top;
-            let sel: string[] = [];
-            for (let el of node_ref.querySelectorAll('.fs-item')) {
-                let r = el.getBoundingClientRect();
+            const sel: string[] = [];
+            for (const el of node_ref.querySelectorAll('.fs-item')) {
+                const r = el.getBoundingClientRect();
                 if (
                     r.left < rbc.right &&
                     r.right > rbc.left &&
                     r.top < rbc.bottom &&
                     r.bottom > rbc.top
                 ) {
-                    let fid = el.getAttribute('fs-id');
+                    const fid = el.getAttribute('fs-id');
                     if (fid != null && $hardDrive?.[fid] != null) sel.push(fid);
                 }
             }
@@ -160,7 +160,7 @@
     }
 
     function on_rightclick(ev: MenuTrigger, item: VfsItem) {
-        let selected = $selectingItems.includes(item.id);
+        const selected = $selectingItems.includes(item.id);
         if (!selected) {
             if (ev.metaKey || ev.ctrlKey) {
                 $selectingItems = [...$selectingItems, item.id];
@@ -190,7 +190,7 @@
     }
 
     function show_void_menu(ev: MenuTrigger) {
-        let originator = { id };
+        const originator = { id };
         contextMenu.set({ x: ev.x, y: ev.y, type: 'Desktop', originator });
     }
 
@@ -207,7 +207,7 @@
 
         is_focus = false;
         clear_selection();
-        let fs_item = required($hardDrive?.[id], 'fs item ' + id);
+        const fs_item = required($hardDrive?.[id], 'fs item ' + id);
         const handlers = doctypes[fs_item.ext];
         if (fs_item.type == 'file') {
             if (fs_item.executable) {
@@ -240,12 +240,12 @@
     function rename() {
         renaming = true;
         void tick().then(() => {
-            let id = required($selectingItems[0], 'renaming selection');
-            let el = document.querySelector<HTMLTextAreaElement>(
+            const id = required($selectingItems[0], 'renaming selection');
+            const el = document.querySelector<HTMLTextAreaElement>(
                 `div[fs-id="${id}"] textarea`,
             );
-            let end_range = required($hardDrive?.[id], 'fs item ' + id).basename
-                .length;
+            const end_range = required($hardDrive?.[id], 'fs item ' + id)
+                .basename.length;
             if (el != null) el.setSelectionRange(0, end_range);
         });
     }
@@ -253,10 +253,10 @@
     function end_renaming(e: Event, item: VfsItem) {
         const target = e.target;
         if (!(target instanceof HTMLTextAreaElement)) return;
-        let name = utils.sanitize_filename(target.value);
+        const name = utils.sanitize_filename(target.value);
 
-        let ext = utils.extname(name);
-        let seedname = utils.basename(name, ext);
+        const ext = utils.extname(name);
+        const seedname = utils.basename(name, ext);
         let basename = seedname;
 
         item.ext = ext.toLowerCase();
@@ -267,7 +267,7 @@
         }
 
         const parent_id = required(item.parent, 'parent of ' + item.id);
-        let parent_items_names = [
+        const parent_items_names = [
             ...required($hardDrive?.[parent_id], 'fs item ' + parent_id)
                 .children.filter((el) => el != item.id)
                 .map((el) => required($hardDrive?.[el], 'fs item ' + el).name),
@@ -290,6 +290,7 @@
     function on_keydown(e: KeyboardEvent) {
         if (!is_focus) return;
         if (renaming) return;
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- defensive guard kept from the base (id is a const today)
         if (id == null) return;
         console.log('keyevent in desktop_folder');
 
@@ -307,9 +308,10 @@
 
     async function on_drop(e: DragEvent) {
         e.preventDefault();
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- defensive guard kept from the base (id is a const today)
         if (id == null) return;
 
-        let copying_obj = await parse_dir({ dataTransfer: e.dataTransfer });
+        const copying_obj = await parse_dir({ dataTransfer: e.dataTransfer });
         queueProgram.set({
             path: './programs/copier.svelte',
             copying_obj,
@@ -326,7 +328,7 @@
             return `url(${item.icon})`;
         }
         if (icons[item.ext] != null) {
-            return `url(/images/xp/icons/${icons[item.ext]})`;
+            return `url(/images/xp/icons/${icons[item.ext] ?? ''})`;
         }
         return null;
     }
@@ -353,25 +355,31 @@
     }}
     on:contextmenu|self={show_void_menu}
     use:long_press
-    on:long_press|self={(e) => {
+    on:long_press|self={(e: CustomEvent<{ x: number; y: number }>) => {
         if (!item_long_pressed)
             show_void_menu({ x: e.detail.x, y: e.detail.y });
     }}
     bind:this={node_ref}
 >
+    <!-- eslint-disable @typescript-eslint/no-unnecessary-condition -- defensive guard kept from the base (id is a const today) -->
     <div
         class="top-0 left-0 bottom-0 absolute flex flex-col flex-wrap"
         class:hidden={id == null}
     >
-        {#each items as item, index (item.id)}
+        <!-- eslint-enable @typescript-eslint/no-unnecessary-condition -->
+        {#each items as item (item.id)}
             <div
                 fs-id={item.id}
                 class="relative fs-item w-[150px] flex-shrink-0 flex-grow-0 overflow-hidden m-2 inline-flex flex-col items-center font-MSSS"
-                on:dblclick={() => open(item.id)}
-                on:contextmenu={(e) => on_rightclick(e, item)}
+                on:dblclick={() => {
+                    open(item.id);
+                }}
+                on:contextmenu={(e) => {
+                    on_rightclick(e, item);
+                }}
                 on:click={(e) => {
                     if (_drag_moved) return;
-                    let fs_id = e.currentTarget.getAttribute('fs-id');
+                    const fs_id = e.currentTarget.getAttribute('fs-id');
                     if (fs_id == null) return;
                     if (e.ctrlKey || e.metaKey) {
                         $selectingItems = $selectingItems.includes(fs_id)
@@ -382,13 +390,15 @@
                     }
                 }}
                 use:long_press
-                on:long_press={(e) => {
+                on:long_press={(e: CustomEvent<{ x: number; y: number }>) => {
                     item_long_pressed = true;
                     setTimeout(() => (item_long_pressed = false), 100);
                     on_rightclick({ x: e.detail.x, y: e.detail.y }, item);
                 }}
                 use:double_tap
-                on:double_tap={() => open(item.id)}
+                on:double_tap={() => {
+                    open(item.id);
+                }}
                 style:transform={item.desktop_css_transform}
                 style:width="{cell_size}px"
                 style:height="{cell_size}px"
@@ -414,7 +424,7 @@
                 {/if}
                 <p
                     class="px-1 mx-0.5 text-[11px] break-words line-clamp-2 text-ellipsis leading-tight text-center text-white
-                    {$selectingItems?.includes(item.id) && is_focus
+                    {$selectingItems.includes(item.id) && is_focus
                         ? 'bg-blue-600 text-slate-50'
                         : ''}"
                     style="text-shadow: 1px 1px 2px black;"
@@ -424,9 +434,12 @@
                 {#if $selectingItems.includes(item.id) && renaming}
                     <textarea
                         autofocus
-                        on:keydown={(e) =>
-                            e.key == 'Enter' && end_renaming(e, item)}
-                        on:blur={(e) => end_renaming(e, item)}
+                        on:keydown={(e) => {
+                            if (e.key == 'Enter') end_renaming(e, item);
+                        }}
+                        on:blur={(e) => {
+                            end_renaming(e, item);
+                        }}
                         class="absolute max-h-[40px] left-0 top-[40px] right-0 bottom-0 overflow-hidden
                         outline-none border-1 border-slate-900 text-[11px] font-MSSS z-50 resize-none"
                         >{item.name}</textarea

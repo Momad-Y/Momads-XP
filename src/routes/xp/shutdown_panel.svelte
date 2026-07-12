@@ -45,7 +45,9 @@
                     </div>
                     <div
                         class="flex flex-col items-center justify-center group"
-                        on:click={() => queueCommand.set('shutdown')}
+                        on:click={() => {
+                            queueCommand.set('shutdown');
+                        }}
                     >
                         <div
                             class="group-hover:brightness-110 w-8 h-8 bg-[url(/images/xp/icons/Power.png)] bg-contain bg-no-repeat mb-1"
@@ -54,7 +56,9 @@
                     </div>
                     <div
                         class="flex flex-col items-center justify-center group"
-                        on:click={() => queueCommand.set('restart')}
+                        on:click={() => {
+                            queueCommand.set('restart');
+                        }}
                     >
                         <div
                             class="group-hover:brightness-110 w-8 h-8 bg-[url(/images/xp/icons/Restart.png)] bg-contain bg-no-repeat mb-1"
