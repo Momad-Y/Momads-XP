@@ -7,8 +7,8 @@ npm-debug.log*
 node_modules/
 
 # Build
-dist/
-dist-ssr/
+/dist/
+/dist-ssr/
 
 # Editor
 .vscode/*
@@ -33,9 +33,9 @@ CLAUDE.md
 # Research clones and browser artifacts
 .claude/research/
 .playwright-mcp/
-# SvelteKit / build
+# SvelteKit / build (anchored to root — static/html/jspaint has its own build/ dir)
 .svelte-kit/
-build/
+/build/
 .netlify/
 coverage/
 test-results/
