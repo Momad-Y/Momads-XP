@@ -1,12 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
-
-async function bootToDesktop(page: Page): Promise<void> {
-    await page.goto('/');
-    // boot takes >=3s (aesthetic sleep) + asset preloading
-    await expect(page.locator('#start-menu-btn')).toBeVisible({
-        timeout: 30_000,
-    });
-}
+import { test, expect } from '@playwright/test';
+import { bootToDesktop } from './helpers';
 
 test('boots straight to loading screen then desktop', async ({ page }) => {
     await bootToDesktop(page);
