@@ -26,6 +26,7 @@
     import { get, set } from 'idb-keyval';
     import { parse_dir } from '../../../../lib/dir_parser';
     import { required } from '../../../../lib/types';
+    import { show_no_association_dialog } from '../../../../lib/no_association';
     import type {
         FSItemOriginator,
         MountedComponent,
@@ -253,10 +254,7 @@
                     fs_item: fs_item,
                 });
             } else {
-                queueProgram.set({
-                    path: './programs/notepad.svelte',
-                    fs_item: fs_item,
-                });
+                show_no_association_dialog(fs_item.name);
             }
         } else {
             dispatch('open', { id: item_id });
