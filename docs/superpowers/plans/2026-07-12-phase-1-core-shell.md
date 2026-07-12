@@ -17,7 +17,7 @@ Every task's requirements implicitly include this section.
 - **Strict TS:** `strict: true` + `noUncheckedIndexedAccess`; ESLint `no-explicit-any` and `no-unsafe-type-assertion` are errors over all of `src/`. Zero `any`, zero unsafe assertions in new code.
 - **svelte-check:** `npm run check` must report **0 errors** (inherited warnings are non-gating).
 - **Prettier/ESLint hooks:** husky + lint-staged format on commit; run `npx prettier --write <files>` before committing if you edited JSON/MD by script.
-- **Gates before EVERY commit** (and per-slice before the PR): `npm run check` && `npm run lint` && `npm run format:check` && `npx vitest run --coverage` && `npm run build` && `npx playwright test` — all green.
+- **Gates:** the FULL chain — `npm run check` && `npm run lint` && `npm run format:check` && `npx vitest run --coverage` && `npm run build` && `npx playwright test` — must be green before every **push/PR** (each slice's final task runs it). Per-commit gates are as listed in each task's commit step, with an absolute minimum of `npm run check` + `npm run lint` on every commit.
 - **SEED_VERSION:** after ANY edit to `static/json/hard_drive.json`, recompute: `sha256sum static/json/hard_drive.json | cut -c1-32` and stamp it into `src/lib/seed.ts:14`.
 - **Conventional commits:** `<type>: <description>` (feat, fix, refactor, docs, test, chore, perf, ci).
 - **No rebranding beyond what the design states.** Copy strings are quoted verbatim in the tasks; do not invent additional copy.
@@ -911,7 +911,13 @@ At the end of the markup (after the closing outer `</div>`, before `<style>`), a
 
 - [ ] **Step 2: Rebrand the markup**
 
-Replace lines 359-384 (the two `<div>` blocks) with:
+First add the profile import next to the other lib imports at the top of `starting.svelte`'s script (§7: never hardcode personal content — the branding reads `profile.meta`):
+
+```typescript
+    import { profile } from '../../lib/profile';
+```
+
+Then replace lines 359-384 (the two `<div>` blocks) with:
 
 ```svelte
 <div class="absolute inset-0 bg-black overflow-hidden text-slate-100">
@@ -923,9 +929,11 @@ Replace lines 359-384 (the two `<div>` blocks) with:
             class="mt-4 text-4xl font-bold font-sans text-slate-50"
             style="text-shadow: 2px 2px 3px rgba(0,0,0,0.6);"
         >
-            Momad's XP
+            {profile.meta.shortName}'s XP
         </p>
-        <p class="text-lg font-sans text-slate-300 italic">AI Engineer</p>
+        <p class="text-lg font-sans text-slate-300 italic">
+            {profile.meta.title}
+        </p>
         <div class="xp-loader">
             <div></div>
             <div></div>
@@ -944,6 +952,8 @@ Replace lines 359-384 (the two `<div>` blocks) with:
 </div>
 ```
 
+(Stated exception: the F11 hint and the "Portfolio" watermark are design copy from §2.1, not personal content — they have no `profile.meta` field and stay literal.)
+
 Also reduce the `.xp-loader` top margin so the bar sits under the text block — in the `<style>` block change `margin-top: 150px;` to `margin-top: 60px;` (parity loop in Task 5 fine-tunes against `my-loading.png`).
 
 - [ ] **Step 3: Regenerate the preload arrays (phase-0-guide §10 discipline)**
@@ -959,6 +969,8 @@ Replace the `images`, `audios`, `fonts`, `empties` const arrays in `starting.sve
         '/assets/images/xp-logo.png',
         '/assets/images/avatar.png',
 ```
+
+`gen/assets.js` prints `let` declarations on a single line — convert them to `const` (the lint config rejects `let` for never-reassigned bindings) and run `npx prettier --write src/routes/xp/starting.svelte` before committing so the arrays are re-wrapped one-entry-per-line.
 
 - [ ] **Step 4: Verify by hand**
 
@@ -1394,13 +1406,15 @@ for (const [id, item] of Object.entries(hd)) {
     }
 }
 
-fs.writeFileSync(SEED_PATH, JSON.stringify(hd, null, 4) + '\n');
+// compact, matching the seed's existing single-line format — a pretty-printed
+// rewrite would bury the real 3-remove/3-add diff in a full-file reformat
+fs.writeFileSync(SEED_PATH, JSON.stringify(hd));
 console.log(`curated: ${Object.keys(hd).length} items on disk`);
 ```
 
 - [ ] **Step 4: Run it and verify the hash test now FAILS**
 
-(`static/` is prettier-ignored, so the script's `JSON.stringify(hd, null, 4)` output is the canonical formatting — no prettier pass needed.)
+(`static/` is prettier-ignored and the seed is compact single-line JSON; the script writes `JSON.stringify(hd)` to keep it that way. The resulting one-line diff is not human-reviewable — reviewers verify the change by reading `gen/curate_seed_phase1.mjs` and trusting its consistency checks plus the hash-guard test, not by eyeballing the JSON diff.)
 
 ```bash
 node gen/curate_seed_phase1.mjs
@@ -1532,10 +1546,10 @@ git commit -m "feat: show XP no-association dialog for unhandled file extensions
 ### Task 9: Start menu restructure (§3.4)
 
 **Files:**
-- Modify: `src/routes/xp/start_menu.svelte` — data arrays (`:24-324`), `StartMenuItem` (`:11-22`), `launch` (`:349-369`), header (`:398-401`), right column render (`:813-843`), bottom bar (`:846-872`), desktop flyout container (`:643-645` gains an id)
+- Modify: `src/routes/xp/start_menu.svelte` — data arrays (`:24-324`), `StartMenuItem` (`:11-22`), header (`:398-401`), right column render (`:813-843`), bottom bar (`:846-872`), desktop flyout container (`:643-645` gains an id)
 
 **Interfaces:**
-- Consumes: `profile.meta.{avatar,name}` + `profile.social` (Task 1/slice 1); placeholder launch contract from Task 6; icons from Task 7.
+- Consumes: `profile.meta.{avatar,name}` + `profile.social` (Task 1/slice 1); placeholder launch contract from Task 6; icons from Task 7; the existing `launch()` (`start_menu.svelte:349-369`), which already forwards `fs_item` into `queueProgram` — no edit to it is needed.
 - Produces: DOM contract for Task 11's E2E — `#start-menu` (existing), `#all-programs-flyout` (new id on the desktop flyout), social `<a>` elements with exact `href`s, Games L2 flyout entries Minesweeper/Solitaire/Chess/DOOM.
 
 - [ ] **Step 1: Restructure the menu data**
@@ -2162,9 +2176,10 @@ test('double-clicking an unassociated file shows the XP dialog', async ({
 Run: `npx playwright test`
 Expected: 10 passed (3 smoke + 2 login + 2 start_menu + 3 shell). If the "New Text Document" flow proves flaky on the rename commit, replace `Enter` + click with only the blur click — the assertion target is the dialog, not the rename.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 4: Run minimum gates and commit**
 
 ```bash
+npm run check && npm run lint && npm run format:check
 git add e2e/start_menu.spec.ts e2e/shell.spec.ts
 git commit -m "test: E2E for start-menu structure, placeholder, cascade, and fallback dialog"
 ```
@@ -2819,7 +2834,7 @@ test.describe('mobile landscape (844x390)', () => {
 - [ ] **Step 2: Run the E2E suite**
 
 Run: `npx playwright test`
-Expected: 12 passed (10 prior + 2 mobile). Note: mobile specs skip `bootToDesktop` — the mobile branch bypasses the boot chain entirely (§4.6: boot sequence deferred on mobile).
+Expected: 12 passed (or 7 if slice 2 has not merged into dev yet — slices are independent). Note: mobile specs skip `bootToDesktop` — the mobile branch bypasses the boot chain entirely (§4.6: boot sequence deferred on mobile).
 
 - [ ] **Step 3: Final gates, push, PR**
 
