@@ -111,7 +111,7 @@
             class="flex flex-row items-center gap-2 cursor-pointer rounded p-1 hover:bg-white/10 outline-none"
             on:click={restart}
             on:keydown={(e) => {
-                if (e.key === 'Enter') restart();
+                if (e.key === 'Enter' || e.key === ' ') restart();
             }}
         >
             <div

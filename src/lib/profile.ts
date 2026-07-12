@@ -20,7 +20,6 @@ export interface ProfileMeta {
     tagline: string;
     location: string;
     email: string;
-    phone: string;
     avatar: string;
     resumePdf: string;
 }
