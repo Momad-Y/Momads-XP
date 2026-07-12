@@ -6,6 +6,7 @@
     import { hardDrive, wallpaper, contextMenu } from '../../lib/store';
     import { bliss_wallpaper, SortOptions, SortOrders } from '../../lib/system';
     import { required } from '../../lib/types';
+    import { SEED_VERSION, shouldReseed } from '../../lib/seed';
     import type {
         ContextMenuRequest,
         LoadPageEvent,
@@ -226,14 +227,15 @@
 
     async function load_hard_drive() {
         let hard_drive = await get<StoredHardDrive>('hard_drive');
-        if (hard_drive == null) {
+        const stored_version = await get<string>('hard_drive_seed_version');
+        if (hard_drive == null || shouldReseed(stored_version)) {
             hard_drive = (
                 await axios.get<StoredHardDrive>('/json/hard_drive.json')
             ).data;
             await set('hard_drive', hard_drive);
+            await set('hard_drive_seed_version', SEED_VERSION);
         }
         migrate_files_format(hard_drive);
-        console.log(hard_drive);
         hardDrive.set(hard_drive);
     }
 
