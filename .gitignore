@@ -25,7 +25,18 @@ Thumbs.db
 .env
 .env.*
 
-# Local development notes 
-docs/
+# Local development notes
+docs/overthinking.txt
 design/
 CLAUDE.md
+
+# Research clones and browser artifacts
+.claude/research/
+.playwright-mcp/
+# SvelteKit / build
+.svelte-kit/
+build/
+.netlify/
+coverage/
+test-results/
+playwright-report/
