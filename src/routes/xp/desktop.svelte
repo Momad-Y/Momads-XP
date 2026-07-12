@@ -62,9 +62,13 @@
         );
 
         //load other pure js lib
+        // panzoom is vendored (design decision 13) — removes the unpkg runtime
+        // dependency; consumer is the kept image_viewer. The Google Charts
+        // loader stays CDN WITHOUT SRI: it fetches submodules dynamically, so
+        // SRI is infeasible — accepted; sole consumer is disk_properties.
         loadjs([
             'https://www.gstatic.com/charts/loader.js',
-            'https://unpkg.com/panzoom@9.4.0/dist/panzoom.min.js',
+            '/js/panzoom.min.js',
         ]);
     });
 
