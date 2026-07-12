@@ -9,6 +9,7 @@
     import { zIndex, runningPrograms } from '../../store';
     import { required } from '../../types';
     import type { WindowOptions } from '../../types';
+    import { next_cascade_position } from '../../cascade';
 
     interface WindowRect {
         top: number;
@@ -93,11 +94,24 @@
             );
             maximized = true;
         } else {
-            if (options.top == null) {
-                options.top = (parent.offsetHeight - win().offsetHeight) / 2;
-            }
-            if (options.left == null) {
-                options.left = (parent.offsetWidth - win().offsetWidth) / 2;
+            if (options.top == null && options.left == null) {
+                // no saved rect, no program-specified position → cascade (§4.1)
+                const position = next_cascade_position({
+                    win_width: win().offsetWidth,
+                    win_height: win().offsetHeight,
+                    workspace_width: parent.offsetWidth,
+                    workspace_height: parent.offsetHeight,
+                });
+                options.top = position.top;
+                options.left = position.left;
+            } else {
+                if (options.top == null) {
+                    options.top =
+                        (parent.offsetHeight - win().offsetHeight) / 2;
+                }
+                if (options.left == null) {
+                    options.left = (parent.offsetWidth - win().offsetWidth) / 2;
+                }
             }
         }
         set_position({

@@ -77,6 +77,12 @@ export interface ProgramLaunchRequest {
     name?: string;
     icon?: string;
     fs_item?: Partial<VfsItem>;
+    /**
+     * The launched executable's own VFS item (name/icon source for the
+     * placeholder). Distinct from `fs_item`, which is the *argument* some
+     * programs open (e.g. the folder my_computer displays).
+     */
+    exe_item?: Partial<VfsItem>;
     webapp?: unknown;
     copying_obj?: CopyTree;
     target_folder_id?: string;
