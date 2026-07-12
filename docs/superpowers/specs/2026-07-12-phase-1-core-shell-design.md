@@ -1,58 +1,46 @@
-# Phase 1 — Core XP Shell: Design
+# Phase 1 — Core XP Shell: Design (v2, post red-team)
 
-> Spec for Phase 1 (SPECIFICATION.md §9 Phase 1; process §11). Status: gates run autonomously per §11 autonomy rule.
-> Owner inputs collected: Instagram handle `7.zsjj`; resume PDF = `docs/Profile.pdf` (LinkedIn export, swappable later).
+> Spec for Phase 1 (SPECIFICATION.md §9 Phase 1; process §11). Gates run autonomously per §11.
+> Owner inputs: Instagram `7.zsjj`; GitHub `Momad-Y`; LinkedIn `mohamed-y-abdelnasser`; resume PDF = `docs/Profile.pdf` (swappable later).
+> v2 incorporates the gate-2 red-team verdict (APPROVE WITH FIXES): welcome retime, MPC verdict, Games flyout, mobile §4.6 content, cascade as build work, placeholder mechanism, coverage mechanics, boot skip, mode locking, SRI verdict, plan slicing.
 
 ## Goal
 
-Rebranded boot flow with a new XP-faithful **login screen**, curated desktop + restructured start menu (placeholders for unbuilt apps), real `profile.json`, and the **mobile portrait experience** — plus the Phase-0 carry-overs (FA-Pro icon replacement, diff-based coverage, loadjs-script SRI decision, notepad-fallback dialog).
+Rebranded boot flow with a new XP-faithful **login screen**, curated desktop + restructured start menu (placeholders for unbuilt apps), real `profile.json`, the **mobile portrait experience**, and the Phase-0 carry-overs (FA-Pro replacement, diff-based coverage, loadjs-script SRI, notepad-fallback dialog).
 
-## Sub-decisions (for/against per §11)
+## Sub-decisions
 
-1. **Login screen placement — new `src/routes/xp/login.svelte` in the `load_page` chain** (starting → **login** → desktop).
-   *For:* matches the established page-switch architecture; login is a full screen, not an overlay; trivial to test.
-   *Against:* one more hardcoded import branch in `+page.svelte`.
-   *Rejected:* overlay inside desktop (login is not a desktop child); SvelteKit route (the shell is a single-route SPA by design).
-2. **Startup sound — played on the login-card click** (the required user gesture), before dispatching desktop; the welcome splash stays but must not double-play audio.
-   *For:* satisfies §2 (sound at Login → Welcome) and §4.3 (on by default, autoplay-safe).
-   *Against:* none material. The base's welcome overlay currently triggers the sound on desktop mount — that trigger MOVES to login (verify no double-play).
-3. **Boot rebrand — text/asset swap inside `starting.svelte`** per §2.1 and `design/inspiration/my-loading.png`: XP logo block + "Momad's XP / AI Engineer" branding, bottom-left F11 hint, bottom-right "Portfolio" watermark. Title in `+page.svelte`/`app.html` becomes **"Momad's XP"**.
-   *For:* keeps the authentic loading animation; smallest change.
-   *Against:* logo remains the MS XP flag (acceptable — nostalgic fair-use posture, §10).
-4. **profile.json + typed accessor — `src/lib/data/profile.json` + `src/lib/profile.ts`** exporting a typed, frozen `profile` object (interface `Profile` mirrors SPECIFICATION.md §7; content from `docs/Profile.pdf` + owner answers; `projects: []` until Phase 2).
-   *For:* compile-time import = type-checked at build; no runtime validation needed for our own bundled file.
-   *Against/rejected:* Zod schema — boundary validation adds a dep for data that never crosses a trust boundary (revisit when profile.json feeds the VFS generator in Phase 2).
-5. **Unbuilt apps — one generic `placeholder.svelte` program** (XP message-window: app icon + "under construction — coming in a later phase"), registered in `launch()`, parameterized by name/icon.
-   *For:* §9 exit criteria demands placeholders; one component serves About Me / My CV / Contact Me / CMD / Python / Music / Games entries.
-   *Against:* none. *Rejected:* per-app stub components (duplication).
-6. **Desktop curation — VFS seed edit** (`hard_drive.json` + `SEED_VERSION` bump): desktop = My Computer, About Me, My CV, Internet Explorer, Contact Me (+ Recycle Bin). Paint/MPC/Games leave the desktop but stay in the start menu (Games → placeholder).
-   *For:* §3.5 exactly; icons exist in `static/assets/icons`.
-   *Against:* returning visitors re-seed (accepted §6.7 semantics).
-7. **Start menu — restructure the two hardcoded columns** per §3.4 + `my-start-menu.png`: header (avatar + name from profile.json), pinned IE + Contact Me, All Programs flyout (My Computer, About Me, CMD, Python, Paint, Music Player, Games submenu), right column (My Computer, My CV, About Me, Contact Me | GitHub, LinkedIn, Instagram | Shut Down). Social links open new tabs via `window.open`; data from profile.json.
-   *For:* start menu is already data-driven arrays in one component.
-   *Against:* Log Off row goes (not in §3.4) — feature-neutral, it returns via Shut Down dialog later.
-8. **Mobile — branch in `+page.svelte` before the boot chain**: `matchMedia` decides desktop (≥1024px), portrait mobile (<1024px portrait → new `src/lib/mobile/MobilePortfolio.svelte`, single-column XP-styled, reads profile.json, Download Resume + mailto + social links, "visit on desktop" footer), or rotate-prompt (<1024px landscape). Reacts to orientation changes live.
-   *For:* mobile visitors never load the shell's heavy assets (spec §4.6 perf trade-offs).
-   *Against:* two render paths to keep consistent — accepted, they share profile.ts.
-9. **FA-Pro replacement — swap inlined Pro SVG paths for FA Free equivalents** in SMenu, SelectBox, ContextMenu, RButton, image_viewer (+ any grep hits), each verified in the parity loop.
-   *For:* removes the licensing violation before the site is promoted.
-   *Against:* minor glyph differences — parity loop owns the visual check.
-10. **Coverage ratchet — diff-cover in CI** (`vitest --coverage` → lcov → `diff-cover --compare-branch origin/dev --fail-under 80` on PRs; fetch-depth 0).
-    *For:* no external service/token; enforces 80% on changed lines exactly as decided in Phase 0.
-    *Rejected:* Codecov (external dependency for the same gate).
-11. **Resume — copy `docs/Profile.pdf` → `static/assets/Mohamed_Abdelnasser_Resume.pdf`**; mobile Download button links it; desktop "My CV" opens the placeholder until Phase 2's viewer.
+1. **Login placement** — new `src/routes/xp/login.svelte` in the `load_page` chain. Requires (stated explicitly): `starting.svelte`'s dispatch retargets `'./xp/desktop.svelte'` → `'./xp/login.svelte'`; `+page.svelte` gains the import branch; the `PageComponent` union extends. Content per §2.2 + `my-users.png`: left branding, "To begin, click on Mohamed to log in", user card (avatar + name + "AI Engineer"), bottom-left "Restart Momad's XP" (reload), bottom-right flavor text.
+   *Rejected:* overlay in desktop; SvelteKit route.
+2. **Startup sound + welcome retime** — `xp_startup.mp3` plays on the login-card click (the user gesture; §4.3 on-by-default is satisfied). **`welcome.svelte` is rewritten**: today its only advance path is the audio `ended`/7s fallback (welcome.svelte:16-36) — moving the sound would strand visitors 7s. New behavior: pure ~1.5s timer + fade per §2.3 (the old audio-length duration was itself a §2.3 deviation). No audio in welcome. **Spec conflict flagged, not silently resolved:** §4.3's table row "Login click → XP logon" vs §2's "startup at Login → Welcome" — Phase 1 plays *startup* at the transition (matches real XP + §2 prose); the logon-sound question goes to Phase 6's sound manager with the spec cleanup.
+3. **Boot rebrand + skip** — `starting.svelte`: XP logo block + "Momad's XP / AI Engineer" per `my-loading.png`; bottom-left "For the best experience, Enter Full Screen (F11)"; bottom-right "Portfolio" watermark. Title → **"Momad's XP"** (`app.html` + `+page.svelte` svelte:head — head wins post-hydration). **§2.1 skip implemented**: any click/keypress dispatches login immediately (assets continue loading in background).
+4. **profile.json + typed accessor** — `src/lib/data/profile.json` + `src/lib/profile.ts` (typed frozen export; interface mirrors §7; content from Profile.pdf + owner inputs; `projects: []` until Phase 2). *Rejected:* Zod (no trust boundary crossed; revisit at Phase 2's VFS generator).
+5. **Placeholder program** — one `placeholder.svelte` (XP message-window: icon + "{Name} is under construction — coming in a later phase"). **Launch mechanism (was missing):** the executable dispatch in `desktop_folder.svelte:213-217` and `my_computer/viewer.svelte` passes only `{path, webapp}` — it gains `fs_item`, so the placeholder derives name/icon from the VFS item; start-menu launches pass an equivalent literal. Multiple instances allowed (no singleton concept in the base; accepted for Phase 1, revisit with the app registry §6.3).
+6. **Desktop curation (seed edit, scripted)** — desktop children become: My Computer, About Me, My CV, Internet Explorer, Contact Me (+ Recycle Bin). **The Games desktop folder VFS entry is deleted** (script edit with parent-children consistency like Phase 0). Paint stays start-menu-only. `SEED_VERSION` recomputed. About Me / My CV / Contact Me are `.exe` VFS items pointing at `placeholder.svelte` with `static/assets/icons/*` icons.
+7. **Start menu restructure** — header gains avatar + name markup (none exists today — start_menu.svelte:398-401 is an empty gradient); pinned: Internet Explorer, Contact Me (placeholder); All Programs flyout: My Computer, About Me, Command Prompt, Python, Paint, **Music Player → launches Media Player Classic** (real inherited app — resolves the MPC-unreachable contradiction; renamed to the §3.4 label; the custom player arrives Phase 3), Games → **flyout with 4 named entries** (Minesweeper, Solitaire, Chess, DOOM — each a named placeholder; icons: chess/doom from `static/assets/icons`, minesweeper/solitaire moved back from `design/asset-pool`); right column: My Computer, My CV, About Me, Contact Me | GitHub, LinkedIn, Instagram | Shut Down (existing flow). Socials open new tabs (`window.open` + `noopener`) — replaces the base's open-in-IE `link` semantics for socials (stated deviation). Display Properties leaves the menu (§3.4 is exhaustive); wallpaper switching stays reachable via desktop right-click → Properties (verified in parity — Phase 0 criterion). Log Off row goes (§3.4).
+8. **Mobile experience** — branch in `+page.svelte` before the boot chain via a pure `decideMode(width, height)` function: ≥1024px → shell; <1024px portrait → `src/routes/xp/mobile/MobilePortfolio.svelte` (path per spec §8); <1024px landscape → rotate prompt. **Content = full §4.6 list**: XP title bar "Momad's XP — AI Engineer", avatar + name + tagline, bio summary, expandable About Me / Experience / Projects / Skills / Education sections (XP-styled accordions), action buttons (Download Resume → `static/assets/Mohamed_Abdelnasser_Resume.pdf`, Contact via mailto, GitHub/LinkedIn/Instagram), "For the full experience, visit on desktop" footer. **Mode locking:** decided once at load; live reaction only portrait ↔ rotate-prompt; a booted desktop never live-switches (protects shell state).
+9. **FA-Pro replacement — full scope is 7 files / 20 glyphs** (SMenu, SelectBox, ContextMenu, RButton, image_viewer, **media_player_classic — 11 glyphs, the whole control bar**, my_computer/sidebar). Swap to FA Free equivalents; MPC's control bar gets a dedicated parity pass. Social icons (M3): **new tiny Svelte icon components inlining FA Free *brands* SVGs** (github/linkedin/instagram are in Free) — no PNG sourcing needed, consistent with the FA work.
+10. **Coverage ratchet mechanics** — `vitest.config.ts`: add `coverage.reporter: ['text', 'lcov']` and **widen `coverage.include` to `src/**/*.ts`** (typed modules get unit-tested + diff-covered; `.svelte` components are exempt from line coverage and owned by E2E — stated narrowing, deliberate). CI: `pip install diff-cover` (python3 is preinstalled on ubuntu-latest, the package is not) + `diff-cover coverage/lcov.info --compare-branch origin/dev --fail-under 80` on PRs; checkout `fetch-depth: 0`.
+11. **Resume copy** — `docs/Profile.pdf` → `static/assets/Mohamed_Abdelnasser_Resume.pdf`; mobile Download links it; desktop My CV opens the placeholder until Phase 2's viewer.
+12. **Window cascade — BUILD work, not verification** (base has none: windows without saved rects open dead-center, Window.svelte:96-101; `calc_nudges` only offsets same-app duplicates). Implement: module-level spawn cursor; windows without a saved rect open at base position + n·(24,24), wrapping before the taskbar; saved-rect behavior unchanged.
+13. **loadjs-script SRI verdict** — **vendor panzoom** locally (`static/js/panzoom.min.js`; consumer is kept image_viewer; removes unpkg runtime dependency). **Google Charts loader stays CDN without SRI** (its loader fetches submodules dynamically — SRI infeasible; sole consumer is disk_properties; accepted, documented). loadjs itself already pinned+SRI in Phase 0.
+14. **Notepad-fallback dialog** — unhandled-extension double-click opens the existing XP `Dialog` ("Windows cannot open this file — no program is associated with it") instead of the silent no-op at desktop_folder.svelte:227 / viewer.svelte:256.
+15. **New assets → preload regen** — after adding login/menu assets, rerun `gen/assets.js` to refresh `starting.svelte`'s preload arrays (phase-0-guide §10 discipline).
 
-## Verification scope (inherited surfaces, §4)
+## Verification scope (inherited, §4)
 
-Window manager (drag/resize/min/max/close/focus/**cascade**), taskbar (§3.6), desktop interactions (§4.2), cursors — verified against win32.run in the §11 parity loop; deviations fixed or logged. Touch-drag note (§4.6) checked on ≥1024px touch emulation. Notepad-fallback: unhandled extensions get an XP "no app associated" dialog instead of a silent no-op.
+Window drag/resize/min/max/close/focus (+ new cascade, decision 12), taskbar §3.6, desktop interactions §4.2, cursors — win32.run parity loop. Touch: verify **and patch** pointer/touch drag on ≥1024px touch emulation (§4.6 note; if the drag pipeline needs pointer-events work, it is in-scope build work).
 
 ## Testing
 
-- **E2E (update + new):** smoke suite gains the login step (boot → login screen → click user card → welcome → desktop); new specs: start-menu structure (pinned/right column/social hrefs), placeholder window opens for About Me, mobile portrait layout renders profile content (viewport 390×844), landscape prompt (844×390).
-- **Unit:** profile.ts shape (required fields non-empty), breakpoint decision function (pure: width/height/orientation → mode), placeholder props.
-- **Coverage:** new modules join `vitest.config.ts` include (profile.ts, breakpoint logic); diff-cover gates the PR.
-- **Parity:** two-browser loop per §11 — win32.run for inherited; `design/inspiration/my-{loading,users,start-menu,desktop}.png` for new surfaces; report in `docs/phase-1-guide.md`.
+- **E2E:** `bootToDesktop` helper gains the login click **in the same commit** as the login insert (CI atomicity), and explicitly waits out the welcome overlay (it covers the taskbar — visibility checks alone can pass while clicks land on the overlay). New specs: login screen renders + card click reaches desktop; start-menu structure (pinned, All Programs incl. Games flyout ×4, right column, social `href`s); placeholder opens for About Me; mobile portrait (390×844) renders ≥1 Experience entry + ≥1 Skills group; landscape (844×390) shows the rotate prompt.
+- **Unit:** profile.ts field integrity; `decideMode` pure function; placeholder props; cascade position calculator.
+- **Parity (§11):** win32.run for inherited; `my-loading.png`, `my-users.png`, **`my-welcome.png`**, `my-start-menu.png`, `my-desktop.png` for new/rebranded; MPC control bar after FA swap; evidence in `docs/phase-1-guide.md`.
 
-## Exit criteria (SPECIFICATION.md §9 Phase 1)
+## Plan slicing (M8)
 
-Boot → login → (startup sound) → welcome → desktop; curated icons open real apps or placeholders; restructured start menu with working social links; taskbar/window behaviors verified; mobile visitors get the simplified portfolio; landscape prompt; CI green incl. diff-cover; `docs/phase-1-guide.md` written; "Phase 1 is complete."
+Four independently mergeable, CI-green PR slices: **(1)** profile.json/profile.ts + login + welcome retime + boot rebrand/skip + smoke-test update; **(2)** seed curation + placeholder + start menu + cascade + fallback dialog; **(3)** mobile; **(4)** carry-overs (FA-Free swap incl. socials, panzoom vendoring, diff-cover). Cutover to `main` after all four.
+
+## Exit criteria (§9 Phase 1)
+
+Boot (skippable) → login (sound on click) → welcome (~1.5s) → desktop; curated icons open real apps or named placeholders; restructured start menu incl. Games flyout and working social links; cascade + verified window/taskbar behaviors; mobile portrait full-content portfolio; landscape prompt; CI green incl. diff-cover; `docs/phase-1-guide.md`; "Phase 1 is complete."
