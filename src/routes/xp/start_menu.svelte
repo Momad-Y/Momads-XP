@@ -5,6 +5,9 @@
     import * as utils from '../../lib/utils';
     import { required } from '../../lib/types';
     import type { MountedComponent, VfsItem } from '../../lib/types';
+    import GitHubIcon from '../../lib/components/icons/GitHubIcon.svelte';
+    import LinkedInIcon from '../../lib/components/icons/LinkedInIcon.svelte';
+    import InstagramIcon from '../../lib/components/icons/InstagramIcon.svelte';
     const { click_outside } = utils;
 
     /** One start-menu entry; `null` renders as a separator. */
@@ -19,6 +22,8 @@
         link?: string;
         /** External URL — renders as <a target="_blank" rel="noopener noreferrer"> instead of an app launch. */
         href?: string;
+        /** Inline icon component (FA brands) — takes precedence over `icon`. */
+        icon_component?: typeof GitHubIcon;
         webapp?: unknown;
         items?: (StartMenuItem | null)[];
     }
@@ -94,21 +99,24 @@
         },
         null,
         // Socials open new tabs (design decision 7 — stated deviation from the
-        // base's open-in-IE `link` semantics). Interim generic icon until the
-        // slice-4 FA-brands components (plan Part 4, Task 19).
+        // base's open-in-IE `link` semantics). Inline FA Free brand icons
+        // (plan Part 4, Task 19).
         {
             name: 'GitHub',
-            icon: '/images/xp/icons/InternetShortcut.png',
+            icon: '',
+            icon_component: GitHubIcon,
             href: social_url('GitHub'),
         },
         {
             name: 'LinkedIn',
-            icon: '/images/xp/icons/InternetShortcut.png',
+            icon: '',
+            icon_component: LinkedInIcon,
             href: social_url('LinkedIn'),
         },
         {
             name: 'Instagram',
-            icon: '/images/xp/icons/InternetShortcut.png',
+            icon: '',
+            icon_component: InstagramIcon,
             href: social_url('Instagram'),
         },
     ];
@@ -671,10 +679,21 @@
                         on:click={hide}
                     >
                         <!-- eslint-enable svelte/no-navigation-without-resolve -->
-                        <div
-                            class="w-7 h-7 bg-contain mr-1"
-                            style:background-image="url({item.icon})"
-                        ></div>
+                        {#if item.icon_component != null}
+                            <span
+                                class="w-7 h-7 mr-1 flex items-center justify-center text-slate-700 group-hover/c2:text-white"
+                            >
+                                <svelte:component
+                                    this={item.icon_component}
+                                    size={18}
+                                />
+                            </span>
+                        {:else}
+                            <div
+                                class="w-7 h-7 bg-contain mr-1"
+                                style:background-image="url({item.icon})"
+                            ></div>
+                        {/if}
                         <div
                             class="text-[11px] group-hover/c2:text-white text-slate-800"
                         >

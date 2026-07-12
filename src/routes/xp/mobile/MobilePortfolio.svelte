@@ -1,6 +1,9 @@
 <script lang="ts">
     import { profile } from '../../../lib/profile';
     import { required } from '../../../lib/types';
+    import GitHubIcon from '../../../lib/components/icons/GitHubIcon.svelte';
+    import LinkedInIcon from '../../../lib/components/icons/LinkedInIcon.svelte';
+    import InstagramIcon from '../../../lib/components/icons/InstagramIcon.svelte';
 
     type SectionName =
         'About Me' | 'Experience' | 'Projects' | 'Skills' | 'Education';
@@ -196,19 +199,20 @@
                 href={social_url('GitHub')}
                 target="_blank"
                 rel="noopener noreferrer"
-                class="xp-btn grow">GitHub</a
+                class="xp-btn grow gap-1"><GitHubIcon size={14} /> GitHub</a
             >
             <a
                 href={social_url('LinkedIn')}
                 target="_blank"
                 rel="noopener noreferrer"
-                class="xp-btn grow">LinkedIn</a
+                class="xp-btn grow gap-1"><LinkedInIcon size={14} /> LinkedIn</a
             >
             <a
                 href={social_url('Instagram')}
                 target="_blank"
                 rel="noopener noreferrer"
-                class="xp-btn grow">Instagram</a
+                class="xp-btn grow gap-1"
+                ><InstagramIcon size={14} /> Instagram</a
             >
         </div>
     </div>
