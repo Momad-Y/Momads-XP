@@ -6,9 +6,14 @@
     import type Desktop from './xp/desktop.svelte';
     import type Shutdown from './xp/shutdown.svelte';
     import type Blackout from './xp/blackout.svelte';
+    import type Login from './xp/login.svelte';
 
     type PageComponent =
-        typeof Starting | typeof Desktop | typeof Shutdown | typeof Blackout;
+        | typeof Starting
+        | typeof Login
+        | typeof Desktop
+        | typeof Shutdown
+        | typeof Blackout;
     /* eslint-enable @typescript-eslint/no-duplicate-type-constituents */
 
     let page: PageComponent | undefined = undefined;
@@ -21,6 +26,8 @@
         //manually import modules cause Vite doesn't support fully dynamic import specifiers
         if (url == './xp/starting.svelte') {
             page = (await import('./xp/starting.svelte')).default;
+        } else if (url == './xp/login.svelte') {
+            page = (await import('./xp/login.svelte')).default;
         } else if (url == './xp/desktop.svelte') {
             page = (await import('./xp/desktop.svelte')).default;
         } else if (url == './xp/shutdown.svelte') {
@@ -34,7 +41,7 @@
 </script>
 
 <svelte:head>
-    <title>Microsoft Windows XP Professional</title>
+    <title>Momad's XP</title>
 </svelte:head>
 
 <svelte:component

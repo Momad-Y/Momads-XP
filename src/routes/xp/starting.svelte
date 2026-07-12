@@ -210,7 +210,7 @@
         preload_context_menus();
         console.log('after preload_context_menu');
 
-        dispatcher('load_page', { url: './xp/desktop.svelte' });
+        dispatcher('load_page', { url: './xp/login.svelte' });
     });
 
     // local copy of app.html's global — this module must not race the inline <script>
