@@ -37,10 +37,13 @@ export function tooltip(element: HTMLElement) {
         comp.style.overflow = 'hidden';
         comp.style.padding = '4px';
         comp.style.fontFamily = 'MSSS';
-        comp.innerHTML = `
-			<p class=" line-clamp-1 leading-tight text-ellipsis" style="font-size:11px;">
-				${tooltip_message}
-			</p>`;
+        // textContent (not innerHTML) — tooltip messages may one day carry
+        // user-controlled VFS names; never give them an HTML sink
+        const message = document.createElement('p');
+        message.className = 'line-clamp-1 leading-tight text-ellipsis';
+        message.style.fontSize = '11px';
+        message.textContent = tooltip_message;
+        comp.replaceChildren(message);
 
         timeout = setTimeout(() => {
             if (comp != null) {

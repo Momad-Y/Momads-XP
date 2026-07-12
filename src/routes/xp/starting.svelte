@@ -226,15 +226,30 @@
     }
 
     async function load_hard_drive() {
-        let hard_drive = await get<StoredHardDrive>('hard_drive');
+        const cached = await get<StoredHardDrive>('hard_drive');
         const stored_version = await get<string>('hard_drive_seed_version');
-        if (hard_drive == null || shouldReseed(stored_version)) {
-            hard_drive = (
-                await axios.get<StoredHardDrive>('/json/hard_drive.json')
-            ).data;
-            await set('hard_drive', hard_drive);
-            await set('hard_drive_seed_version', SEED_VERSION);
+        let hard_drive = cached;
+        if (cached == null || shouldReseed(stored_version)) {
+            try {
+                hard_drive = (
+                    await axios.get<StoredHardDrive>('/json/hard_drive.json')
+                ).data;
+                await set('hard_drive', hard_drive);
+                await set('hard_drive_seed_version', SEED_VERSION);
+            } catch (error) {
+                // Re-seed fetch failed (offline / flaky network). A returning
+                // visitor has a perfectly usable cached drive — boot from it
+                // instead of bricking on a black screen; retry next boot.
+                // A first-time visitor has no fallback: rethrow.
+                if (cached == null) throw error;
+                console.error(
+                    'VFS re-seed fetch failed; booting from cached drive',
+                    error,
+                );
+                hard_drive = cached;
+            }
         }
+        if (hard_drive == null) throw new Error('VFS seed unavailable');
         migrate_files_format(hard_drive);
         hardDrive.set(hard_drive);
     }

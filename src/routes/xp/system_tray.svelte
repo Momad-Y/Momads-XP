@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onDestroy, mount } from 'svelte';
-    import { queueProgram, systemVolume } from '../../lib/store';
+    import { systemVolume } from '../../lib/store';
     import TrayIcon from '../../lib/components/xp/TrayIcon.svelte';
     import type { MountedComponent } from '../../lib/types';
 
@@ -39,18 +39,6 @@
 <div
     class="system-tray shrink-0 max-w-[200px] h-full flex flex-row items-center justify-end"
 >
-    <TrayIcon
-        icon="/images/xp/icons/TourXP.png"
-        tooltip_message="Take a tour of Windows XP"
-        on_click={() => {
-            console.log('tray icon click');
-            queueProgram.set({
-                name: 'Microsoft Windows XP Tour',
-                icon: '/images/xp/icons/TourXP.png',
-                path: './programs/xp_tour.svelte',
-            });
-        }}
-    ></TrayIcon>
     <TrayIcon icon="/images/xp/icons/SecurityError.png"></TrayIcon>
     <TrayIcon
         icon={$systemVolume > 0.03
