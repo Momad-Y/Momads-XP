@@ -214,6 +214,7 @@
                 queueProgram.set({
                     path: fs_item.url,
                     webapp: fs_item.webapp,
+                    exe_item: fs_item,
                 });
             } else if (handlers != null) {
                 queueProgram.set({

@@ -30,7 +30,8 @@
     onDestroy(() => {});
 
     async function launch(program: ProgramLaunchRequest) {
-        const { fs_item, copying_obj, target_folder_id, path } = program;
+        const { fs_item, exe_item, copying_obj, target_folder_id, path } =
+            program;
 
         if (path == './programs/my_computer.svelte') {
             const Program = (await import('./programs/my_computer.svelte'))
@@ -187,6 +188,21 @@
                 },
             });
 
+            //add to program tray
+            runningPrograms.update((values) => {
+                return [...values, program];
+            });
+        } else if (path == './programs/placeholder.svelte') {
+            const Program = (await import('./programs/placeholder.svelte'))
+                .default;
+            const program: ProgramInstance = mount(Program, {
+                target: node_ref,
+                props: {
+                    id: short.generate(),
+                    fs_item: exe_item ?? fs_item,
+                    get_self: () => program,
+                },
+            });
             //add to program tray
             runningPrograms.update((values) => {
                 return [...values, program];
