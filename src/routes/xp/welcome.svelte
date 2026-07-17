@@ -44,7 +44,7 @@
     >
         <span
             class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[42px] text-slate-50 italic font-bold"
-            >Welcome</span
+            >welcome</span
         >
     </div>
 
