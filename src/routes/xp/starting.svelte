@@ -305,7 +305,7 @@
     <div
         class="absolute top-[50%] -translate-y-[50%] left-[50%] -translate-x-[50%] animate-fadein flex flex-col items-center"
     >
-        <img src="/assets/images/xp-logo.png" alt="" width="260px" />
+        <img src="/assets/images/xp-logo.png" alt="" width="360px" />
         <div class="xp-loader">
             <div></div>
             <div></div>
@@ -332,7 +332,7 @@
         border: 2px solid #b2b2b2;
         border-radius: 7px;
         margin: 0 auto;
-        margin-top: 150px;
+        margin-top: 90px;
         padding: 2px 1px;
         overflow: hidden;
         font-size: 0;
