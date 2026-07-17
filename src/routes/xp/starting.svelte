@@ -305,7 +305,7 @@
     <div
         class="absolute top-[50%] -translate-y-[50%] left-[50%] -translate-x-[50%] animate-fadein flex flex-col items-center"
     >
-        <img src="/images/xp_loading_logo.jpg" alt="" width="400px" />
+        <img src="/assets/images/xp-logo.png" alt="" width="260px" />
         <div class="xp-loader">
             <div></div>
             <div></div>

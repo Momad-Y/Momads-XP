@@ -1,7 +1,7 @@
 <div
     class="absolute inset-0 bg-[#00309c] flex flex-col items-center justify-center text-center p-8 font-sans"
 >
-    <img src="/images/xp_logo.png" alt="" class="w-28 mb-4" />
+    <img src="/assets/images/xp-logo.png" alt="" class="w-24 mb-4" />
     <p
         class="text-slate-50 text-lg font-bold mb-2"
         style="text-shadow: 1px 1px 2px rgba(0,0,0,0.5);"
