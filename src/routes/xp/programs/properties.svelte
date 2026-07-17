@@ -172,6 +172,7 @@
             size="sm"
             items={['General', 'Sharing', 'Customize']}
             selected="General"
+            disabled={['Sharing', 'Customize']}
         ></Tab>
         <div
             class="w-full grow bg-[#fafaf9] shadow-sm -mt-[1px] overflow-y-auto p-2"
