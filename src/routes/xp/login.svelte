@@ -42,17 +42,10 @@
         <!-- left: branding -->
         <div class="w-1/3 flex flex-col items-center justify-center px-6">
             <img
-                src="/assets/images/xp-logo.png"
-                alt=""
-                class="w-24 mb-4 drop-shadow-lg"
+                src="/images/xp_logo_horizontal.png"
+                alt="Windows XP"
+                class="w-72 drop-shadow-lg"
             />
-            <p
-                class="text-slate-50 text-3xl font-bold"
-                style="text-shadow: 2px 2px 3px rgba(0,0,0,0.4);"
-            >
-                Momad's XP
-            </p>
-            <p class="text-slate-200 text-lg italic">{profile.meta.title}</p>
         </div>
 
         <!-- divider -->
