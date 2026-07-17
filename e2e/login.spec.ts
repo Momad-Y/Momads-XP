@@ -7,7 +7,7 @@ test('login screen renders branding, instruction, and user card', async ({
     const card = page.locator('#login-user-card');
     await expect(card).toBeVisible({ timeout: 30_000 });
     await expect(
-        page.getByText('To begin, click on Mohamed to log in'),
+        page.getByText("To begin, click 'My' user name"),
     ).toBeVisible();
     await expect(page.getByText("Restart Momad's XP")).toBeVisible();
     await expect(card.getByText('Mohamed Abdelnasser')).toBeVisible();
