@@ -96,11 +96,12 @@
             items={[
                 'Themes',
                 'Desktop',
-                'Screesaver',
+                'Screen Saver',
                 'Appearance',
                 'Settings',
             ]}
             selected="Desktop"
+            disabled={['Themes', 'Screen Saver', 'Appearance', 'Settings']}
         ></Tab>
         <div
             class="w-full grow bg-[#fafaf9] shadow-sm -mt-[1px] flex flex-col overflow-hidden"
