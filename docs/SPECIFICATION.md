@@ -46,7 +46,7 @@ The website loads through four sequential screens that mimic a real XP boot, the
 
 ### 2.1 Boot / Loading Screen
 
-- Black background with the **original Windows XP boot logo** (owner decision 2026-07-17: no personalized "Momad's XP" branding on the boot screen — identical to win32.run / real XP)
+- Black background with the **custom Momad's-XP logo image** (`static/assets/images/xp-logo.png`; owner decision 2026-07-18: the custom logo image everywhere the Windows logo would appear — but no extra HTML branding text lines on any screen)
 - Animated progress bar (the classic blue segmented bar)
 - "For the best experience, Enter Full Screen (F11)" hint at bottom-left
 - "Portfolio" watermark at bottom-right
@@ -58,7 +58,7 @@ The website loads through four sequential screens that mimic a real XP boot, the
 ### 2.2 User Login Screen
 
 - Blue gradient background matching XP's login screen
-- Left side: the **original "Microsoft Windows XP" logo** only (owner decision 2026-07-17: no personalized branding text on the login screen)
+- Left side: the **custom Momad's-XP logo image** only (`static/assets/images/xp-logo.png`; owner decision 2026-07-18 — no extra branding text lines)
 - Center: "To begin, click on Mohamed to log in"
 - Right side: User avatar card — Mohamed's photo, name, title "AI Engineer"
 - Bottom-left: "Restart Momad's XP" button (reloads the page)

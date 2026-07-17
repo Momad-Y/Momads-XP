@@ -42,7 +42,7 @@
         <!-- left: branding -->
         <div class="w-1/3 flex flex-col items-center justify-center px-6">
             <img
-                src="/images/xp_logo.png"
+                src="/assets/images/xp-logo.png"
                 alt="Windows XP"
                 class="w-56 drop-shadow-lg"
             />

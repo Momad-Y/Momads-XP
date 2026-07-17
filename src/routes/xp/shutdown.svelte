@@ -45,7 +45,7 @@
         class="grow bg-[radial-gradient(circle_at_5%_5%,#91b1ef_0,#7698e6_6%,#5a7edc_12%)] relative overflow-hidden"
     >
         <div class="absolute top-[30%] left-[45%] flex flex-col items-end">
-            <img src="/images/xp_logo.png" width="200" />
+            <img src="/assets/images/xp-logo.png" width="200" />
             <p class="mr-4 mt-8 text-right text-[24px] text-slate-50">
                 Windows is shutting down...
             </p>
