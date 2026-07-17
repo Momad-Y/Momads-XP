@@ -30,6 +30,7 @@
     const images = [
         '/images/ms.png',
         '/images/radio_check.png',
+        '/images/xp_loading_logo.jpg',
         '/images/xp_logo.png',
         '/images/xp_logo_horizontal.png',
         '/images/wallpapers/Ascent.jpg',

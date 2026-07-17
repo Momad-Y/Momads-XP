@@ -39,7 +39,7 @@
         class="sticky top-0 z-10 h-8 flex items-center px-2 shrink-0"
         style="background: linear-gradient(rgb(9, 151, 255) 0%, rgb(0, 83, 238) 8%, rgb(0, 80, 238) 40%, rgb(0, 61, 215) 88%, rgb(0, 61, 215) 93%, rgb(0, 66, 235) 95%, rgb(0, 61, 215) 96%, rgb(0, 55, 210) 100%);"
     >
-        <img src="/assets/images/xp-logo.png" alt="" class="h-5 mr-2" />
+        <img src="/images/xp_logo.png" alt="" class="h-5 mr-2" />
         <span
             class="text-slate-50 text-[13px] font-bold truncate"
             style="text-shadow: 1px 1px 1px rgba(0,0,0,0.5);"
