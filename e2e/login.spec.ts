@@ -11,7 +11,7 @@ test('login screen renders branding, instruction, and user card', async ({
     ).toBeVisible();
     await expect(page.getByText("Restart Momad's XP")).toBeVisible();
     await expect(card.getByText('Mohamed Abdelnasser')).toBeVisible();
-    await expect(card.getByText('AI Engineer')).toBeVisible();
+    await expect(card.getByText('1337 programs running.')).toBeVisible();
 });
 
 test('clicking the user card reaches the desktop through welcome', async ({
