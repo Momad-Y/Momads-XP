@@ -59,7 +59,7 @@
                 class="text-slate-50 text-lg text-center"
                 style="text-shadow: 1px 1px 2px rgba(0,0,0,0.4);"
             >
-                To begin, click on Mohamed to log in
+                To begin, click 'My' user name
             </p>
         </div>
 

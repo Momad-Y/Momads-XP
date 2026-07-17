@@ -59,7 +59,7 @@ The website loads through four sequential screens that mimic a real XP boot, the
 
 - Blue gradient background matching XP's login screen
 - Left side: the **custom Momad's-XP logo image** only (`static/assets/images/xp-logo.png`; owner decision 2026-07-18 — no extra branding text lines)
-- Center: "To begin, click on Mohamed to log in"
+- Center: "To begin, click 'My' user name" (owner wording)
 - Right side: User avatar card — Mohamed's photo, name, title "AI Engineer"
 - Bottom-left: "Restart Momad's XP" button (reloads the page)
 - Bottom-right: Flavor text — "After you log on, the system is yours to explore. Every detail has been designed with a purpose."
