@@ -6,14 +6,13 @@
  * portfolio content) would never reach returning visitors. The boot path
  * compares the stored version with SEED_VERSION and re-seeds on mismatch.
  *
- * SEED_VERSION is the sha256 (hex, first 32 chars) of static/json/hard_drive.json.
- * Recompute after ANY seed edit:
- *     sha256sum static/json/hard_drive.json | cut -c1-32
- * (Phase 2 replaces this hand stamp with the generate-vfs build step.)
+ * SEED_VERSION is a content hash written by `npm run generate:vfs`
+ * (scripts/generate-vfs.ts) — never hand-edited; CI enforces freshness.
  */
 import type { HardDrive } from './types';
 
-export const SEED_VERSION = '29365afea2023187083d902c0a225831';
+export { SEED_VERSION } from './generated/seed_version';
+import { SEED_VERSION } from './generated/seed_version';
 
 export function shouldReseed(stored: string | null | undefined): boolean {
     return stored !== SEED_VERSION;

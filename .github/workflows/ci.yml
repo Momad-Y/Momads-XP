@@ -30,6 +30,12 @@ jobs:
             - name: Format check
               run: npm run format:check
 
+            - name: VFS seed freshness (generated == committed)
+              run: |
+                  npx tsc --noEmit --strict --skipLibCheck --resolveJsonModule --module esnext --moduleResolution bundler --target es2022 scripts/generate-vfs.ts
+                  npm run generate:vfs
+                  git diff --exit-code static/json/hard_drive.json src/lib/generated
+
             - name: Unit tests (coverage-gated)
               run: npx vitest run --coverage
 
