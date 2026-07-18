@@ -45,7 +45,10 @@
                 "Deployed AI-powered QA system using Gemini Vision, Playwright, and FastAPI, automating cross-platform validation across 7 regional markets."
             ],
             "images": [
-                "/assets/images/avatar.png"
+                {
+                    "src": "/assets/images/avatar.png",
+                    "alt": "Mohamed at Printerpix (test image)"
+                }
             ]
         },
         {
@@ -219,57 +222,35 @@
         {
             "name": "RoboCup @Home Education 2024",
             "description": "ROS1 task stack for the Eindhoven 2024 RoboCup@Home Education challenge, executed on the Jupiter robot by Lattel Robotics. Covers real-time object detection, person tracking, and speech interaction; the team placed 3rd internationally.",
-            "tech": [
-                "ROS1",
-                "C++",
-                "OpenCV",
-                "PyTorch"
-            ],
+            "tech": ["ROS1", "C++", "OpenCV", "PyTorch"],
             "url": "https://github.com/Momad-Y/Eindhoven-2024-RoboCup-at-HomeEDU",
             "images": []
         },
         {
             "name": "EUC RAG Agent",
             "description": "A Retrieval-Augmented Generation agent for a fictional university, combining MiniLM/Gemini embeddings or TF-IDF retrieval with Gemini and Llama 2 generation to answer university-related inquiries from TXT, CSV, PDF, and DOC sources.",
-            "tech": [
-                "Python",
-                "RAG",
-                "Gemini",
-                "Sentence Transformers"
-            ],
+            "tech": ["Python", "RAG", "Gemini", "Sentence Transformers"],
             "url": "https://github.com/Momad-Y/EUC-RAG-Agent",
             "images": []
         },
         {
             "name": "Hikaru-Nakarmsen Chess Robot",
             "description": "Fully automates a Dobot Magician robotic arm to play chess against a human opponent, with the Stockfish engine providing the moves.",
-            "tech": [
-                "Python",
-                "Stockfish",
-                "Robotics"
-            ],
+            "tech": ["Python", "Stockfish", "Robotics"],
             "url": "https://github.com/Momad-Y/Hikaru-Nakarmsen-Chess-Robot",
             "images": []
         },
         {
             "name": "Lyric Logic",
             "description": "An NLP project that predicts which artist a lyric belongs to using LSTM and CNN models, served through a Streamlit web app.",
-            "tech": [
-                "Python",
-                "TensorFlow",
-                "Keras",
-                "NLTK",
-                "Streamlit"
-            ],
+            "tech": ["Python", "TensorFlow", "Keras", "NLTK", "Streamlit"],
             "url": "https://github.com/Momad-Y/Lyric-Logic",
             "images": []
         },
         {
             "name": "OptiCompanion",
             "description": "An application designed to help blind and visually impaired individuals using AI.",
-            "tech": [
-                "Dart"
-            ],
+            "tech": ["Dart"],
             "url": "https://github.com/Momad-Y/OptiCompanion",
             "images": []
         }
