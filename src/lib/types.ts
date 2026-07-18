@@ -41,6 +41,23 @@ export interface VfsItem {
     webapp?: unknown;
     /** Transient CSS transform applied when the user drags a desktop icon. */
     desktop_css_transform?: string;
+    /** Generator-stamped pointer from a seeded entry file into profile.json (Phase 2). */
+    portfolio_ref?: PortfolioRef;
+}
+
+export type PortfolioSection =
+    | 'experience'
+    | 'projects'
+    | 'education'
+    | 'skills'
+    | 'awards'
+    | 'certifications';
+
+/** Stamped only by scripts/generate-vfs.ts; consumed by portfolio_viewer. */
+export interface PortfolioRef {
+    section: PortfolioSection;
+    /** Array index, except `skills` where it is the category name. */
+    key: number | string;
 }
 
 /** The whole virtual file system, keyed by `VfsItem.id`. */

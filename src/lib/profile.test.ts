@@ -55,8 +55,13 @@ describe('profile integrity', () => {
         expect(profile.about.bio).toHaveLength(2);
     });
 
-    it('projects are empty until Phase 2', () => {
-        expect(profile.projects).toEqual([]);
+    it('projects are populated and well-formed (Phase 2)', () => {
+        expect(profile.projects.length).toBeGreaterThanOrEqual(4);
+        for (const project of profile.projects) {
+            expect(project.name.length).toBeGreaterThan(0);
+            expect(project.description.length).toBeGreaterThan(0);
+            expect(project.tech.length).toBeGreaterThan(0);
+        }
     });
 
     it('is deeply frozen', () => {

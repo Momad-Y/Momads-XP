@@ -20,6 +20,13 @@ test.describe('mobile portrait (390x844)', () => {
         await page.getByRole('button', { name: 'Skills' }).click();
         await expect(page.getByText('AI & Machine Learning')).toBeVisible();
 
+        // Projects render real entries now (Phase 2 populated profile.projects)
+        await page.getByRole('button', { name: 'Projects' }).click();
+        await expect(
+            page.getByText('RoboCup @Home Education 2024'),
+        ).toBeVisible();
+        await expect(page.getByText(/coming soon/)).toHaveCount(0);
+
         // resume download + socials
         await expect(page.locator('a[download]')).toHaveAttribute(
             'href',

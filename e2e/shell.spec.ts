@@ -1,15 +1,28 @@
 import { test, expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { bootToDesktop } from './helpers';
 
-test('About Me desktop icon opens the named placeholder', async ({ page }) => {
+// All §3.5 desktop apps are real now — the placeholder tests use the
+// start-menu Python entry (Phase 3), the surviving placeholder target.
+async function openPythonPlaceholder(page: Page) {
+    await page.locator('#start-menu-btn').click();
+    await page.locator('#start-menu').getByText('All Programs').hover();
+    const flyout = page.locator('#all-programs-flyout');
+    await expect(flyout).toBeVisible();
+    await flyout.getByText('Python', { exact: true }).click();
+}
+
+test('Python start-menu entry opens the named placeholder', async ({
+    page,
+}) => {
     await bootToDesktop(page);
-    await page.locator('#work-space p', { hasText: 'About Me' }).dblclick();
+    await openPythonPlaceholder(page);
 
     const win = page.locator('#work-space .window').first();
     await expect(win).toBeVisible();
     await expect(
         win.getByText(
-            'About Me is under construction — coming in a later phase.',
+            'Python is under construction — coming in a later phase.',
         ),
     ).toBeVisible();
     await win.getByText('OK').click();
@@ -18,12 +31,9 @@ test('About Me desktop icon opens the named placeholder', async ({ page }) => {
 
 test('two rect-less windows cascade instead of stacking', async ({ page }) => {
     await bootToDesktop(page);
-    await page.locator('#work-space p', { hasText: 'About Me' }).dblclick();
+    await openPythonPlaceholder(page);
     await expect(page.locator('#work-space .window')).toHaveCount(1);
-    // desktop_folder.open() debounces opens across ALL icons for 400ms —
-    // wait it out or the second double-click is silently swallowed
-    await page.waitForTimeout(450);
-    await page.locator('#work-space p', { hasText: 'Contact Me' }).dblclick();
+    await openPythonPlaceholder(page);
     await expect(page.locator('#work-space .window')).toHaveCount(2);
 
     const first = await page

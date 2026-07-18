@@ -11,9 +11,13 @@ function drive_snapshot(): HardDrive {
 
 // Module-level snapshot taken on first import (after the boot screen has
 // seeded the hard drive store), exactly as the untyped base code did.
-const computer = my_computer.map((el) =>
-    required(drive_snapshot()[el], `fs item ${el}`),
-);
+// Filtering (not throwing) on missing ids: an offline returning visitor may
+// boot from a cached drive that predates newer seeded entries in the
+// `my_computer` list — degrade to the items that exist (Phase 2 red-team M1).
+const computer = my_computer.flatMap((el) => {
+    const item = drive_snapshot()[el];
+    return item == null ? [] : [item];
+});
 const drives = computer.filter(
     (item) => item.type == 'drive' || item.type == 'removable_storage',
 );

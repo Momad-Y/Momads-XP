@@ -55,11 +55,7 @@
         {
             name: 'Contact Me',
             icon: '/assets/icons/contact-me.png',
-            path: './programs/placeholder.svelte',
-            fs_item: {
-                name: 'Contact Me',
-                icon: '/assets/icons/contact-me.png',
-            },
+            path: './programs/contact_me.svelte',
             font: 'bold',
         },
     ];
@@ -76,25 +72,21 @@
         {
             name: 'My CV',
             icon: '/assets/icons/my-cv.png',
-            path: './programs/placeholder.svelte',
-            fs_item: { name: 'My CV', icon: '/assets/icons/my-cv.png' },
+            // no fs_item: the viewer falls back to profile.meta.resumePdf
+            // (a partial fs_item would throw in full_vfs_item)
+            path: './programs/pdf_viewer.svelte',
             font: 'bold',
         },
         {
             name: 'About Me',
             icon: '/assets/icons/about-me.png',
-            path: './programs/placeholder.svelte',
-            fs_item: { name: 'About Me', icon: '/assets/icons/about-me.png' },
+            path: './programs/about_me.svelte',
             font: 'bold',
         },
         {
             name: 'Contact Me',
             icon: '/assets/icons/contact-me.png',
-            path: './programs/placeholder.svelte',
-            fs_item: {
-                name: 'Contact Me',
-                icon: '/assets/icons/contact-me.png',
-            },
+            path: './programs/contact_me.svelte',
             font: 'bold',
         },
         null,
@@ -128,7 +120,11 @@
             icon: '/images/xp/icons/MyComputer.png',
             path: './programs/my_computer.svelte',
         },
-        placeholder_entry('About Me', '/assets/icons/about-me.png'),
+        {
+            name: 'About Me',
+            icon: '/assets/icons/about-me.png',
+            path: './programs/about_me.svelte',
+        },
         placeholder_entry(
             'Command Prompt',
             '/images/xp/icons/CommandPrompt.png',

@@ -6,7 +6,11 @@
     import { hardDrive, wallpaper, contextMenu } from '../../lib/store';
     import { bliss_wallpaper, SortOptions, SortOrders } from '../../lib/system';
     import { required } from '../../lib/types';
-    import { SEED_VERSION, shouldReseed } from '../../lib/seed';
+    import {
+        SEED_VERSION,
+        merge_on_reseed,
+        shouldReseed,
+    } from '../../lib/seed';
     import type {
         ContextMenuRequest,
         LoadPageEvent,
@@ -176,9 +180,25 @@
         let hard_drive = cached;
         if (cached == null || shouldReseed(stored_version)) {
             try {
-                hard_drive = (
+                const fetched = (
                     await axios.get<StoredHardDrive>('/json/hard_drive.json')
                 ).data;
+                if (cached == null) {
+                    hard_drive = fetched;
+                } else {
+                    // Phase 2 spec D3: carry the visitor's own files across
+                    // seed updates; on any merge failure fall back to the
+                    // plain new seed (never a broken drive).
+                    try {
+                        hard_drive = merge_on_reseed(cached, fetched);
+                    } catch (merge_error) {
+                        console.error(
+                            're-seed merge failed; using plain seed',
+                            merge_error,
+                        );
+                        hard_drive = fetched;
+                    }
+                }
                 await set('hard_drive', hard_drive);
                 await set('hard_drive_seed_version', SEED_VERSION);
             } catch (error) {

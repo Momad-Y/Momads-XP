@@ -105,9 +105,12 @@
     }
 
     $: is_focus = $zIndex == my_computer_instance.window?.z_index;
-    const computer = my_computer.map((el) =>
-        required($hardDrive?.[el], 'fs item ' + el),
-    );
+    // Filter (don't throw) on missing ids: an offline stale cached drive may
+    // predate newer seeded entries in the list (Phase 2 red-team M1).
+    const computer = my_computer.flatMap((el) => {
+        const item = $hardDrive?.[el];
+        return item == null ? [] : [item];
+    });
 
     let node_ref: HTMLDivElement;
     $: {
