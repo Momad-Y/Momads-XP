@@ -1210,6 +1210,7 @@ All personal content lives in a single `src/lib/data/profile.json`. Components r
 - [ ] SEO: meta tags, Open Graph image (screenshot of the desktop), structured data
 - [ ] Favicon: XP-style icon
 - [ ] Accessibility: keyboard navigation for desktop icons and start menu; focus indicators
+- [ ] **Burn svelte-check warnings to ZERO** (131 inherited from the win32.run base as of Phase 2 — mostly a11y: missing `alt`, clickable `<div>`s without keyboard/ARIA; owner-requested explicit item 2026-07-18); tighten CI to gate on warnings once clean
 - [ ] Cross-browser testing (Chrome, Firefox, Safari, Edge)
 - [ ] Deploy to Netlify with custom domain
 

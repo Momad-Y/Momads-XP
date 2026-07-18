@@ -44,7 +44,12 @@
                 "Designed LangChain multi-chain LLM architecture with Gemini for automated multilingual content generation across 6 languages, with Pydantic validation and multi-platform API integration.",
                 "Deployed AI-powered QA system using Gemini Vision, Playwright, and FastAPI, automating cross-platform validation across 7 regional markets."
             ],
-            "images": []
+            "images": [
+                {
+                    "src": "/assets/images/avatar.png",
+                    "alt": "Mohamed at Printerpix (test image)"
+                }
+            ]
         },
         {
             "company": "Udacity",
