@@ -5,7 +5,14 @@
  * is accepted for a portfolio contact form.
  */
 export interface RateLimiter {
+    /** Per-IP token bucket — safe to call before validation. */
     allow(ip: string, now_ms: number): boolean;
+    /**
+     * Global daily send cap — call ONLY right before an actual Resend send
+     * (gate-6 B3: spam/invalid requests must not burn the budget legit
+     * senders need).
+     */
+    allow_send(now_ms: number): boolean;
 }
 
 interface Bucket {
@@ -29,12 +36,6 @@ export function create_rate_limiter(opts?: {
 
     return {
         allow(ip: string, now_ms: number): boolean {
-            if (now_ms - day_window_start >= DAY_MS) {
-                day_window_start = now_ms;
-                day_count = 0;
-            }
-            if (day_count >= per_day) return false;
-
             const bucket = buckets.get(ip) ?? {
                 tokens: per_ip,
                 last_refill_ms: now_ms,
@@ -47,6 +48,14 @@ export function create_rate_limiter(opts?: {
                 return false;
             }
             buckets.set(ip, { tokens: tokens - 1, last_refill_ms: now_ms });
+            return true;
+        },
+        allow_send(now_ms: number): boolean {
+            if (now_ms - day_window_start >= DAY_MS) {
+                day_window_start = now_ms;
+                day_count = 0;
+            }
+            if (day_count >= per_day) return false;
             day_count += 1;
             return true;
         },

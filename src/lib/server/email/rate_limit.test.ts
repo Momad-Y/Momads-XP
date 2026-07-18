@@ -26,15 +26,26 @@ describe('create_rate_limiter', () => {
         expect(rl.allow('2.2.2.2', 0)).toBe(true);
     });
 
-    it('trips the global daily cap across IPs and resets next day', () => {
+    it('trips the global daily send cap and resets next day', () => {
         const rl = create_rate_limiter({
             per_ip_per_hour: 100,
             global_per_day: 3,
         });
-        expect(rl.allow('a', 0)).toBe(true);
-        expect(rl.allow('b', 0)).toBe(true);
-        expect(rl.allow('c', 0)).toBe(true);
-        expect(rl.allow('d', 0)).toBe(false);
-        expect(rl.allow('d', 86_400_000)).toBe(true);
+        expect(rl.allow_send(0)).toBe(true);
+        expect(rl.allow_send(0)).toBe(true);
+        expect(rl.allow_send(0)).toBe(true);
+        expect(rl.allow_send(0)).toBe(false);
+        expect(rl.allow_send(86_400_000)).toBe(true);
+    });
+
+    it('per-IP checks do not burn the global send budget (gate-6 B3)', () => {
+        const rl = create_rate_limiter({
+            per_ip_per_hour: 100,
+            global_per_day: 1,
+        });
+        // spam-shaped traffic that never reaches a send
+        for (let i = 0; i < 10; i++) rl.allow(`bot-${String(i)}`, 0);
+        // the one real send still fits
+        expect(rl.allow_send(0)).toBe(true);
     });
 });

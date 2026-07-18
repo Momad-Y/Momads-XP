@@ -22,7 +22,18 @@ export const prerender = false;
 const limiter = create_rate_limiter();
 
 export const POST: RequestHandler = async (event) => {
-    if (!is_allowed_origin(event.request.headers.get('origin'))) {
+    // §6.8 "Origin/Referer": privacy browsers strip Origin — fall back to
+    // the Referer's origin before rejecting (gate-6 L4).
+    let origin = event.request.headers.get('origin');
+    const referer = event.request.headers.get('referer');
+    if (origin == null && referer != null) {
+        try {
+            origin = new URL(referer).origin;
+        } catch {
+            // unparseable referer — treated as absent
+        }
+    }
+    if (!is_allowed_origin(origin)) {
         return json({ error: 'forbidden_origin' }, { status: 403 });
     }
 
@@ -64,6 +75,11 @@ export const POST: RequestHandler = async (event) => {
     if (key == null || key === '') {
         console.error('/api/email: RESEND_API_KEY not configured');
         return json({ error: 'not_configured' }, { status: 500 });
+    }
+
+    // Global daily cap consumed only by real sends (gate-6 B3).
+    if (!limiter.allow_send(now)) {
+        return json({ error: 'rate_limited' }, { status: 429 });
     }
 
     try {
