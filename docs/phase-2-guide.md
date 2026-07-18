@@ -46,4 +46,6 @@ Netlify unchanged (production = `main`). **`RESEND_API_KEY` is provisioned** (ow
 - New icons (`TXT.png` etc.) are deliberately NOT preloaded (lazy-load accepted; no preload-manifest churn).
 - Resend free tier ≈100 emails/day; in-memory limits reset on cold starts — accepted for a portfolio (worst case: quiet contact form for a day, no spend possible).
 
+**Carry-over (owner-requested):** svelte-check's 131 inherited warnings are explicitly scheduled for zero in Phase 6 (SPECIFICATION.md §9 Phase 6 checklist) — new code must not grow the count meanwhile.
+
 **Phase 2 is complete.**
