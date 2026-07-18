@@ -20,7 +20,7 @@ Drives everything, now including My Computer content. **`projects` (6 entries) i
 
 ## 7. Deployment + Resend
 
-Netlify unchanged (production = `main`). **`RESEND_API_KEY` is provisioned** (owner-authorized 2026-07-18): sending-only key `momads-xp-contact` created in Resend, stored as a secret Netlify env var on `momad-xp` (all contexts, functions scope; not retrievable afterwards — rotate in Resend if a copy is ever needed). Env-var changes only reach the function on the next deploy — this doc change triggered that production rebuild. Delivery smoke-test recorded below. Note: with no verified domain, the `onboarding@resend.dev` sender only delivers to the Resend account owner's email; verify a domain + set `EMAIL_FROM` if the account ever moves.
+Netlify unchanged (production = `main`). **`RESEND_API_KEY` is provisioned** (owner-authorized 2026-07-18): sending-only key `momads-xp-contact` created in Resend, stored as a **regular-class** Netlify env var on `momad-xp` (all contexts/scopes; secret-class writes silently fail on this plan — verified with a probe var; regular class is still server-side-only, value visible in the Netlify dashboard; owner approved 2026-07-18). Env-var changes only reach the function on the next deploy — this doc change triggered that production rebuild. Delivery smoke-test recorded below. Note: with no verified domain, the `onboarding@resend.dev` sender only delivers to the Resend account owner's email; verify a domain + set `EMAIL_FROM` if the account ever moves.
 
 ## 8. Functional checklist
 
