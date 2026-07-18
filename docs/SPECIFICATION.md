@@ -1019,6 +1019,7 @@ All personal content lives in a single `src/lib/data/profile.json`. Components r
 │   │       ├── mobile/                   # (new) portrait-mode simplified portfolio — §4.6
 │   │       └── programs/                 # One component (or folder) per app
 │   │           ├── my_computer/          # Explorer (inherited, mapped to profile VFS)
+│   │           ├── portfolio_viewer.svelte   # (new) detail window for seeded .txt entries — §3.1/D1
 │   │           ├── internet_explorer.svelte  # IE chrome (inherited) + chat UI (new)
 │   │           ├── about_me.svelte       # (new)
 │   │           ├── contact_me.svelte     # (new) Outlook Express-style email form
@@ -1038,6 +1039,11 @@ All personal content lives in a single `src/lib/data/profile.json`. Components r
 │       ├── stores/                       # Window manager, boot phase, sound manager
 │       ├── data/
 │       │   └── profile.json              # (new) All personal content — §7
+│       ├── portfolio.ts                  # (new) PortfolioRef → render-ready detail
+│       ├── vfs_gen/                      # (new) pure profile→VFS tree builder (unit-tested)
+│       ├── generated/                    # (new) GENERATED: seed_version.ts + vfs_ids.ts
+│       ├── email_limits.ts               # (new) client-safe caps shared with /api/email
+│       ├── server/email/                 # (new) validate / rate_limit / origin (server-only)
 │       ├── sounds.ts                     # (new) Sound manager — §6.5
 │       └── utils/
 │
@@ -1051,7 +1057,8 @@ All personal content lives in a single `src/lib/data/profile.json`. Components r
 │   └── assets/                           # (new) portfolio images, avatar, resume PDF
 │
 ├── scripts/
-│   └── generate-vfs.ts                   # (new) profile.json → VFS seed, bumps SEED_VERSION
+│   ├── generate-vfs.ts                   # (new) profile.json → VFS seed + SEED_VERSION + ids
+│   └── vfs-base.json                     # (new) frozen inherited shell items (generator input)
 │
 ├── .github/workflows/ci.yml              # (new) CI: typecheck, lint, tests, build (§5 CI/CD)
 ├── netlify.toml                          # (new) build cmd, publish dir, Node version pin
