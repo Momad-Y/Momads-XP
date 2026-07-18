@@ -64,11 +64,16 @@ describe('build_portfolio', () => {
         expect(pdf?.url).toBe(profile.meta.resumePdf);
     });
 
-    it('throws on id collisions', () => {
+    it('duplicate titles within a section get distinct ids (gate-6 L1)', () => {
         const doubled = {
             ...profile,
             awards: [...profile.awards, ...profile.awards],
         };
-        expect(() => build_portfolio(doubled)).toThrow(/collision/);
+        const b = build_portfolio(doubled);
+        const awards_folder = b.items['p2FolderAwards'];
+        expect(awards_folder?.children).toHaveLength(profile.awards.length * 2);
+        expect(new Set(awards_folder?.children).size).toBe(
+            profile.awards.length * 2,
+        );
     });
 });

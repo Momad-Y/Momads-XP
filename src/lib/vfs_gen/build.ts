@@ -53,9 +53,12 @@ function entry_file(
     basename: string,
     key: PortfolioRef['key'],
     folder_id: string,
+    id_suffix = '',
 ): VfsItem {
     return {
-        ...base_item(entry_id(section, basename), folder_id),
+        // suffix disambiguates duplicate titles within a section (gate-6 L1:
+        // e.g. two degrees at one institution would otherwise collide/throw)
+        ...base_item(entry_id(section, basename) + id_suffix, folder_id),
         type: 'file',
         basename,
         name: `${basename}.txt`,
@@ -84,22 +87,35 @@ export function build_portfolio(profile: Profile): PortfolioBuild {
                 `${e.company} — ${e.role}`,
                 i,
                 'p2FolderExperience',
+                String(i),
             ),
         ),
         projects: profile.projects.map((p, i) =>
-            entry_file('projects', p.name, i, 'p2FolderProjects'),
+            entry_file('projects', p.name, i, 'p2FolderProjects', String(i)),
         ),
         education: profile.education.map((e, i) =>
-            entry_file('education', e.institution, i, 'p2FolderEducation'),
+            entry_file(
+                'education',
+                e.institution,
+                i,
+                'p2FolderEducation',
+                String(i),
+            ),
         ),
         skills: Object.keys(profile.skills).map((category) =>
             entry_file('skills', category, category, 'p2FolderSkills'),
         ),
         certifications: profile.certifications.map((c, i) =>
-            entry_file('certifications', c.title, i, 'p2FolderCertifications'),
+            entry_file(
+                'certifications',
+                c.title,
+                i,
+                'p2FolderCertifications',
+                String(i),
+            ),
         ),
         awards: profile.awards.map((a, i) =>
-            entry_file('awards', a.title, i, 'p2FolderAwards'),
+            entry_file('awards', a.title, i, 'p2FolderAwards', String(i)),
         ),
     };
 

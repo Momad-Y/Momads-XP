@@ -41,14 +41,25 @@
     let page_count = 0;
     let load_error = false;
 
+    // Render-token guard (gate-6 B2): rapid zoom clicks re-enter render();
+    // a stale pass must never clear/append into the shared pages_node.
+    let render_token = 0;
+
     async function render() {
         const node = pages_node;
         if (node == null) return;
+        const token = ++render_token;
         try {
-            const doc = await getDocument({ url: pdf_url }).promise;
+            const task = getDocument({ url: pdf_url });
+            const doc = await task.promise;
+            if (token !== render_token) {
+                void task.destroy();
+                return;
+            }
             page_count = doc.numPages;
             node.replaceChildren();
             for (let i = 1; i <= doc.numPages; i++) {
+                if (token !== render_token) break;
                 const page = await doc.getPage(i);
                 const base = page.getViewport({ scale: 1 });
                 const scale = ((node.clientWidth - 24) / base.width) * zoom;
@@ -57,9 +68,11 @@
                 canvas.width = viewport.width;
                 canvas.height = viewport.height;
                 canvas.className = 'mx-auto mb-3 shadow-md bg-white';
+                if (token !== render_token) break;
                 node.appendChild(canvas);
                 await page.render({ canvas, viewport }).promise;
             }
+            void task.destroy();
         } catch (error) {
             console.error('pdf render failed', error);
             load_error = true;

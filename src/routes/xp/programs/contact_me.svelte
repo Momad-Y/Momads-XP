@@ -89,6 +89,10 @@
                 show_dialog(
                     'The mail server is busy. Please try again in a little while.',
                 );
+            } else if (res.status === 422) {
+                show_dialog(
+                    'That was fast! Please wait a moment and try sending again.',
+                );
             } else {
                 show_dialog(
                     'The message could not be sent. Please try again later.',
@@ -153,6 +157,10 @@
                 icon="/images/xp/icons/Email.png"
                 on_click={reset}
             />
+            <div class="w-px h-5 bg-stone-300 mx-1"></div>
+            <RButton icon="/images/xp/icons/Cut.png" disabled={true} />
+            <RButton icon="/images/xp/icons/Copy.png" disabled={true} />
+            <RButton icon="/images/xp/icons/Paste.png" disabled={true} />
             <div class="w-px h-5 bg-stone-300 mx-1"></div>
             {#if linkedin}
                 <!-- eslint-disable svelte/no-navigation-without-resolve -- external social URL, not an app route -->
