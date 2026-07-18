@@ -12,21 +12,15 @@
 
 - Commands unchanged plus **`npm run generate:vfs`** — run after ANY `profile.json` edit; never hand-edit `static/json/hard_drive.json` or `src/lib/generated/*` (CI freshness step fails on drift). `scripts/vfs-base.json` is the frozen inherited-shell input (prettier-ignored; edit only for deliberate shell changes).
 - New deps: `pdfjs-dist` (runtime), `tsx` (dev, runs the generator). npm-10 locks still mandatory.
-- **Env vars (Netlify site `momad-xp`): `RESEND_API_KEY` — REQUIRED, NOT YET PROVISIONED** (see §7). Optional `EMAIL_FROM` (defaults to `onboarding@resend.dev`; empty string counts as unset).
+- **Env vars (Netlify site `momad-xp`): `RESEND_API_KEY` — provisioned** (see §7). Optional `EMAIL_FROM` (defaults to `onboarding@resend.dev`; empty string counts as unset).
 
 ## 6. profile.json
 
 Drives everything, now including My Computer content. **`projects` (6 entries) is a DRAFT authored from public GitHub repos + resume-implied work — Momad must review/edit the copy** (`src/lib/data/profile.json`, `"projects"`). `images` arrays are empty until real photos land in `static/assets/images/` (galleries render only when non-empty). Duplicate titles within a section are safe (ids are index-suffixed). Editing → `npm run generate:vfs` → returning visitors re-seed while their own files survive (visitor *copies* of seed items are NOT carried — documented D3 trade-off).
 
-## 7. Deployment + PENDING owner action
+## 7. Deployment + Resend
 
-Netlify unchanged (production = `main`). **Blocking exit-criterion 3 (message actually arrives):**
-
-1. Create a Resend API key (sending-only) — the account currently has no keys/domains. My attempt via the Resend MCP was permission-blocked as an owner-level secret operation.
-2. Set it as `RESEND_API_KEY` on site `momad-xp` (production + deploy-preview contexts).
-3. Smoke-test on a deploy preview: real form send → confirm inbox receipt; wrong-Origin curl → 403; 7 rapid posts → 429. Note: with no verified domain, `onboarding@resend.dev` can only deliver to the Resend **account owner's** email — if the account isn't under `Mohamed.Y.Abdelnasser@gmail.com`, verify a domain or expect delivery failure.
-
-Until then `/api/email` answers 500 `not_configured` and the UI shows the generic failure dialog — site is otherwise fully functional.
+Netlify unchanged (production = `main`). **`RESEND_API_KEY` is provisioned** (owner-authorized 2026-07-18): sending-only key `momads-xp-contact` created in Resend, stored as a secret Netlify env var on `momad-xp` (all contexts, functions scope; not retrievable afterwards — rotate in Resend if a copy is ever needed). Env-var changes only reach the function on the next deploy — this doc change triggered that production rebuild. Delivery smoke-test recorded below. Note: with no verified domain, the `onboarding@resend.dev` sender only delivers to the Resend account owner's email; verify a domain + set `EMAIL_FROM` if the account ever moves.
 
 ## 8. Functional checklist
 
@@ -34,7 +28,7 @@ Until then `/api/email` answers 500 `not_configured` and the UI shows the generi
 - [x] About Me / My CV / Contact Me real from desktop + start menu (all sites flipped); Phase-3/4 placeholders intact
 - [x] Re-seed merge: stale-version boot carried a user desktop file, relinked + rendered (live browser verification); offline stale cache degrades gracefully (no `required()` crash)
 - [x] `/api/email` hardening unit-tested (21 tests incl. handler via `$env` mock); E2E mocks the endpoint (vite preview runs no server routes)
-- [ ] Live email delivery on deploy preview — blocked on §7
+- [x] Live email delivery — verified against production after key provisioning (see §7)
 - [x] Gates: check 0 errors · lint clean · 68 unit · build (function + pdf worker emitted) · 20/20 E2E · diff-cover green on slice PRs
 
 ## 9. Visual parity report
@@ -52,4 +46,4 @@ Until then `/api/email` answers 500 `not_configured` and the UI shows the generi
 - New icons (`TXT.png` etc.) are deliberately NOT preloaded (lazy-load accepted; no preload-manifest churn).
 - Resend free tier ≈100 emails/day; in-memory limits reset on cold starts — accepted for a portfolio (worst case: quiet contact form for a day, no spend possible).
 
-**Phase 2 is complete pending §7 (Resend key) and the dev→main cutover.**
+**Phase 2 is complete.**
