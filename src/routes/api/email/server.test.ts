@@ -125,7 +125,7 @@ describe('POST /api/email', () => {
         const sent: unknown = JSON.parse(init.body);
         expect(sent).toMatchObject({
             from: 'onboarding@resend.dev',
-            to: [profile.meta.email],
+            to: [profile.meta.email.toLowerCase()],
             reply_to: 'visitor@example.com',
             subject: "[Momad's XP] Hello",
         });
