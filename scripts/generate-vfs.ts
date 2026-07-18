@@ -24,7 +24,7 @@ const IE_EXE = '2jpDfV5KSoYMArQnHgux5S';
 /** Flipped per slice as real programs land (spec D13). */
 const PROGRAM_URLS = {
     about_me: './programs/placeholder.svelte',
-    my_cv: './programs/placeholder.svelte',
+    my_cv: './programs/pdf_viewer.svelte',
     contact_me: './programs/placeholder.svelte',
 };
 

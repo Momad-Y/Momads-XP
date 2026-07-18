@@ -76,8 +76,9 @@
         {
             name: 'My CV',
             icon: '/assets/icons/my-cv.png',
-            path: './programs/placeholder.svelte',
-            fs_item: { name: 'My CV', icon: '/assets/icons/my-cv.png' },
+            // no fs_item: the viewer falls back to profile.meta.resumePdf
+            // (a partial fs_item would throw in full_vfs_item)
+            path: './programs/pdf_viewer.svelte',
             font: 'bold',
         },
         {

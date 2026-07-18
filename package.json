@@ -58,6 +58,7 @@
         "is-valid-http-url": "^1.0.3",
         "jszip": "^3.10.1",
         "lodash": "^4.17.21",
+        "pdfjs-dist": "^6.1.200",
         "short-uuid": "^4.2.2",
         "srt-webvtt": "^2.0.0",
         "svelte-range-slider-pips": "^2.0.3",

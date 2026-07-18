@@ -193,6 +193,22 @@
             runningPrograms.update((values) => {
                 return [...values, program];
             });
+        } else if (path == './programs/pdf_viewer.svelte') {
+            const Program = (await import('./programs/pdf_viewer.svelte'))
+                .default;
+            const program: ProgramInstance = mount(Program, {
+                target: node_ref,
+                props: {
+                    id: short.generate(),
+                    fs_item: full_vfs_item(fs_item),
+                    exec_path: path,
+                    get_self: () => program,
+                },
+            });
+            //add to program tray
+            runningPrograms.update((values) => {
+                return [...values, program];
+            });
         } else if (path == './programs/portfolio_viewer.svelte') {
             const full = full_vfs_item(fs_item);
             if (full?.portfolio_ref == null) {
