@@ -1,15 +1,17 @@
 import { test, expect } from '@playwright/test';
 import { bootToDesktop } from './helpers';
 
-test('About Me desktop icon opens the named placeholder', async ({ page }) => {
+test('Contact Me desktop icon opens the named placeholder', async ({
+    page,
+}) => {
     await bootToDesktop(page);
-    await page.locator('#work-space p', { hasText: 'About Me' }).dblclick();
+    await page.locator('#work-space p', { hasText: 'Contact Me' }).dblclick();
 
     const win = page.locator('#work-space .window').first();
     await expect(win).toBeVisible();
     await expect(
         win.getByText(
-            'About Me is under construction — coming in a later phase.',
+            'Contact Me is under construction — coming in a later phase.',
         ),
     ).toBeVisible();
     await win.getByText('OK').click();
@@ -18,12 +20,17 @@ test('About Me desktop icon opens the named placeholder', async ({ page }) => {
 
 test('two rect-less windows cascade instead of stacking', async ({ page }) => {
     await bootToDesktop(page);
-    await page.locator('#work-space p', { hasText: 'About Me' }).dblclick();
+    await page.locator('#work-space p', { hasText: 'Contact Me' }).dblclick();
     await expect(page.locator('#work-space .window')).toHaveCount(1);
     // desktop_folder.open() debounces opens across ALL icons for 400ms —
     // wait it out or the second double-click is silently swallowed
     await page.waitForTimeout(450);
-    await page.locator('#work-space p', { hasText: 'Contact Me' }).dblclick();
+    // .first(): once the first placeholder is open, its title bar and body
+    // also match 'Contact Me' — the desktop icon is the first match
+    await page
+        .locator('#work-space p', { hasText: 'Contact Me' })
+        .first()
+        .dblclick();
     await expect(page.locator('#work-space .window')).toHaveCount(2);
 
     const first = await page

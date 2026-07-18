@@ -84,8 +84,7 @@
         {
             name: 'About Me',
             icon: '/assets/icons/about-me.png',
-            path: './programs/placeholder.svelte',
-            fs_item: { name: 'About Me', icon: '/assets/icons/about-me.png' },
+            path: './programs/about_me.svelte',
             font: 'bold',
         },
         {
@@ -129,7 +128,11 @@
             icon: '/images/xp/icons/MyComputer.png',
             path: './programs/my_computer.svelte',
         },
-        placeholder_entry('About Me', '/assets/icons/about-me.png'),
+        {
+            name: 'About Me',
+            icon: '/assets/icons/about-me.png',
+            path: './programs/about_me.svelte',
+        },
         placeholder_entry(
             'Command Prompt',
             '/images/xp/icons/CommandPrompt.png',
