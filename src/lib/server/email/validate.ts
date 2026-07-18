@@ -2,6 +2,15 @@
  * Payload validation for /api/email (SPECIFICATION.md §6.8, Phase 2 spec D4).
  * Boundary validation: never trust the request body.
  */
+import {
+    EMAIL_RE,
+    MAX_BODY_BYTES,
+    MAX_FROM_LENGTH,
+    MAX_MESSAGE_LENGTH,
+    MAX_SUBJECT_LENGTH,
+    MIN_FILL_TIME_MS,
+} from '../../email_limits';
+
 export interface EmailPayload {
     from_email: string;
     subject: string;
@@ -16,13 +25,13 @@ export type ValidationResult =
     | { ok: true; value: EmailPayload }
     | { ok: false; code: 'invalid_payload' | 'honeypot' | 'too_fast' };
 
-export const MAX_BODY_BYTES = 32_768;
-export const MAX_FROM_LENGTH = 254;
-export const MAX_SUBJECT_LENGTH = 200;
-export const MAX_MESSAGE_LENGTH = 5000;
-export const MIN_FILL_TIME_MS = 3000;
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export {
+    MAX_BODY_BYTES,
+    MAX_FROM_LENGTH,
+    MAX_MESSAGE_LENGTH,
+    MAX_SUBJECT_LENGTH,
+    MIN_FILL_TIME_MS,
+};
 
 function is_record(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null;

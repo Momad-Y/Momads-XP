@@ -55,11 +55,7 @@
         {
             name: 'Contact Me',
             icon: '/assets/icons/contact-me.png',
-            path: './programs/placeholder.svelte',
-            fs_item: {
-                name: 'Contact Me',
-                icon: '/assets/icons/contact-me.png',
-            },
+            path: './programs/contact_me.svelte',
             font: 'bold',
         },
     ];
@@ -90,11 +86,7 @@
         {
             name: 'Contact Me',
             icon: '/assets/icons/contact-me.png',
-            path: './programs/placeholder.svelte',
-            fs_item: {
-                name: 'Contact Me',
-                icon: '/assets/icons/contact-me.png',
-            },
+            path: './programs/contact_me.svelte',
             font: 'bold',
         },
         null,

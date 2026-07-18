@@ -3,12 +3,11 @@
  * The 3s min-fill-time guard is deliberately server-only.
  */
 import {
+    EMAIL_RE,
     MAX_FROM_LENGTH,
     MAX_MESSAGE_LENGTH,
     MAX_SUBJECT_LENGTH,
-} from './server/email/validate';
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+} from './email_limits';
 
 export interface ContactForm {
     from_email: string;
