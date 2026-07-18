@@ -25,7 +25,7 @@ const IE_EXE = '2jpDfV5KSoYMArQnHgux5S';
 const PROGRAM_URLS = {
     about_me: './programs/about_me.svelte',
     my_cv: './programs/pdf_viewer.svelte',
-    contact_me: './programs/placeholder.svelte',
+    contact_me: './programs/contact_me.svelte',
 };
 
 const desktop_exe = (
