@@ -1,4 +1,5 @@
 import type { ProgramDescriptor } from './types';
+import { PORTFOLIO_ENTRY_IDS, PORTFOLIO_FOLDER_IDS } from './generated/vfs_ids';
 
 export interface DefaultWallpaper {
     name: string;
@@ -102,6 +103,9 @@ export const my_computer: string[] = [
     'cTbkbrM4qjwF3UfmCoFkEK', //c drive
     'ejq5mVcfZA2fzR1uwYUC6n', //d drive
     'o1owmZuXKQdXR5vFxaBBW3', //f removable storage
+    // Phase 2 (spec D9): portfolio folders render first in the root view's
+    // "Files Stored on This Computer" section (drives filter separately).
+    ...PORTFOLIO_FOLDER_IDS,
     my_music_id, //my music
     my_pictures_id, //my pictures
 ];
@@ -119,6 +123,9 @@ export const protected_items: string[] = [
     recycle_bin_id,
     desktop_folder,
     wallpapers_folder,
+    // Phase 2 (spec F8): portfolio entry files ARE the product — visitors
+    // keep full delete/rename freedom over their own files only.
+    ...PORTFOLIO_ENTRY_IDS,
 ];
 
 export const hidden_items: string[] = [
@@ -167,6 +174,14 @@ export const doctypes: Record<string, ProgramDescriptor[]> = {
     '.jpeg': [image_viewer, paint_program],
     '.gif': [image_viewer],
     '.html': [ie_program],
+    // Phase 2: seeded portfolio entries (portfolio_ref-stamped .txt files).
+    '.txt': [
+        {
+            path: './programs/portfolio_viewer.svelte',
+            icon: '/images/xp/icons/TXT.png',
+            name: 'Portfolio Viewer',
+        },
+    ],
 };
 
 export const icons: Record<string, string> = {
