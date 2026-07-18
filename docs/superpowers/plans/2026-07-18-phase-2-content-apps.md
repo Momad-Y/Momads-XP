@@ -352,7 +352,7 @@ describe('build_portfolio', () => {
         const first = built.items[exp_folder?.children[0] ?? ''];
         expect(first?.ext).toBe('.txt');
         expect(first?.portfolio_ref).toEqual({ section: 'experience', key: 0 });
-        expect(first?.icon).toBeTruthy();
+        expect(first?.icon).toBe('/images/xp/icons/TXT.png');
         expect(first?.name).toBe(
             `${profile.experience[0]?.company} — ${profile.experience[0]?.role}.txt`,
         );
@@ -465,8 +465,10 @@ const FOLDERS: { id: string; name: string; section: PortfolioSection }[] = [
     { id: 'p2FolderAwards', name: 'Awards', section: 'awards' },
 ];
 
-// TXT_ICON: copy the literal from icons['.txt'] in src/lib/system.ts
-const TXT_ICON = '<look up icons[".txt"] in src/lib/system.ts and inline it>';
+// Full path — the icons map in system.ts stores the bare 'TXT.png', but
+// per-item `icon` is consumed verbatim as url(${item.icon}) (viewer.svelte,
+// title bars); a bare filename would render a broken image.
+const TXT_ICON = '/images/xp/icons/TXT.png';
 
 function base_item(id: string, parent: string): Omit<VfsItem, 'type' | 'name' | 'basename' | 'ext'> {
     return {
@@ -570,7 +572,7 @@ export function build_portfolio(profile: Profile): PortfolioBuild {
 }
 ```
 
-(Replace the `TXT_ICON` placeholder string with the real literal from `system.ts` before committing — the test asserts `icon` is truthy, and Task 5's freshness gate locks the final value.)
+(Icons are deliberately NOT added to `starting.svelte`'s preload arrays — `TXT.png` lazy-loads on first Explorer open; churning the preload manifest isn't worth a cosmetic first-paint. Recorded in the phase guide.)
 
 - [ ] **Step 4: Run tests** — `npx vitest run src/lib/vfs_gen` → PASS; `npm run check` → 0 errors.
 
@@ -753,6 +755,17 @@ await set('hard_drive_seed_version', SEED_VERSION);
 
 (`StoredHardDrive` stays whatever type it is today; import `merge_on_reseed` from `../../lib/seed`.)
 
+- [ ] **Step 4b: Offline-stale-cache resilience (red-team M1 — binding).** Phase 2 appends portfolio folder ids to the `my_computer` list, but a Phase-1 visitor who is OFFLINE at their first Phase-2 boot keeps their old cached drive (the fetch-failure fallback path) — and both `finder.ts:14` and `viewer.svelte:108` do `my_computer.map((el) => required(drive[el], ...))`, which would hard-throw and kill the desktop. Change BOTH call sites from throwing `required` to a filtering map, e.g. in `finder.ts`:
+
+```typescript
+const computer = my_computer.flatMap((el) => {
+    const item = drive_snapshot()[el];
+    return item == null ? [] : [item];
+});
+```
+
+and the equivalent in `viewer.svelte`'s `computer` const. Degraded-but-alive: an offline stale cache simply doesn't show the portfolio folders until the visitor is back online. Add a unit-style note in the commit body; behavior is covered by the merge tests + unchanged E2E.
+
 - [ ] **Step 5: Run gates** — `npx vitest run` → all PASS; `npm run check` → 0 errors; `npm run lint`.
 
 - [ ] **Step 6: Commit**
@@ -794,6 +807,8 @@ console.log('base items:', Object.keys(hd).length);
 ```
 
 Expected: `base items: 21`. The base is FROZEN — future content changes go through `profile.json`, structural shell changes edit this base deliberately.
+
+Then add `scripts/vfs-base.json` to `.prettierignore` (red-team H1: it's compact single-line JSON; `scripts/` is NOT prettier-ignored and lint-staged skips `.json`, so `format:check` would otherwise fail CI).
 
 - [ ] **Step 2: Install tsx (npm-10 lock!)**
 
@@ -927,7 +942,9 @@ execSync('npx prettier --write src/lib/generated/seed_version.ts src/lib/generat
 console.log(`generated: ${Object.keys(seed).length} items, SEED_VERSION ${version}`);
 ```
 
-> Strict-TS note: the two `as VfsItem & Record<string, unknown>` assertions above are in `scripts/` (outside the `src/`-scoped `no-unsafe-type-assertion` rule); if eslint still flags them, restructure with a typed spread helper instead of suppressing.
+> Strict-TS note (red-team M5): `scripts/` is covered by NEITHER `npm run check` (tsconfig includes only `src/**` etc.) NOR `npm run lint` (no flat-config `files` block matches — eslint silently skips it). The generator is therefore explicitly type-checked in Step 5's CI freshness step and the local gates via:
+> `npx tsc --noEmit --strict --skipLibCheck --resolveJsonModule --module esnext --moduleResolution bundler --target es2022 scripts/generate-vfs.ts`
+> The two `as VfsItem & Record<string, unknown>` assertions are acceptable there; prefer a typed spread helper if tsc complains.
 
 - [ ] **Step 4: Wire seed.ts + package.json + run it**
 
@@ -947,6 +964,7 @@ Expected: generator prints item count + version; hash test PASSES against the re
 ```yaml
             - name: VFS seed freshness (generated == committed)
               run: |
+                  npx tsc --noEmit --strict --skipLibCheck --resolveJsonModule --module esnext --moduleResolution bundler --target es2022 scripts/generate-vfs.ts
                   npm run generate:vfs
                   git diff --exit-code static/json/hard_drive.json src/lib/generated
 ```
@@ -992,7 +1010,7 @@ import { PORTFOLIO_ENTRY_IDS, PORTFOLIO_FOLDER_IDS } from './generated/vfs_ids';
 '.txt': [
     {
         path: './programs/portfolio_viewer.svelte',
-        icon: <the icons['.txt'] literal>,
+        icon: '/images/xp/icons/TXT.png',
         name: 'Portfolio Viewer',
     },
 ],
@@ -1414,7 +1432,7 @@ Why `full_vfs_item` is safe here for both entry points: it returns `undefined` f
 
 - `system.ts` `doctypes`: `'.pdf': [{ path: './programs/pdf_viewer.svelte', icon: '/assets/icons/my-cv.png', name: 'PDF Viewer' }]`
 - `scripts/generate-vfs.ts`: `PROGRAM_URLS.my_cv = './programs/pdf_viewer.svelte'`
-- `start_menu.svelte`: replace the My CV `placeholder_entry(...)` with a real launch `{ path: './programs/pdf_viewer.svelte', name: 'My CV', icon: '/assets/icons/my-cv.png' }` matching the surrounding `StartMenuItem` shape.
+- `start_menu.svelte` (red-team M2 — **enumerate sites first**: `grep -n "placeholder.svelte\|My CV\|About Me\|Contact Me" src/routes/xp/start_menu.svelte`): My CV is an INLINE object (~line 77, `path: './programs/placeholder.svelte'` + `fs_item`), not a `placeholder_entry()` call — change its `path` to `'./programs/pdf_viewer.svelte'` and drop the `fs_item`. Each app may appear in MULTIPLE columns/flyouts; flip EVERY site for the app in that slice (also sanity-check neighbors — e.g. a col_2 "Contact Me" entry currently points at `my_computer.svelte`; if found inconsistent, fix it in slice 4 with a note in the PR).
 - `npm run generate:vfs`
 
 - [ ] **Step 5: E2E** — `e2e/pdf_viewer.spec.ts`:
@@ -1469,8 +1487,8 @@ Branch: `git checkout dev && git pull && git checkout -b feature/phase-2-slice-3
 - **My Resume click:** `queueProgram.set({ path: './programs/pdf_viewer.svelte' })`.
 
 - [ ] **Step 1: Implement** the component per the contract above (standard scaffold; `exec_path` set so the window rect persists).
-- [ ] **Step 2: Flip generator + start menu; regenerate** (`PROGRAM_URLS.about_me`, `start_menu.svelte` About Me entry → `{ path: './programs/about_me.svelte', ... }`, `npm run generate:vfs`).
-- [ ] **Step 3: Update `e2e/shell.spec.ts`** — retarget its two placeholder-based tests to Contact Me (the only remaining §3.5 placeholder): the "opens the named placeholder" test dblclicks `Contact Me`; the cascade test opens `Contact Me` then `About Me` (sizes now differ — assert only relative 24px offset if both windows are rect-less on first run; if the About Me default rect breaks the 24px assertion, cascade-test with Contact Me + a second Contact Me instance instead).
+- [ ] **Step 2: Flip generator + start menu; regenerate** (`PROGRAM_URLS.about_me`; `start_menu.svelte`: About Me appears in BOTH col_2 (~line 83, inline object) and the All Programs flyout (~line 131, `placeholder_entry('About Me', ...)`) — flip both to `{ path: './programs/about_me.svelte', name: 'About Me', icon: '/assets/icons/about-me.png' }`; then `npm run generate:vfs`).
+- [ ] **Step 3: Update `e2e/shell.spec.ts`** — retarget its two placeholder-based tests to Contact Me (the only remaining §3.5 desktop placeholder): the "opens the named placeholder" test dblclicks `Contact Me`; the cascade test opens `Contact Me` twice (two placeholder instances, identical rect-less size → the existing 24px assertion holds; remember the 450ms dblclick-debounce wait between opens).
 - [ ] **Step 4: E2E** — `e2e/about_me.spec.ts`:
 
 ```typescript
@@ -1632,7 +1650,15 @@ export const POST: RequestHandler = async (event) => {
 };
 ```
 
-- [ ] **Step 1: Write failing handler tests** (`vi.stubGlobal('fetch', ...)`; build `Request` objects with an allowed Origin header; a minimal `event` stub typed against `RequestHandler`'s parameter via a helper — if constructing the typed event fights the generated `$types`, test through `new Request` + a thin cast-free factory; assert: 403 wrong origin · 413 oversize · 400 bad JSON · 202-without-send on honeypot (fetch NOT called) · 422 too_fast · 429 on 6th call same IP · 500 not_configured when env empty · 202 happy path with correct Resend payload (from/to/reply_to/subject prefix) · 502 when fetch rejects or returns 500).
+- [ ] **Step 1: Write failing handler tests.** **CRITICAL setup (red-team C1, empirically verified):** vitest cannot resolve SvelteKit's `$env` virtual modules — importing `+server.ts` fails with `Cannot find module '$env/dynamic/private'` unless the test starts with:
+
+```typescript
+vi.mock('$env/dynamic/private', () => ({
+    env: { RESEND_API_KEY: 'test', EMAIL_FROM: '' },
+}));
+```
+
+(placed before the `+server` import; override per-test via `vi.mocked`/re-mock for the `not_configured` case). Then (`vi.stubGlobal('fetch', ...)`; build `Request` objects with an allowed Origin header; a minimal `event` stub typed against `RequestHandler`'s parameter via a helper — if constructing the typed event fights the generated `$types`, test through `new Request` + a thin cast-free factory; assert: 403 wrong origin · 413 oversize · 400 bad JSON · 202-without-send on honeypot (fetch NOT called) · 422 too_fast · 429 on 6th call same IP · 500 not_configured when env empty · 202 happy path with correct Resend payload (from/to/reply_to/subject prefix) · 502 when fetch rejects or returns 500).
 - [ ] **Step 2: Fail → implement → pass**; `npm run check` (the `./$types` import requires `svelte-kit sync` — runs via `npm run prepare`).
 - [ ] **Step 3: Verify the function is emitted:** `npm run build && grep -r "api/email" .netlify build -l | head` → the server bundle contains the route (adapter-netlify emits it because `prerender=false`).
 - [ ] **Step 4: Commit** — `feat: /api/email Netlify function with Resend + §6.8 hardening`.
@@ -1642,7 +1668,7 @@ export const POST: RequestHandler = async (event) => {
 **Files:**
 - Create: `src/routes/xp/programs/contact_me.svelte`
 - Modify: `src/routes/xp/work_space.svelte` (branch, raw `fs_item` passthrough like pdf_viewer), `scripts/generate-vfs.ts` (`PROGRAM_URLS.contact_me`), `src/routes/xp/start_menu.svelte` (Contact Me → real), regenerate
-- Modify: `e2e/shell.spec.ts` (LAST placeholder gone — retarget the placeholder test + cascade test to a start-menu placeholder app, e.g. All Programs → Python; keep assertions otherwise identical)
+- Modify: `e2e/shell.spec.ts` (LAST desktop placeholder gone — red-team M3: real programs set `exec_path` → persist window rects → NOT rect-less, so the cascade test must keep using placeholders. Retarget both tests to the start-menu Python placeholder with this exact open sequence, done TWICE for the cascade test (450ms apart): `await page.getByText('start', { exact: true }).click(); await page.getByText('All Programs').hover(); await page.getByText('Python', { exact: true }).click();` — reuse the working selectors from `e2e/start_menu.spec.ts` if they differ. Assertions stay identical: placeholder copy `Python is under construction — coming in a later phase.` and the 24px cascade offset.)
 - Test: `e2e/contact_me.spec.ts`
 
 **Layout contract (from `design/inspiration/email.png`, our content):**
@@ -1651,7 +1677,8 @@ export const POST: RequestHandler = async (event) => {
 - Fields: `To:` read-only `{profile.meta.name} <{profile.meta.email}>` · `From:` visitor email input, placeholder `Your email address` · `Subject:` placeholder `Subject of your message` · body textarea, placeholder `Write your message here`.
 - Status bar: `Compose a message to Mohamed`.
 - Hidden honeypot: `<input name="website" tabindex="-1" autocomplete="off" class="absolute -left-[9999px]" bind:value={website} />`; `const opened_at = Date.now()` at mount.
-- Submit flow: client-side validation mirroring Task 10's caps → inline field styling + XP `Dialog` (mounted on `#desktop` like `no_association.ts`) on error; while pending disable Send; `fetch('/api/email', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ from_email, subject, message, website, opened_at }) })`.
+- Submit flow: client-side validation mirrors Task 10's caps/format ONLY — the 3s min-fill-time guard is **server-only** (red-team M4: a legitimate fast click gets the server's generic failure dialog; humans filling three fields take >3s, so this path is bot-only in practice). Validation failure → XP `Dialog` (mounted on `#desktop` like `no_association.ts`); while pending disable Send; `fetch('/api/email', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ from_email, subject, message, website, opened_at }) })`.
+- Validation dialog copy (verbatim, title `Contact Me`): empty/invalid email → `Please enter a valid email address.`; empty subject → `Please enter a subject.`; empty message → `Please enter a message.` (first failing field wins, checked in that order).
 - Result dialogs (verbatim copy): success → title `Contact Me`, message `Message sent successfully.`; 429 → `The mail server is busy. Please try again in a little while.`; anything else → `The message could not be sent. Please try again later.` Success also clears the form.
 
 - [ ] **Step 1: Implement** per contract (standard scaffold; small pure `validate_contact_form` helper inside `src/lib/contact.ts` + `contact.test.ts` so the mirror rules are unit-tested).
@@ -1667,7 +1694,9 @@ test('validation error shows an XP dialog', async ({ page }) => {
     await page.locator('#work-space p', { hasText: 'Contact Me' }).dblclick();
     const win = page.locator('#work-space .window').first();
     await win.getByText('Send Message').click();
-    await expect(page.getByText(/enter a valid email/i)).toBeVisible();
+    await expect(
+        page.getByText('Please enter a valid email address.'),
+    ).toBeVisible();
 });
 
 test('successful send shows the success dialog (mocked API)', async ({ page }) => {
@@ -1680,7 +1709,7 @@ test('successful send shows the success dialog (mocked API)', async ({ page }) =
     await win.getByPlaceholder('Your email address').fill('visitor@example.com');
     await win.getByPlaceholder('Subject of your message').fill('Hello');
     await win.getByPlaceholder('Write your message here').fill('Great site!');
-    await page.waitForTimeout(3100); // min-fill-time guard
+    // no artificial wait: min-fill-time is server-only and the API is mocked
     await win.getByText('Send Message').click();
     await expect(page.getByText('Message sent successfully.')).toBeVisible();
 });
@@ -1697,7 +1726,8 @@ test('successful send shows the success dialog (mocked API)', async ({ page }) =
 
 - [ ] `git grep -n "placeholder.svelte" src/ scripts/` — remaining references ONLY for Phase 3/4 apps (CMD, Python, Paint, Music Player, Games) in `start_menu.svelte` + the work_space branch itself.
 - [ ] Boot a cached-drive browser (load production once, then local build): confirm re-seed merge kept a user-created folder + file across the Phase-2 seed change (manual DevTools check, IndexedDB `hard_drive`).
-- [ ] Mobile spec: add a `profile.projects`-non-empty assertion to `e2e/mobile.spec.ts` (spec D14/M1 — section renders now that data exists).
+- [ ] Mobile spec: add a `profile.projects`-non-empty assertion to `e2e/mobile.spec.ts` (spec D14/M1 — section renders now that data exists). Also confirm slice 1's projects data didn't break the existing mobile full-content test.
+- [ ] Update `docs/SPECIFICATION.md` §8 file structure: add `portfolio_viewer.svelte`, `src/lib/vfs_gen/`, `src/lib/portfolio.ts`, `src/lib/server/email/`, `src/lib/generated/`, `scripts/vfs-base.json`; confirm `pdf_viewer.svelte` / `about_me.svelte` / `contact_me.svelte` / `api/email` entries match what shipped.
 - [ ] `npm run check` 0 errors · `npm run lint` clean · full unit suite · `npm run build` · full E2E ≥16 specs green.
 - [ ] Gate 6 (outside this plan): fresh-context implementation review → fixes → `docs/phase-2-guide.md` (must include: projects-draft owner review flag · Resend key/domain records · merge copy-loss note · quota acceptance note) → visual parity report → cutover PR `dev` → `main`.
 
@@ -1705,4 +1735,8 @@ test('successful send shows the success dialog (mocked API)', async ({ page }) =
 
 - **Spec coverage:** D1(T2/T3/T6) D2(T3/T5) D3(T4) D4/D5(T11) D6(T8) D7(T9) D8(T12) D9(T6) D10(T1) D11(T1) D12(tests throughout) D13(T5/T8/T9/T12) D14(closeout). Exit criteria 1–5 → T6/T8/T9/T12/T5+T4/closeout.
 - **Type consistency:** `PortfolioRef`/`PortfolioDetail`/`resolve_portfolio_ref` (T2) consumed verbatim in T6; `PortfolioBuild` fields (T3) consumed in T5; `vfs_ids.ts` exports (T5) consumed in T6/T9; Task-10 signatures consumed verbatim in T11/T12.
-- **Known look-ups left to the implementer (deliberate, with exact locations):** `icons['.txt']` literal (system.ts), `RButton` prop names, `StartMenuItem` shape, pdfjs-dist current major — each task says where to look.
+- **Known look-ups left to the implementer (deliberate, with exact locations):** `RButton` prop names, `StartMenuItem` shape, pdfjs-dist current major — each task says where to look.
+
+## Gate-4 red-team disposition
+
+Fresh-context red-team verdict: **APPROVE WITH FIXES** (1 critical, 2 high, 5 medium, 4 low; key mechanisms tested empirically). All findings verified and accepted, incorporated above: C1 (`$env` vi.mock — Task 11), H1 (`scripts/vfs-base.json` prettier-ignored — Task 5), H2 (full-path `TXT.png` icon — Tasks 3/6), M1 (offline stale-cache `required()` crash → filtering maps — Task 4 Step 4b), M2 (start-menu site enumeration — Tasks 8/9/12), M3 (cascade test keeps placeholder targets — Tasks 9/12), M4 (verbatim validation copy + server-only min-fill-time — Task 12), M5 (explicit `tsc --noEmit` over `scripts/` in CI — Task 5), L2/L3 (closeout items). One deliberate deviation from a suggested fix: L1 (preload the new icons) is **declined** — icons lazy-load; preload-manifest churn isn't warranted for a cosmetic first-paint (documented in Task 3).
