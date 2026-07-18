@@ -112,7 +112,7 @@
         </div>
         <p class="text-slate-100 text-[11px] text-right leading-snug">
             After you log on, you 'can't' add or change accounts.<br />
-            Just go to Control Panel and click User Accounts.
+            Don't go to Control Panel.
         </p>
     </div>
 </div>
