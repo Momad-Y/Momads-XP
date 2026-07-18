@@ -95,7 +95,10 @@ export const POST: RequestHandler = async (event) => {
                     env.EMAIL_FROM != null && env.EMAIL_FROM !== ''
                         ? env.EMAIL_FROM
                         : 'onboarding@resend.dev',
-                to: [profile.meta.email],
+                // Resend's sandbox compares the recipient against the
+                // account email CASE-SENSITIVELY — normalize (verified via
+                // API log: 403 for Mohamed.Y.… vs account mohamed.y.…).
+                to: [profile.meta.email.toLowerCase()],
                 reply_to: result.value.from_email,
                 subject: `[Momad's XP] ${result.value.subject}`,
                 text: `From: ${result.value.from_email}\n\n${result.value.message}`,
