@@ -174,6 +174,13 @@ export const doctypes: Record<string, ProgramDescriptor[]> = {
     '.jpeg': [image_viewer, paint_program],
     '.gif': [image_viewer],
     '.html': [ie_program],
+    '.pdf': [
+        {
+            path: './programs/pdf_viewer.svelte',
+            icon: '/assets/icons/my-cv.png',
+            name: 'PDF Viewer',
+        },
+    ],
     // Phase 2: seeded portfolio entries (portfolio_ref-stamped .txt files).
     '.txt': [
         {
