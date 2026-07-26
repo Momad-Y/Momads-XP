@@ -22,14 +22,22 @@
         }
     }}
 >
-    <div
-        class="h-[25px] w-[25px] bg-contain bg-no-repeat {disabled
-            ? 'grayscale'
-            : ''}"
-        style:background-image="url({icon})"
-    ></div>
+    {#if icon.trim() != ''}
+        <div
+            class="h-[25px] w-[25px] bg-contain bg-no-repeat {disabled
+                ? 'grayscale'
+                : ''}"
+            style:background-image="url({icon})"
+        ></div>
+    {/if}
     {#if title.trim() != ''}
-        <div class="text-[12px] text-slate-900 ml-2">{title}</div>
+        <div
+            class="text-[12px] text-slate-900 {icon.trim() != ''
+                ? 'ml-2'
+                : 'mx-1'}"
+        >
+            {title}
+        </div>
     {/if}
     {#if expandable}
         <div class="w-[10px] ml-1">
