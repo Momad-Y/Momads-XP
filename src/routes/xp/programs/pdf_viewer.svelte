@@ -125,12 +125,16 @@
             <div class="w-px h-5 bg-[#aca899] mx-1"></div>
             <RButton
                 title="−"
+                icon="/images/xp/icons/Magnifier.png"
+                tooltip_message="Zoom out"
                 on_click={() => {
                     set_zoom(zoom - 0.25);
                 }}
             />
             <RButton
                 title="+"
+                icon="/images/xp/icons/Magnifier.png"
+                tooltip_message="Zoom in"
                 on_click={() => {
                     set_zoom(zoom + 0.25);
                 }}
