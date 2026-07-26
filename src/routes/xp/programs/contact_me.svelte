@@ -62,6 +62,76 @@
         message = '';
     }
 
+    /**
+     * Toolbar Cut/Copy/Paste operate on the last-focused field (the toolbar
+     * click itself blurs the field, but inputs keep their selection range).
+     */
+    type EditableField = HTMLInputElement | HTMLTextAreaElement;
+    let last_field: EditableField | null = null;
+
+    function track_focus(event: FocusEvent) {
+        const target = event.currentTarget;
+        if (
+            target instanceof HTMLInputElement ||
+            target instanceof HTMLTextAreaElement
+        ) {
+            last_field = target;
+        }
+    }
+
+    function sync_field(el: EditableField) {
+        // bind:value listens for input events — dispatch one so the Svelte
+        // state follows the programmatic edit
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    async function clipboard_cut_copy(cut: boolean) {
+        const el = last_field;
+        if (el == null) return;
+        const start = el.selectionStart ?? 0;
+        const end = el.selectionEnd ?? 0;
+        const selected = el.value.slice(start, end);
+        if (selected === '') return;
+        try {
+            await navigator.clipboard.writeText(selected);
+        } catch (error) {
+            console.error('clipboard write failed', error);
+            return;
+        }
+        if (cut && !el.readOnly) {
+            el.value = el.value.slice(0, start) + el.value.slice(end);
+            sync_field(el);
+            el.focus();
+            el.setSelectionRange(start, start);
+        } else {
+            el.focus();
+            el.setSelectionRange(start, end);
+        }
+    }
+
+    async function clipboard_paste() {
+        const el = last_field;
+        if (el == null || el.readOnly) return;
+        let text: string;
+        try {
+            text = await navigator.clipboard.readText();
+        } catch {
+            // Firefox (and denied permissions) block programmatic reads
+            show_dialog(
+                'The browser blocked clipboard access — press Ctrl+V in the field instead.',
+            );
+            return;
+        }
+        if (text === '') return;
+        const start = el.selectionStart ?? el.value.length;
+        const end = el.selectionEnd ?? el.value.length;
+        el.value = el.value.slice(0, start) + text + el.value.slice(end);
+        sync_field(el);
+        el.focus();
+        const caret = start + text.length;
+        el.setSelectionRange(caret, caret);
+    }
+
     async function send() {
         if (sending) return;
         const error = validate_contact_form({ from_email, subject, message });
@@ -158,9 +228,27 @@
                 on_click={reset}
             />
             <div class="w-px h-5 bg-stone-300 mx-1"></div>
-            <RButton icon="/images/xp/icons/Cut.png" disabled={true} />
-            <RButton icon="/images/xp/icons/Copy.png" disabled={true} />
-            <RButton icon="/images/xp/icons/Paste.png" disabled={true} />
+            <RButton
+                icon="/images/xp/icons/Cut.png"
+                tooltip_message="Cut"
+                on_click={() => {
+                    void clipboard_cut_copy(true);
+                }}
+            />
+            <RButton
+                icon="/images/xp/icons/Copy.png"
+                tooltip_message="Copy"
+                on_click={() => {
+                    void clipboard_cut_copy(false);
+                }}
+            />
+            <RButton
+                icon="/images/xp/icons/Paste.png"
+                tooltip_message="Paste"
+                on_click={() => {
+                    void clipboard_paste();
+                }}
+            />
             <div class="w-px h-5 bg-stone-300 mx-1"></div>
             {#if linkedin}
                 <!-- eslint-disable svelte/no-navigation-without-resolve -- external social URL, not an app route -->
@@ -187,6 +275,7 @@
                     type="text"
                     readonly
                     value="{profile.meta.name} <{profile.meta.email}>"
+                    on:focus={track_focus}
                 />
             </label>
             <label class="flex flex-row items-center">
@@ -196,6 +285,7 @@
                     type="email"
                     placeholder="Your email address"
                     bind:value={from_email}
+                    on:focus={track_focus}
                 />
             </label>
             <label class="flex flex-row items-center">
@@ -206,6 +296,7 @@
                     type="text"
                     placeholder="Subject of your message"
                     bind:value={subject}
+                    on:focus={track_focus}
                 />
             </label>
             <input
@@ -223,7 +314,8 @@
             <textarea
                 class="grow resize-none p-2 border border-stone-400 bg-white text-[12px] outline-none"
                 placeholder="Write your message here"
-                bind:value={message}></textarea>
+                bind:value={message}
+                on:focus={track_focus}></textarea>
         </div>
 
         <!-- status bar -->
