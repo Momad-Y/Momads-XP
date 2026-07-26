@@ -34,6 +34,10 @@ npm run generate:vfs
 
 CI fails if the committed seed drifts from a fresh regeneration. Images are `{ "src": "...", "alt": "..." }` objects referencing files in `static/assets/images/`.
 
+### Environment variables
+
+Server-side only, used by the `/api/email` function — see `.env.example`. In production they live in the Netlify site settings (changing one requires a redeploy).
+
 ### Workflow
 
 Work lands on `feature/*` branches → PR into `dev` (CI-gated) → periodic cutover PR `dev` → `main` (production deploys from `main` only). The full phase workflow (spec → red-team → plan → red-team → implement → review) is documented in `docs/SPECIFICATION.md` §11; per-phase handoffs live in `docs/phase-*-guide.md`.
