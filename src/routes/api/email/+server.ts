@@ -21,6 +21,23 @@ export const prerender = false;
 // best-effort by design; accepted).
 const limiter = create_rate_limiter();
 
+/**
+ * SvelteKit's generated env types claim `string` when a local .env declares
+ * the key but `string | undefined` in CI — this boundary keeps the runtime
+ * guards honest (and lint quiet) in both worlds.
+ */
+function optional_env(value: string | undefined): string | undefined {
+    return value;
+}
+
+/** Sender address; empty/unset falls back to Resend's sandbox sender. */
+function email_from(): string {
+    const configured = optional_env(env.EMAIL_FROM);
+    return configured != null && configured !== ''
+        ? configured
+        : 'onboarding@resend.dev';
+}
+
 export const POST: RequestHandler = async (event) => {
     // §6.8 "Origin/Referer": privacy browsers strip Origin — fall back to
     // the Referer's origin before rejecting (gate-6 L4).
@@ -71,7 +88,7 @@ export const POST: RequestHandler = async (event) => {
         );
     }
 
-    const key = env.RESEND_API_KEY;
+    const key = optional_env(env.RESEND_API_KEY);
     if (key == null || key === '') {
         console.error('/api/email: RESEND_API_KEY not configured');
         return json({ error: 'not_configured' }, { status: 500 });
@@ -91,10 +108,7 @@ export const POST: RequestHandler = async (event) => {
             },
             body: JSON.stringify({
                 // empty string counts as unset (Netlify env vars default to '')
-                from:
-                    env.EMAIL_FROM != null && env.EMAIL_FROM !== ''
-                        ? env.EMAIL_FROM
-                        : 'onboarding@resend.dev',
+                from: email_from(),
                 // Resend's sandbox compares the recipient against the
                 // account email CASE-SENSITIVELY — normalize (verified via
                 // API log: 403 for Mohamed.Y.… vs account mohamed.y.…).
@@ -105,7 +119,14 @@ export const POST: RequestHandler = async (event) => {
             }),
         });
         if (!res.ok) {
-            console.error('/api/email: resend responded', res.status);
+            // Log Resend's error body server-side (never echoed to the
+            // client) — a bare status left 4xx causes undiagnosable.
+            const detail = await res.text().catch(() => '(unreadable)');
+            console.error(
+                '/api/email: resend responded',
+                res.status,
+                detail.slice(0, 500),
+            );
             return json({ error: 'send_failed' }, { status: 502 });
         }
         return json({ ok: true }, { status: 202 });
