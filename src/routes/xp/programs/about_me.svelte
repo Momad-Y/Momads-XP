@@ -85,7 +85,16 @@
     const menu: MenuBarEntry[] = [
         {
             name: 'File',
-            items: [[{ name: 'Close', action: () => { destroy(); } }]],
+            items: [
+                [
+                    {
+                        name: 'Close',
+                        action: () => {
+                            destroy();
+                        },
+                    },
+                ],
+            ],
         },
         {
             name: 'View',
