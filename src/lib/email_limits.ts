@@ -10,4 +10,11 @@ export const MAX_SUBJECT_LENGTH = 200;
 export const MAX_MESSAGE_LENGTH = 5000;
 export const MIN_FILL_TIME_MS = 3000;
 
-export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/**
+ * Practical email shape, aligned with what Resend accepts: dot-atom local
+ * part, domain labels without leading/trailing hyphens or empty segments,
+ * alphabetic TLD. The old permissive `[^\s@]` pattern let through addresses
+ * like `a@b.com.` that Resend 422s after our validation passed.
+ */
+export const EMAIL_RE =
+    /^[A-Za-z0-9._%+-]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*\.[A-Za-z]{2,}$/;

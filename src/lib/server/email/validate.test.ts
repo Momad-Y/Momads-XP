@@ -77,7 +77,19 @@ describe('validate_email_payload', () => {
     });
 
     it('rejects malformed emails and empty fields', () => {
-        for (const from_email of ['not-an-email', 'a@b', 'a b@c.d', '']) {
+        for (const from_email of [
+            'not-an-email',
+            'a@b',
+            'a b@c.d',
+            '',
+            // shapes the old permissive regex passed but Resend 422s
+            'visitor@example.com.',
+            'visitor@example..com',
+            'a@b.c-',
+            'a@-b.com',
+            'a@b.c3',
+            'Test@a.a', // owner's original repro: single-letter TLD
+        ]) {
             expect(
                 validate_email_payload({ ...valid, from_email }, NOW),
             ).toEqual({ ok: false, code: 'invalid_payload' });
