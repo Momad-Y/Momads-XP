@@ -3,12 +3,16 @@
 <script lang="ts">
     import Window from '../../../lib/components/xp/Window.svelte';
     import RButton from '../../../lib/components/xp/RButton.svelte';
-    import { unmount } from 'svelte';
+    import Menu from '../../../lib/components/xp/Menu.svelte';
+    import Dialog from '../../../lib/components/xp/Dialog.svelte';
+    import { mount, unmount } from 'svelte';
     import { queueProgram, runningPrograms } from '../../../lib/store';
     import { profile } from '../../../lib/profile';
     import { PROJECTS_FOLDER_ID } from '../../../lib/generated/vfs_ids';
     import { required } from '../../../lib/types';
     import type {
+        MenuBarEntry,
+        MountedComponent,
         ProgramInstance,
         WindowController,
         WindowOptions,
@@ -53,6 +57,51 @@
         queueProgram.set({ path: './programs/pdf_viewer.svelte' });
     }
 
+    function show_about_dialog() {
+        const target = required(
+            document.querySelector('#desktop'),
+            'desktop element',
+        );
+        const dialog: MountedComponent = mount(Dialog, {
+            target,
+            props: {
+                title: 'About Momad',
+                message: `${profile.meta.name} — ${profile.meta.title}, ${profile.meta.location}. Built into Momad's XP. Very Professional.`,
+                icon: '/assets/icons/about-me.png',
+                get_self: () => dialog,
+                buttons: [
+                    {
+                        name: 'OK',
+                        focus: true,
+                        action: () => {
+                            void unmount(dialog);
+                        },
+                    },
+                ],
+            },
+        });
+    }
+
+    const menu: MenuBarEntry[] = [
+        {
+            name: 'File',
+            items: [[{ name: 'Close', action: () => { destroy(); } }]],
+        },
+        {
+            name: 'View',
+            items: [
+                [
+                    { name: 'My Projects', action: open_projects },
+                    { name: 'My Resume', action: open_resume },
+                ],
+            ],
+        },
+        {
+            name: 'Help',
+            items: [[{ name: 'About Momad', action: show_about_dialog }]],
+        },
+    ];
+
     export function destroy() {
         runningPrograms.update((programs) =>
             programs.filter((p) => p != get_self()),
@@ -78,13 +127,9 @@
         slot="content"
         class="absolute inset-0 flex flex-col bg-xp-yellow font-Tahoma"
     >
-        <!-- menu bar (decorative, like the Explorer stubs) -->
-        <div
-            class="shrink-0 flex flex-row gap-4 px-2 py-1 text-[11px] text-slate-800 border-b border-stone-300"
-        >
-            <span>File</span>
-            <span>View</span>
-            <span class="text-slate-400">Help</span>
+        <!-- menu bar -->
+        <div class="shrink-0 border-b border-stone-300 px-1">
+            <Menu {menu} />
         </div>
 
         <!-- toolbar -->
