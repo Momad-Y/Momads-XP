@@ -1211,6 +1211,7 @@ All personal content lives in a single `src/lib/data/profile.json`. Components r
 - [ ] Favicon: XP-style icon
 - [ ] Accessibility: keyboard navigation for desktop icons and start menu; focus indicators
 - [ ] **Burn svelte-check warnings to ZERO** (131 inherited from the win32.run base as of Phase 2 — mostly a11y: missing `alt`, clickable `<div>`s without keyboard/ARIA; owner-requested explicit item 2026-07-18); tighten CI to gate on warnings once clean
+- [ ] **Resolve all `npm audit` findings** (13 as of 2026-07-19: 8 high / 2 moderate / 3 low — owner-requested explicit item). All remaining fixes are BREAKING upgrades, hence deferred: **axios ≤0.32.0 → 1.x** (the big CVE list; only used client-side for the same-origin seed fetch, so real exposure is low — either upgrade or replace with native `fetch` and drop the dep), **svelte-preprocess 5 → 6** (dev-only brace-expansion DoS chain), **@sveltejs/kit minor bump** (cookie CVE — server-side, touches the /api routes), **short-uuid 5 → 6+** (uuid bounds check). Each needs the full gate suite + E2E after upgrading; tighten CI with an `npm audit --audit-level=high` step once clean
 - [ ] Cross-browser testing (Chrome, Firefox, Safari, Edge)
 - [ ] Deploy to Netlify with custom domain
 
