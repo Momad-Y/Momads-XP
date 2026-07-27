@@ -3,6 +3,7 @@
 <script lang="ts">
     import Window from '../../../lib/components/xp/Window.svelte';
     import RButton from '../../../lib/components/xp/RButton.svelte';
+    import Menu from '../../../lib/components/xp/Menu.svelte';
     import Dialog from '../../../lib/components/xp/Dialog.svelte';
     import { mount, unmount } from 'svelte';
     import { runningPrograms } from '../../../lib/store';
@@ -10,6 +11,7 @@
     import { validate_contact_form } from '../../../lib/contact';
     import { required } from '../../../lib/types';
     import type {
+        MenuBarEntry,
         MountedComponent,
         ProgramInstance,
         WindowController,
@@ -22,6 +24,65 @@
     export let exec_path: string | undefined = undefined;
 
     const linkedin = profile.social.find((s) => s.platform === 'LinkedIn');
+
+    let show_status_bar = true;
+
+    $: menu = [
+        {
+            name: 'File',
+            items: [
+                [
+                    { name: 'New Message', action: reset },
+                    {
+                        name: 'Send Message',
+                        action: () => {
+                            void send();
+                        },
+                    },
+                ],
+                [{ name: 'Close', action: () => { destroy(); } }],
+            ],
+        },
+        {
+            name: 'Edit',
+            items: [
+                [
+                    {
+                        name: 'Cut',
+                        action: () => {
+                            void clipboard_cut_copy(true);
+                        },
+                    },
+                    {
+                        name: 'Copy',
+                        action: () => {
+                            void clipboard_cut_copy(false);
+                        },
+                    },
+                    {
+                        name: 'Paste',
+                        action: () => {
+                            void clipboard_paste();
+                        },
+                    },
+                ],
+            ],
+        },
+        {
+            name: 'View',
+            items: [
+                [
+                    {
+                        name: 'Status Bar',
+                        check: show_status_bar,
+                        action: () => {
+                            show_status_bar = !show_status_bar;
+                        },
+                    },
+                ],
+            ],
+        },
+    ] satisfies MenuBarEntry[];
 
     let from_email = '';
     let subject = '';
@@ -202,13 +263,9 @@
         slot="content"
         class="absolute inset-0 flex flex-col bg-xp-yellow font-Tahoma"
     >
-        <!-- menu bar (decorative, Outlook Express style) -->
-        <div
-            class="shrink-0 flex flex-row gap-4 px-2 py-1 text-[11px] text-slate-800 border-b border-stone-300"
-        >
-            <span>File</span>
-            <span>Edit</span>
-            <span>View</span>
+        <!-- menu bar: relative+z so dropdowns paint above the toolbar -->
+        <div class="shrink-0 border-b border-stone-300 px-1 relative z-20">
+            <Menu {menu} />
         </div>
 
         <!-- toolbar -->
@@ -319,10 +376,12 @@
         </div>
 
         <!-- status bar -->
-        <div
-            class="shrink-0 px-3 py-1 border-t border-stone-300 text-[11px] text-slate-700"
-        >
-            Compose a message to Mohamed
-        </div>
+        {#if show_status_bar}
+            <div
+                class="shrink-0 px-3 py-1 border-t border-stone-300 text-[11px] text-slate-700"
+            >
+                Compose a message to Mohamed
+            </div>
+        {/if}
     </div>
 </Window>
