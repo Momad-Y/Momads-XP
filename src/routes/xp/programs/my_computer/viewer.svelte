@@ -398,6 +398,17 @@
             void set('my_computer::read_transfer_guide', true);
         }
     }
+
+    /** Root-view items (folders/drives) mirror the grid's selection rules. */
+    function select_root_item(e: MouseEvent, item_id: string) {
+        if (e.ctrlKey || e.metaKey) {
+            $selectingItems = $selectingItems.includes(item_id)
+                ? $selectingItems.filter((id) => id !== item_id)
+                : [...$selectingItems, item_id];
+        } else {
+            $selectingItems = [item_id];
+        }
+    }
 </script>
 
 <div
@@ -523,7 +534,10 @@
         <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
         {#each computer.filter((el) => el.type == 'folder') as item}
             <div
-                class="w-[150px] ml-4 mr-8 overflow-hidden inline-flex flex-row items-center font-MSSS"
+                class="fs-item w-[150px] ml-4 mr-8 overflow-hidden inline-flex flex-row items-center font-MSSS"
+                on:click={(e) => {
+                    select_root_item(e, item.id);
+                }}
                 on:dblclick={() => {
                     open(item.id);
                 }}
@@ -548,7 +562,11 @@
                         : `url(${item.icon})`}
                 ></div>
                 <div
-                    class="px-1 text-[11px] line-clamp-2 text-ellipsis leading-tight"
+                    class="px-1 text-[11px] line-clamp-2 text-ellipsis leading-tight {$selectingItems.includes(
+                        item.id,
+                    ) && is_focus
+                        ? 'bg-blue-600 text-slate-50'
+                        : ''}"
                 >
                     {item.display_name != null ? item.display_name : item.name}
                 </div>
@@ -564,7 +582,10 @@
         <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
         {#each computer.filter((el) => el.type == 'drive') as item}
             <div
-                class="w-[150px] ml-4 mr-8 overflow-hidden inline-flex flex-row items-center font-MSSS"
+                class="fs-item w-[150px] ml-4 mr-8 overflow-hidden inline-flex flex-row items-center font-MSSS"
+                on:click={(e) => {
+                    select_root_item(e, item.id);
+                }}
                 on:dblclick={() => {
                     open(item.id);
                 }}
@@ -586,7 +607,11 @@
                     class="w-[50px] h-[50px] shrink-0 bg-[url(/images/xp/icons/LocalDisk.png)] bg-contain bg-no-repeat bg-center"
                 ></div>
                 <div
-                    class="px-1 text-[11px] line-clamp-2 text-ellipsis leading-tight"
+                    class="px-1 text-[11px] line-clamp-2 text-ellipsis leading-tight {$selectingItems.includes(
+                        item.id,
+                    ) && is_focus
+                        ? 'bg-blue-600 text-slate-50'
+                        : ''}"
                 >
                     {item.display_name != null ? item.display_name : item.name}
                 </div>
@@ -602,7 +627,10 @@
         <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
         {#each computer.filter((el) => el.type == 'removable_storage') as item}
             <div
-                class="w-[150px] ml-4 mr-8 overflow-hidden inline-flex flex-row items-center font-MSSS"
+                class="fs-item w-[150px] ml-4 mr-8 overflow-hidden inline-flex flex-row items-center font-MSSS"
+                on:click={(e) => {
+                    select_root_item(e, item.id);
+                }}
                 on:dblclick={() => {
                     open(item.id);
                 }}
@@ -624,7 +652,11 @@
                     class="w-[50px] h-[50px] shrink-0 bg-[url(/images/xp/icons/RemovableMedia.png)] bg-contain bg-no-repeat bg-center"
                 ></div>
                 <div
-                    class="px-1 text-[11px] line-clamp-2 text-ellipsis leading-tight"
+                    class="px-1 text-[11px] line-clamp-2 text-ellipsis leading-tight {$selectingItems.includes(
+                        item.id,
+                    ) && is_focus
+                        ? 'bg-blue-600 text-slate-50'
+                        : ''}"
                 >
                     {item.display_name != null ? item.display_name : item.name}
                 </div>
