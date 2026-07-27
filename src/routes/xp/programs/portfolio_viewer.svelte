@@ -47,8 +47,14 @@
                 text_content = await file.text();
             }
         } catch (error) {
-            console.error('text load failed', error);
-            text_error = true;
+            if (item.storage_type === 'local') {
+                // a created-but-never-saved document has no stored payload —
+                // open it as an empty page, like Notepad would
+                text_content = '';
+            } else {
+                console.error('text load failed', error);
+                text_error = true;
+            }
         }
     });
 
