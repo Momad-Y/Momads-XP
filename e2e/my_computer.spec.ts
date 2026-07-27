@@ -36,6 +36,18 @@ test('Explorer root lists the six portfolio folders', async ({ page }) => {
     }
 });
 
+test('root-view items highlight on selection', async ({ page }) => {
+    await openMyComputer(page);
+    const win = page.locator('#work-space .window').first();
+    const drive = win.getByText('Local Disk (C:)');
+    await drive.click();
+    await expect(drive).toHaveClass(/bg-blue-600/);
+    const folder = win.getByText('Experience', { exact: true });
+    await folder.click();
+    await expect(folder).toHaveClass(/bg-blue-600/);
+    await expect(drive).not.toHaveClass(/bg-blue-600/);
+});
+
 test('an experience entry opens a detail window with bullets', async ({
     page,
 }) => {
