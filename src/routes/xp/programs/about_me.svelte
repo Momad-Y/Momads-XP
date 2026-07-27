@@ -136,8 +136,9 @@
         slot="content"
         class="absolute inset-0 flex flex-col bg-xp-yellow font-Tahoma"
     >
-        <!-- menu bar -->
-        <div class="shrink-0 border-b border-stone-300 px-1">
+        <!-- menu bar: relative+z so the dropdowns paint above the toolbar
+             (Menu's own z-10 needs a positioned/flex context to matter) -->
+        <div class="shrink-0 border-b border-stone-300 px-1 relative z-20">
             <Menu {menu} />
         </div>
 
