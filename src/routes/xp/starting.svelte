@@ -223,6 +223,11 @@
         const now = new Date().getTime();
         for (const key of Object.keys(drive)) {
             const obj = required(drive[key], 'fs item ' + key);
+            // Pre-fix uploads stored extensions case-preserved (PHOTO.PNG →
+            // '.PNG'), breaking doctype/icon lookups — normalize old drives.
+            if (obj.ext !== obj.ext.toLowerCase()) {
+                obj.ext = obj.ext.toLowerCase();
+            }
             // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- persisted pre-migration data may genuinely miss this field despite the type
             if (obj.children == null) {
                 obj.children = [

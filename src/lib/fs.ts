@@ -179,6 +179,9 @@ export async function new_fs_item(
     parent_id: string | null,
     file: File | null = null,
 ): Promise<string | undefined> {
+    // XP is case-insensitive about extensions; doctype/icon lookups key on
+    // lowercase — normalize here so uploads like PHOTO.PNG stay openable
+    ext = ext.toLowerCase();
     if (type == null || seedname == null || parent_id == null) {
         return;
     }
@@ -269,6 +272,8 @@ export async function new_fs_item_raw(
     }
     if (item.ext == null) {
         item.ext = '';
+    } else {
+        item.ext = item.ext.toLowerCase();
     }
     if (item.icon == null) {
         item.icon = '/images/xp/icons/ApplicationWindow.png';

@@ -239,7 +239,7 @@
         const fs_item = required($hardDrive?.[item_id], 'fs item ' + item_id);
         if (fs_item.parent == recycle_bin_id) return;
 
-        const handlers = doctypes[fs_item.ext];
+        const handlers = doctypes[fs_item.ext.toLowerCase()];
         if (fs_item.type == 'file') {
             console.log(fs_item);
             if (fs_item.executable) {
