@@ -209,7 +209,7 @@
         is_focus = false;
         clear_selection();
         const fs_item = required($hardDrive?.[id], 'fs item ' + id);
-        const handlers = doctypes[fs_item.ext];
+        const handlers = doctypes[fs_item.ext.toLowerCase()];
         if (fs_item.type == 'file') {
             if (fs_item.executable) {
                 queueProgram.set({
