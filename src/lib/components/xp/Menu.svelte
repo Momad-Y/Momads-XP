@@ -88,6 +88,11 @@
                                                 width="17px"
                                                 height="17px"
                                             />
+                                        {:else if item.check}
+                                            <span
+                                                class="text-[11px] text-slate-900 group-sub-hover:text-slate-50"
+                                                >✓</span
+                                            >
                                         {/if}
                                     </div>
                                     <div
