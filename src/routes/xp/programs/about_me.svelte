@@ -31,20 +31,35 @@
                 url: s.url,
             })),
             lines: [] as string[],
+            groups: [] as { name: string; items: readonly string[] }[],
         },
         {
             name: 'Skills',
             links: [] as { label: string; url: string }[],
-            lines: Object.keys(profile.skills),
+            lines: [] as string[],
+            groups: Object.entries(profile.skills).map(([name, items]) => ({
+                name,
+                items,
+            })),
         },
         {
             name: 'Languages',
             links: [] as { label: string; url: string }[],
             lines: profile.languages.map((l) => `${l.language} — ${l.level}`),
+            groups: [] as { name: string; items: readonly string[] }[],
         },
     ];
 
     const collapsed: Record<string, boolean> = {};
+    /** Per-category expansion inside the Skills panel. */
+    let expanded_groups: Record<string, boolean> = {};
+
+    function toggle_group(name: string) {
+        expanded_groups = {
+            ...expanded_groups,
+            [name]: !expanded_groups[name],
+        };
+    }
 
     function open_projects() {
         queueProgram.set({
@@ -232,6 +247,32 @@
                                 >
                             {/each}
                             <!-- eslint-enable svelte/no-navigation-without-resolve -->
+                            {#each section.groups as group (group.name)}
+                                <button
+                                    type="button"
+                                    class="flex w-full flex-row items-center mt-1.5 ml-1 text-[12px] text-blue-600 leading-tight text-left"
+                                    on:click={() => {
+                                        toggle_group(group.name);
+                                    }}
+                                >
+                                    <span
+                                        class="w-3 shrink-0 text-[9px] text-blue-700"
+                                        >{expanded_groups[group.name]
+                                            ? '▾'
+                                            : '▸'}</span
+                                    >
+                                    {group.name}
+                                </button>
+                                {#if expanded_groups[group.name]}
+                                    {#each group.items as skill (skill)}
+                                        <p
+                                            class="mt-1 ml-6 text-[11px] text-slate-700 leading-tight"
+                                        >
+                                            {skill}
+                                        </p>
+                                    {/each}
+                                {/if}
+                            {/each}
                             {#each section.lines as line (line)}
                                 <p
                                     class="mt-1.5 ml-1 text-[12px] text-blue-600 leading-tight"

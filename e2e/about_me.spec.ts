@@ -16,6 +16,21 @@ test('About Me renders bio, sidebar and toolbar actions', async ({ page }) => {
     await expect(explorer.getByText("Momad's XP.txt")).toBeVisible();
 });
 
+test('Skills categories expand and collapse', async ({ page }) => {
+    await bootToDesktop(page);
+    await page.locator('#work-space p', { hasText: 'About Me' }).dblclick();
+    const win = page.locator('#work-space .window').first();
+    await expect(win.getByText('NLP & LLMs')).toBeVisible();
+    await expect(win.getByText('RAG Pipelines')).toBeHidden();
+
+    await win.getByText('NLP & LLMs').click();
+    await expect(win.getByText('RAG Pipelines')).toBeVisible();
+    await expect(win.getByText('LangGraph')).toBeVisible();
+
+    await win.getByText('NLP & LLMs').click();
+    await expect(win.getByText('RAG Pipelines')).toBeHidden();
+});
+
 test('About Me menu bar has working File/View/Help menus', async ({ page }) => {
     await bootToDesktop(page);
     await page.locator('#work-space p', { hasText: 'About Me' }).dblclick();
