@@ -70,6 +70,89 @@ test('a project entry shows tech chips and link', async ({ page }) => {
     await expect(detail.getByText('Visit project')).toBeVisible();
 });
 
+test('an uploaded (local) txt file opens and shows its content', async ({
+    page,
+}) => {
+    await bootToDesktop(page);
+    await page.evaluate(async () => {
+        const open = indexedDB.open('keyval-store');
+        const db = await new Promise<IDBDatabase>((resolve, reject) => {
+            open.onsuccess = () => {
+                resolve(open.result);
+            };
+            open.onerror = () => {
+                reject(new Error('idb open failed'));
+            };
+        });
+        const put = (key: string, val: unknown) =>
+            new Promise<void>((resolve, reject) => {
+                const tx = db
+                    .transaction('keyval', 'readwrite')
+                    .objectStore('keyval')
+                    .put(val, key);
+                tx.onsuccess = () => {
+                    resolve();
+                };
+                tx.onerror = () => {
+                    reject(new Error('idb put failed'));
+                };
+            });
+        const get = (key: string) =>
+            new Promise<Record<string, { children: string[] }>>(
+                (resolve, reject) => {
+                    const tx = db
+                        .transaction('keyval')
+                        .objectStore('keyval')
+                        .get(key);
+                    tx.onsuccess = () => {
+                        resolve(
+                            tx.result as Record<string, { children: string[] }>,
+                        );
+                    };
+                    tx.onerror = () => {
+                        reject(new Error('idb get failed'));
+                    };
+                },
+            );
+        await put(
+            'e2eUploadedTxtBlob0001',
+            new Blob(['hello from an uploaded file'], {
+                type: 'text/plain',
+            }),
+        );
+        const drive = await get('hard_drive');
+        const DESKTOP = 'nt1QdU9Sws26H26UNQZcQU';
+        drive['e2eUploadedTxt0000001'] = {
+            id: 'e2eUploadedTxt0000001',
+            type: 'file',
+            name: 'notes.txt',
+            basename: 'notes',
+            ext: '.txt',
+            storage_type: 'local',
+            url: 'e2eUploadedTxtBlob0001',
+            parent: DESKTOP,
+            size: 1,
+            children: [],
+            date_created: 1,
+            date_modified: 1,
+            sort_option: 0,
+            sort_order: 0,
+        } as never;
+        const desktop = drive[DESKTOP];
+        if (desktop == null) throw new Error('desktop missing');
+        desktop.children = [...desktop.children, 'e2eUploadedTxt0000001'];
+        await put('hard_drive', drive);
+    });
+    await page.reload();
+    await bootToDesktop(page);
+
+    await page.locator('#work-space p', { hasText: 'notes.txt' }).dblclick();
+    const win = page.locator('#work-space .window').first();
+    await expect(win.getByText('hello from an uploaded file')).toBeVisible({
+        timeout: 10000,
+    });
+});
+
 test('an education entry shows honors', async ({ page }) => {
     await openMyComputer(page);
     const win = await enterFolder(page, 'Education');
