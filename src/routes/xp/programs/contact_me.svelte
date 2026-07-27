@@ -40,7 +40,14 @@
                         },
                     },
                 ],
-                [{ name: 'Close', action: () => { destroy(); } }],
+                [
+                    {
+                        name: 'Close',
+                        action: () => {
+                            destroy();
+                        },
+                    },
+                ],
             ],
         },
         {
