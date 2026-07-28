@@ -236,8 +236,18 @@
         if (now - _last_open < 400) return;
         _last_open = now;
         clear_selection();
-        const fs_item = required($hardDrive?.[item_id], 'fs item ' + item_id);
-        if (fs_item.parent == recycle_bin_id) return;
+        const clicked = required($hardDrive?.[item_id], 'fs item ' + item_id);
+        if (clicked.parent == recycle_bin_id) return;
+        // .lnk shortcut: resolve to its target before opening
+        let fs_item = clicked;
+        if (clicked.shortcut_target != null) {
+            const target = $hardDrive?.[clicked.shortcut_target];
+            if (target == null) {
+                show_no_association_dialog(clicked.name);
+                return;
+            }
+            fs_item = target;
+        }
 
         const handlers = doctypes[fs_item.ext.toLowerCase()];
         if (fs_item.type == 'file') {
@@ -260,7 +270,7 @@
                 show_no_association_dialog(fs_item.name);
             }
         } else {
-            dispatch('open', { id: item_id });
+            dispatch('open', { id: fs_item.id });
         }
     }
 

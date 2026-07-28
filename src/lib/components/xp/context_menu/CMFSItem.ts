@@ -16,6 +16,7 @@ import { get } from 'svelte/store';
 import * as fs from '../../../fs';
 import short from 'short-uuid';
 import { saveAs } from 'file-saver';
+import { required } from '../../../types';
 import type { ContextMenuSpec, FSItemOriginator } from '../../../types';
 
 export const make = ({
@@ -201,6 +202,26 @@ export const make = ({
                               disabled: get(clipboard).length == 0,
                               action: () => {
                                   fs.paste(originator.item.id);
+                              },
+                          },
+                      ]
+                    : []),
+            ],
+            [
+                ...(originator.item.parent != recycle_bin_id &&
+                originator.item.parent != null &&
+                originator.item.ext != '.lnk'
+                    ? [
+                          {
+                              name: 'Create Shortcut',
+                              action: () => {
+                                  fs.create_shortcut(
+                                      originator.item.id,
+                                      required(
+                                          originator.item.parent,
+                                          'parent of ' + originator.item.id,
+                                      ),
+                                  );
                               },
                           },
                       ]

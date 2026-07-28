@@ -107,6 +107,55 @@ function dir_contains_dir(a: string | null, b: string | null): boolean {
     return paths.includes(a);
 }
 
+/**
+ * Create an XP-style shortcut (.lnk) to `target_id` in `parent_id`. Opening
+ * the shortcut resolves and opens the target (see viewer/desktop open()).
+ */
+export function create_shortcut(target_id: string, parent_id: string): void {
+    const data = drive_snapshot();
+    const target = required(data[target_id], `fs item ${target_id}`);
+    const parent = required(data[parent_id], `fs item ${parent_id}`);
+
+    const seed = `Shortcut to ${target.basename}`;
+    const existing = parent.children.map(
+        (el) => required(data[el], `fs item ${el}`).name,
+    );
+    let basename = seed;
+    let appendix = 2;
+    while (existing.includes(basename + '.lnk')) {
+        basename = `${seed} (${String(appendix)})`;
+        appendix++;
+    }
+
+    const now = new Date().getTime();
+    const shortcut: VfsItem = {
+        id: short.generate(),
+        type: 'file',
+        name: basename + '.lnk',
+        basename,
+        ext: '.lnk',
+        parent: parent_id,
+        children: [],
+        icon: target.icon,
+        storage_type: 'fake',
+        size: 1,
+        shortcut_target: target_id,
+        date_created: now,
+        date_modified: now,
+        sort_option: SortOptions.NONE,
+        sort_order: SortOrders.ASCENDING,
+    };
+
+    hardDrive.update((drive) => {
+        const d = required(drive, 'hard drive');
+        d[shortcut.id] = shortcut;
+        const p2 = required(d[parent_id], `fs item ${parent_id}`);
+        p2.children = [...p2.children, shortcut.id];
+        p2.date_modified = now;
+        return d;
+    });
+}
+
 export function clone_fs(
     obj_current_id: string,
     parent_id: string,

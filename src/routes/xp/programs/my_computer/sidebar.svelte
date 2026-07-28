@@ -1,6 +1,7 @@
 <script lang="ts">
     import { my_music_id, my_pictures_id } from '../../../../lib/system';
     import * as fs from '../../../../lib/fs';
+    import { queueProgram } from '../../../../lib/store';
     import type { MyComputerInstance } from '../../../../lib/types';
     export let my_computer_instance: MyComputerInstance;
 
@@ -37,9 +38,12 @@
                     : [
                           {
                               name: 'View System Information',
-                              disabled: true,
                               icon: 'explorerproperties.png',
-                              action: () => {},
+                              action: () => {
+                                  queueProgram.set({
+                                      path: './programs/system_properties.svelte',
+                                  });
+                              },
                           },
                       ]),
 

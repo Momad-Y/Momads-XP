@@ -43,6 +43,8 @@ export interface VfsItem {
     desktop_css_transform?: string;
     /** Generator-stamped pointer from a seeded entry file into profile.json (Phase 2). */
     portfolio_ref?: PortfolioRef;
+    /** A shortcut (.lnk): opening resolves and opens this target item's id. */
+    shortcut_target?: string;
 }
 
 export type PortfolioSection =
