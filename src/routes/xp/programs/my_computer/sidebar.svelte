@@ -11,6 +11,8 @@
     interface SidebarItem {
         name: string;
         icon: string;
+        /** XP greys out non-functional tasks; disabled items don't react. */
+        disabled?: boolean;
         action: () => void;
     }
 
@@ -27,6 +29,7 @@
                     ? [
                           {
                               name: 'Hide the contents of this drive',
+                              disabled: true,
                               icon: 'StartMenuProgramsAlt.png',
                               action: () => {},
                           },
@@ -34,6 +37,7 @@
                     : [
                           {
                               name: 'View System Information',
+                              disabled: true,
                               icon: 'explorerproperties.png',
                               action: () => {},
                           },
@@ -41,6 +45,7 @@
 
                 {
                     name: 'Add or remove programs',
+                    disabled: true,
                     icon: 'Programs.png',
                     action: () => {
                         console.log(id);
@@ -51,6 +56,7 @@
                     ? [
                           {
                               name: 'Search for files or folders',
+                              disabled: true,
                               icon: 'Search.png',
                               action: () => {},
                           },
@@ -58,6 +64,7 @@
                     : [
                           {
                               name: 'Change a setting',
+                              disabled: true,
                               icon: 'ControlPanel.png',
                               action: () => {},
                           },
@@ -90,6 +97,7 @@
                 },
                 {
                     name: 'My Network Places',
+                    disabled: true,
                     icon: 'MyNetworkPlaces.png',
                     action: () => {},
                 },
@@ -116,11 +124,13 @@
                           },
                           {
                               name: 'Publish this folder to the Web',
+                              disabled: true,
                               icon: 'Publishtoweb.png',
                               action: () => {},
                           },
                           {
                               name: 'Share this folder',
+                              disabled: true,
                               icon: 'SharedFolder.png',
                               action: () => {},
                           },
@@ -186,15 +196,23 @@
                 <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
                 {#each section.items as item}
                     <div
-                        class="flex flex-row items-center mt-2"
-                        on:click={item.action}
+                        class="flex flex-row items-center mt-2 {item.disabled
+                            ? 'cursor-default'
+                            : 'cursor-pointer'}"
+                        on:click={() => {
+                            if (!item.disabled) item.action();
+                        }}
                     >
                         <div
-                            class="ml-1 w-5 h-5 bg-contain"
+                            class="ml-1 w-5 h-5 bg-contain {item.disabled
+                                ? 'grayscale opacity-60'
+                                : ''}"
                             style:background-image="url(/images/xp/icons/{item.icon})"
                         ></div>
                         <p
-                            class="ml-2 mr-2 text-[12px] text-blue-600 leading-tight"
+                            class="ml-2 mr-2 text-[12px] leading-tight {item.disabled
+                                ? 'text-[#a1a192]'
+                                : 'text-blue-600'}"
                         >
                             {item.name}
                         </p>

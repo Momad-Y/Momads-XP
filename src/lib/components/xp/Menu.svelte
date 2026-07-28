@@ -84,6 +84,9 @@
                                     <div class="w-[20px] ml-1 shrink-0">
                                         {#if item.icon}
                                             <img
+                                                class={item.disabled
+                                                    ? 'grayscale opacity-60'
+                                                    : ''}
                                                 src={item.icon}
                                                 width="17px"
                                                 height="17px"

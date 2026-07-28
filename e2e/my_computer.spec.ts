@@ -36,6 +36,19 @@ test('Explorer root lists the six portfolio folders', async ({ page }) => {
     }
 });
 
+test('inert sidebar tasks are greyed out and unresponsive', async ({
+    page,
+}) => {
+    await openMyComputer(page);
+    const win = page.locator('#work-space .window').first();
+    const inert = win.getByText('My Network Places');
+    await expect(inert).toHaveClass(/text-\[#a1a192\]/);
+    const live = win.getByText('My Pictures', { exact: true }).first();
+    await expect(live).toHaveClass(/text-blue-600/);
+    await inert.click();
+    await expect(page.locator('#work-space .window')).toHaveCount(1);
+});
+
 test('root-view items highlight on selection', async ({ page }) => {
     await openMyComputer(page);
     const win = page.locator('#work-space .window').first();
