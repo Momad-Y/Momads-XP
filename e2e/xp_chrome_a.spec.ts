@@ -39,9 +39,8 @@ test('Create Shortcut makes a working .lnk that opens its target', async ({
     const shortcut = win.getByText('Shortcut to Experience.lnk');
     await expect(shortcut).toBeVisible();
 
-    // opening the shortcut opens the Experience folder (dismiss transfer guide)
+    // opening the shortcut opens the Experience folder
     await shortcut.dblclick();
-    await win.locator('.dialog').getByText('OK').click();
     await page.waitForTimeout(450);
     await expect(win.getByText('Printerpix — AI Engineer.txt')).toBeVisible();
 });
