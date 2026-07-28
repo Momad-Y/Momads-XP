@@ -1,0 +1,44 @@
+import { test, expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { bootToDesktop } from './helpers';
+
+async function openMyComputer(page: Page) {
+    await bootToDesktop(page);
+    await page.locator('#work-space p', { hasText: 'My Computer' }).dblclick();
+    await expect(page.locator('#work-space .window').first()).toBeVisible();
+}
+
+test('Folders button shows a tree that navigates', async ({ page }) => {
+    await openMyComputer(page);
+    const win = page.locator('#work-space .window').first();
+    await win.getByText('Folders', { exact: true }).click();
+
+    // root entries in the tree
+    const tree = win.locator('div[role="treeitem"]');
+    await expect(tree.filter({ hasText: 'Local Disk (C:)' })).toBeVisible();
+    await expect(tree.filter({ hasText: 'Experience' }).first()).toBeVisible();
+
+    // clicking a portfolio folder in the tree navigates the viewer into it
+    await tree.filter({ hasText: 'Experience' }).first().click();
+    // File Transfer guide may appear on first folder entry
+    const guide = win.locator('.dialog').getByText('OK');
+    if (await guide.count()) await guide.click();
+    await expect(win.getByText('Printerpix — AI Engineer.txt')).toBeVisible();
+});
+
+test('Search button finds files by name', async ({ page }) => {
+    await openMyComputer(page);
+    const win = page.locator('#work-space .window').first();
+    await win.getByText('Search', { exact: true }).click();
+
+    await win.getByPlaceholder('All or part of a name').fill('Resume');
+    // the panel's own Search button (last match; toolbar button is first)
+    await win.getByText('Search', { exact: true }).last().click();
+
+    await expect(win.getByText('Mohamed_Abdelnasser_Resume.pdf')).toBeVisible();
+
+    // a nonsense query yields the empty state
+    await win.getByPlaceholder('All or part of a name').fill('zzzznope');
+    await win.getByText('Search', { exact: true }).last().click();
+    await expect(win.getByText('No items match your search.')).toBeVisible();
+});
