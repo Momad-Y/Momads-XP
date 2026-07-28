@@ -92,40 +92,51 @@
                 [
                     {
                         name: 'Toolbars',
+                        disabled: true,
                     },
                     {
                         name: 'Status Bar',
+                        disabled: true,
                     },
                     {
                         name: 'Explorer Bar',
+                        disabled: true,
                     },
                 ],
                 [
                     {
                         name: 'Thumbnails',
+                        disabled: true,
                     },
                     {
                         name: 'Tiles',
+                        disabled: true,
                     },
                     {
                         name: 'Icons',
+                        disabled: true,
                     },
                     {
                         name: 'List',
+                        disabled: true,
                     },
                     {
                         name: 'Details',
+                        disabled: true,
                     },
                 ],
                 [
                     {
                         name: 'Choose Details...',
+                        disabled: true,
                     },
                     {
                         name: 'Go To',
+                        disabled: true,
                     },
                     {
                         name: 'Refresh',
+                        disabled: true,
                     },
                 ],
             ],
@@ -136,22 +147,27 @@
                 [
                     {
                         name: 'Add to Favorites...',
+                        disabled: true,
                     },
                     {
                         name: 'Organize Favorites',
+                        disabled: true,
                     },
                 ],
                 [
                     {
                         name: 'Links',
+                        disabled: true,
                         icon: '/images/xp/icons/FolderClosed.png',
                     },
                     {
                         name: 'MSN.com',
+                        disabled: true,
                         icon: '/images/xp/icons/URL.png',
                     },
                     {
                         name: 'Radio Station Guide',
+                        disabled: true,
                         icon: '/images/xp/icons/URL.png',
                     },
                 ],
@@ -163,17 +179,21 @@
                 [
                     {
                         name: 'Map Network Drive...',
+                        disabled: true,
                     },
                     {
                         name: 'Disconnect Network Drive...',
+                        disabled: true,
                     },
                     {
                         name: 'Synchronize...',
+                        disabled: true,
                     },
                 ],
                 [
                     {
                         name: 'Folder Options...',
+                        disabled: true,
                     },
                 ],
             ],
@@ -336,9 +356,15 @@
                 <div class=" w-full h-full border-l border-stone-300"></div>
             </div>
 
-            <RButton icon="/images/xp/icons/Search.png" title="Search"
+            <RButton
+                icon="/images/xp/icons/Search.png"
+                title="Search"
+                disabled={true}
             ></RButton>
-            <RButton icon="/images/xp/icons/FolderView.png" title="Folders"
+            <RButton
+                icon="/images/xp/icons/FolderView.png"
+                title="Folders"
+                disabled={true}
             ></RButton>
 
             <div class="w-[1px] h-full py-1">
@@ -348,6 +374,7 @@
             <RButton
                 icon="/images/xp/icons/FolderView-Classic.png"
                 expandable={true}
+                disabled={true}
             ></RButton>
         </div>
         <div

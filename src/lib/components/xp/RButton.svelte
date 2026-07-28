@@ -32,9 +32,9 @@
     {/if}
     {#if title.trim() != ''}
         <div
-            class="text-[12px] text-slate-900 {icon.trim() != ''
-                ? 'ml-2'
-                : 'mx-1'}"
+            class="text-[12px] {disabled
+                ? 'text-slate-400'
+                : 'text-slate-900'} {icon.trim() != '' ? 'ml-2' : 'mx-1'}"
         >
             {title}
         </div>

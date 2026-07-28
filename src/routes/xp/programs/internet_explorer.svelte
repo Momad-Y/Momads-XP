@@ -456,7 +456,10 @@
 
             <div class="w-[1px] h-[30px] mx-1 border-l border-stone-300"></div>
 
-            <RButton icon="/images/xp/icons/Email.png" expandable={true}
+            <RButton
+                icon="/images/xp/icons/Email.png"
+                expandable={true}
+                disabled={true}
             ></RButton>
         </div>
 
