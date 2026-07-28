@@ -48,4 +48,17 @@ Netlify unchanged (production = `main`). **`RESEND_API_KEY` is provisioned** (ow
 
 **Carry-over (owner-requested):** svelte-check's 131 inherited warnings are explicitly scheduled for zero in Phase 6 (SPECIFICATION.md §9 Phase 6 checklist) — new code must not grow the count meanwhile.
 
+## 11. Post-Phase-2 fix batch + native-XP chrome (owner-requested)
+
+After the phase closed, a large owner-driven batch landed on `dev` and cut
+over together: **18 fixes** (window-rect clamp, pdf zoom icons + failure
+retry, contact clipboard toolbar, .env.example, strict email validation,
+About Me / Contact Me working menus, menu stacking, skills tree, root-view
+selection, uploaded PDFs/txt, case-insensitive extensions, Adobe pdf icon,
+in-universe Help page, inert-control greying, all-apps audit) and **native-XP
+chrome in 5 clusters** (System Properties + Mail + Create Shortcut;
+Back/Forward history dropdowns; Search panel + Folders tree; five view modes;
+shared Favorites seeded from profile.social). Suite grew to 42 E2E + 78 unit.
+New shared modules: `src/lib/favorites.ts`, `src/routes/xp/programs/{system_properties,my_computer/{search_panel,folders_tree}}.svelte`.
+
 **Phase 2 is complete.**
