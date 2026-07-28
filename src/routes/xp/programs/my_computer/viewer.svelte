@@ -41,6 +41,37 @@
     export let self: MountedComponent | undefined = undefined;
     export let my_computer_instance: MyComputerInstance;
     export let id: string | null | undefined = null;
+    export let view_mode:
+        'Thumbnails' | 'Tiles' | 'Icons' | 'List' | 'Details' = 'Icons';
+
+    // Per-mode layout classes for the item box, icon and label.
+    $: item_box = {
+        Thumbnails: 'w-[120px] flex-col items-center m-2 text-center',
+        Tiles: 'w-[220px] flex-row items-center m-1',
+        Icons: 'w-[150px] flex-row items-center m-2',
+        List: 'w-[180px] flex-row items-center mx-2 my-0.5',
+        Details: 'w-full flex-row items-center mx-1 my-0.5',
+    }[view_mode];
+    $: icon_box = {
+        Thumbnails: 'w-[80px] h-[80px]',
+        Tiles: 'w-[32px] h-[32px]',
+        Icons: 'w-[50px] h-[50px]',
+        List: 'w-[16px] h-[16px]',
+        Details: 'w-[16px] h-[16px]',
+    }[view_mode];
+
+    function type_label(item: VfsItem): string {
+        if (item.type === 'folder') return 'File Folder';
+        if (item.type === 'drive') return 'Local Disk';
+        if (item.type === 'removable_storage') return 'Removable Disk';
+        return item.ext !== ''
+            ? `${item.ext.slice(1).toUpperCase()} File`
+            : 'File';
+    }
+    function size_label(item: VfsItem): string {
+        if (item.type !== 'file') return '';
+        return `${String(item.size ?? 0)} KB`;
+    }
 
     /** A point with the optional modifier keys of a (possibly synthetic) click. */
     interface MenuTrigger {
@@ -451,10 +482,20 @@
         }}
     >
         {#if sorted_items}
+            {#if view_mode === 'Details'}
+                <div
+                    class="flex flex-row items-center border-b border-stone-300 bg-[#f1f0e8] text-[11px] font-bold text-slate-700 px-1 sticky top-0"
+                >
+                    <span class="w-[16px] shrink-0"></span>
+                    <span class="grow px-1 mx-0.5">Name</span>
+                    <span class="w-[90px] shrink-0">Type</span>
+                    <span class="w-[70px] shrink-0 text-right pr-2">Size</span>
+                </div>
+            {/if}
             {#each sorted_items as item (item.id)}
                 <div
                     fs-id={item.id}
-                    class="fs-item w-[150px] overflow-hidden m-2 inline-flex flex-row items-center font-MSSS relative
+                    class="fs-item {item_box} overflow-hidden inline-flex font-MSSS relative align-top
                     {$clipboard.includes(item.id) && $clipboard_op == 'cut'
                         ? 'opacity-70'
                         : ''}"
@@ -490,13 +531,15 @@
                     }}
                 >
                     {#if previewable_exts.includes(item.ext)}
-                        <Previewable
-                            default_icon={file_icon(item)}
-                            fs_id={item.id}
-                        ></Previewable>
+                        <div class="{icon_box} shrink-0">
+                            <Previewable
+                                default_icon={file_icon(item)}
+                                fs_id={item.id}
+                            ></Previewable>
+                        </div>
                     {:else}
                         <div
-                            class="w-[50px] h-[50px] shrink-0 bg-contain bg-no-repeat bg-center
+                            class="{icon_box} shrink-0 bg-contain bg-no-repeat bg-center
                         {item.type == 'folder'
                                 ? 'bg-[url(/images/xp/icons/FolderClosed.png)]'
                                 : 'bg-[url(/images/xp/icons/Default.png)]'} "
@@ -504,13 +547,26 @@
                         ></div>
                     {/if}
                     <p
-                        class="px-1 mx-0.5 text-[11px] break-words line-clamp-2 text-ellipsis leading-tight
+                        class="px-1 mx-0.5 text-[11px] {view_mode === 'List' ||
+                        view_mode === 'Details'
+                            ? 'truncate grow'
+                            : 'break-words line-clamp-2 text-ellipsis'} leading-tight
                         {$selectingItems.includes(item.id) && is_focus
                             ? 'bg-blue-600 text-slate-50'
                             : ''}"
                     >
                         {item.name}
                     </p>
+                    {#if view_mode === 'Details'}
+                        <span
+                            class="w-[90px] shrink-0 text-[11px] text-slate-600 truncate"
+                            >{type_label(item)}</span
+                        >
+                        <span
+                            class="w-[70px] shrink-0 text-[11px] text-slate-600 text-right pr-2"
+                            >{size_label(item)}</span
+                        >
+                    {/if}
                     {#if $selectingItems.includes(item.id) && renaming}
                         <textarea
                             autofocus

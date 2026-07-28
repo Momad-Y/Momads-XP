@@ -68,6 +68,18 @@
 
     export let viewer: Viewer | undefined = undefined;
 
+    // File view mode (§ View menu / Views toolbar dropdown)
+    type ViewMode = 'Thumbnails' | 'Tiles' | 'Icons' | 'List' | 'Details';
+    let view_mode: ViewMode = 'Icons';
+    const view_modes: ViewMode[] = [
+        'Thumbnails',
+        'Tiles',
+        'Icons',
+        'List',
+        'Details',
+    ];
+    let views_menu = false;
+
     const menu: MenuBarEntry[] = [
         {
             name: 'File',
@@ -106,28 +118,13 @@
                         disabled: true,
                     },
                 ],
-                [
-                    {
-                        name: 'Thumbnails',
-                        disabled: true,
+                view_modes.map((m) => ({
+                    name: m,
+                    check: view_mode === m,
+                    action: () => {
+                        view_mode = m;
                     },
-                    {
-                        name: 'Tiles',
-                        disabled: true,
-                    },
-                    {
-                        name: 'Icons',
-                        disabled: true,
-                    },
-                    {
-                        name: 'List',
-                        disabled: true,
-                    },
-                    {
-                        name: 'Details',
-                        disabled: true,
-                    },
-                ],
+                })),
                 [
                     {
                         name: 'Choose Details...',
@@ -461,11 +458,38 @@
                 <div class=" w-full h-full border-l border-stone-300"></div>
             </div>
 
-            <RButton
-                icon="/images/xp/icons/FolderView-Classic.png"
-                expandable={true}
-                disabled={true}
-            ></RButton>
+            <div class="relative">
+                <RButton
+                    icon="/images/xp/icons/FolderView-Classic.png"
+                    expandable={true}
+                    on_click={() => (views_menu = !views_menu)}
+                    on_expand={() => (views_menu = !views_menu)}
+                    tooltip_message="Views"
+                ></RButton>
+                {#if views_menu}
+                    <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+                    <div
+                        use:utils.click_outside
+                        on:click_outside={() => (views_menu = false)}
+                        class="absolute right-0 top-full z-30 min-w-[120px] border border-slate-400 bg-slate-50 shadow text-[11px]"
+                    >
+                        {#each view_modes as m (m)}
+                            <div
+                                class="px-3 py-1 flex flex-row items-center gap-1 hover:bg-blue-600 hover:text-slate-50 cursor-pointer"
+                                on:click={() => {
+                                    view_mode = m;
+                                    views_menu = false;
+                                }}
+                            >
+                                <span class="w-3 text-[9px]"
+                                    >{view_mode === m ? '●' : ''}</span
+                                >
+                                {m}
+                            </div>
+                        {/each}
+                    </div>
+                {/if}
+            </div>
         </div>
         <div
             class="shrink-0 flex flex-row items-center border-b border-stone-300 text-[11px] items-center"
@@ -512,6 +536,7 @@
                 <Viewer
                     bind:this={viewer}
                     id={history[page_index]}
+                    {view_mode}
                     on:open={(e: CustomEvent<{ id: string | null }>) => {
                         open(e.detail.id);
                     }}
