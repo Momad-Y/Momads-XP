@@ -2,7 +2,8 @@
 
 <script lang="ts">
     import Window from '../../../lib/components/xp/Window.svelte';
-    import { unmount } from 'svelte';
+    import { onMount, unmount } from 'svelte';
+    import * as fs from '../../../lib/fs';
     import { runningPrograms } from '../../../lib/store';
     import { resolve_portfolio_ref } from '../../../lib/portfolio';
     import { required } from '../../../lib/types';
@@ -31,6 +32,32 @@
 
     let expanded_image: string | null = null;
 
+    /** Plain text files (user-created/uploaded) render their raw content. */
+    const MAX_TEXT_BYTES = 1_048_576;
+    let text_content: string | null = null;
+    let text_error = false;
+
+    onMount(async () => {
+        if (detail != null || item == null) return;
+        try {
+            const file = await fs.get_file(item.id);
+            if (file.size > MAX_TEXT_BYTES) {
+                text_content = `${await file.slice(0, MAX_TEXT_BYTES).text()}\n… (truncated)`;
+            } else {
+                text_content = await file.text();
+            }
+        } catch (error) {
+            if (item.storage_type === 'local') {
+                // a created-but-never-saved document has no stored payload —
+                // open it as an empty page, like Notepad would
+                text_content = '';
+            } else {
+                console.error('text load failed', error);
+                text_error = true;
+            }
+        }
+    });
+
     export function destroy() {
         runningPrograms.update((programs) =>
             programs.filter((p) => p != get_self()),
@@ -56,7 +83,14 @@
         class="absolute inset-0 overflow-y-auto bg-white font-Tahoma text-slate-900 p-4"
     >
         {#if detail == null}
-            <p class="text-[11px]">This file cannot be displayed.</p>
+            {#if text_content != null}
+                <pre
+                    class="whitespace-pre-wrap break-words font-MSSS text-[12px] leading-snug">{text_content}</pre>
+            {:else if text_error}
+                <p class="text-[11px]">This file cannot be displayed.</p>
+            {:else}
+                <p class="text-[11px] text-slate-500">Loading…</p>
+            {/if}
         {:else}
             <h1 class="text-[17px] font-bold text-[#00309f]">
                 {detail.heading}

@@ -41,6 +41,37 @@
     export let self: MountedComponent | undefined = undefined;
     export let my_computer_instance: MyComputerInstance;
     export let id: string | null | undefined = null;
+    export let view_mode:
+        'Thumbnails' | 'Tiles' | 'Icons' | 'List' | 'Details' = 'Icons';
+
+    // Per-mode layout classes for the item box, icon and label.
+    $: item_box = {
+        Thumbnails: 'w-[120px] flex-col items-center m-2 text-center',
+        Tiles: 'w-[220px] flex-row items-center m-1',
+        Icons: 'w-[150px] flex-row items-center m-2',
+        List: 'w-[180px] flex-row items-center mx-2 my-0.5',
+        Details: 'w-full flex-row items-center mx-1 my-0.5',
+    }[view_mode];
+    $: icon_box = {
+        Thumbnails: 'w-[80px] h-[80px]',
+        Tiles: 'w-[32px] h-[32px]',
+        Icons: 'w-[50px] h-[50px]',
+        List: 'w-[16px] h-[16px]',
+        Details: 'w-[16px] h-[16px]',
+    }[view_mode];
+
+    function type_label(item: VfsItem): string {
+        if (item.type === 'folder') return 'File Folder';
+        if (item.type === 'drive') return 'Local Disk';
+        if (item.type === 'removable_storage') return 'Removable Disk';
+        return item.ext !== ''
+            ? `${item.ext.slice(1).toUpperCase()} File`
+            : 'File';
+    }
+    function size_label(item: VfsItem): string {
+        if (item.type !== 'file') return '';
+        return `${String(item.size ?? 0)} KB`;
+    }
 
     /** A point with the optional modifier keys of a (possibly synthetic) click. */
     interface MenuTrigger {
@@ -236,10 +267,20 @@
         if (now - _last_open < 400) return;
         _last_open = now;
         clear_selection();
-        const fs_item = required($hardDrive?.[item_id], 'fs item ' + item_id);
-        if (fs_item.parent == recycle_bin_id) return;
+        const clicked = required($hardDrive?.[item_id], 'fs item ' + item_id);
+        if (clicked.parent == recycle_bin_id) return;
+        // .lnk shortcut: resolve to its target before opening
+        let fs_item = clicked;
+        if (clicked.shortcut_target != null) {
+            const target = $hardDrive?.[clicked.shortcut_target];
+            if (target == null) {
+                show_no_association_dialog(clicked.name);
+                return;
+            }
+            fs_item = target;
+        }
 
-        const handlers = doctypes[fs_item.ext];
+        const handlers = doctypes[fs_item.ext.toLowerCase()];
         if (fs_item.type == 'file') {
             console.log(fs_item);
             if (fs_item.executable) {
@@ -260,7 +301,7 @@
                 show_no_association_dialog(fs_item.name);
             }
         } else {
-            dispatch('open', { id: item_id });
+            dispatch('open', { id: fs_item.id });
         }
     }
 
@@ -398,6 +439,17 @@
             void set('my_computer::read_transfer_guide', true);
         }
     }
+
+    /** Root-view items (folders/drives) mirror the grid's selection rules. */
+    function select_root_item(e: MouseEvent, item_id: string) {
+        if (e.ctrlKey || e.metaKey) {
+            $selectingItems = $selectingItems.includes(item_id)
+                ? $selectingItems.filter((id) => id !== item_id)
+                : [...$selectingItems, item_id];
+        } else {
+            $selectingItems = [item_id];
+        }
+    }
 </script>
 
 <div
@@ -430,10 +482,20 @@
         }}
     >
         {#if sorted_items}
+            {#if view_mode === 'Details'}
+                <div
+                    class="flex flex-row items-center border-b border-stone-300 bg-[#f1f0e8] text-[11px] font-bold text-slate-700 px-1 sticky top-0"
+                >
+                    <span class="w-[16px] shrink-0"></span>
+                    <span class="grow px-1 mx-0.5">Name</span>
+                    <span class="w-[90px] shrink-0">Type</span>
+                    <span class="w-[70px] shrink-0 text-right pr-2">Size</span>
+                </div>
+            {/if}
             {#each sorted_items as item (item.id)}
                 <div
                     fs-id={item.id}
-                    class="fs-item w-[150px] overflow-hidden m-2 inline-flex flex-row items-center font-MSSS relative
+                    class="fs-item {item_box} overflow-hidden inline-flex font-MSSS relative align-top
                     {$clipboard.includes(item.id) && $clipboard_op == 'cut'
                         ? 'opacity-70'
                         : ''}"
@@ -469,13 +531,15 @@
                     }}
                 >
                     {#if previewable_exts.includes(item.ext)}
-                        <Previewable
-                            default_icon={file_icon(item)}
-                            fs_id={item.id}
-                        ></Previewable>
+                        <div class="{icon_box} shrink-0">
+                            <Previewable
+                                default_icon={file_icon(item)}
+                                fs_id={item.id}
+                            ></Previewable>
+                        </div>
                     {:else}
                         <div
-                            class="w-[50px] h-[50px] shrink-0 bg-contain bg-no-repeat bg-center
+                            class="{icon_box} shrink-0 bg-contain bg-no-repeat bg-center
                         {item.type == 'folder'
                                 ? 'bg-[url(/images/xp/icons/FolderClosed.png)]'
                                 : 'bg-[url(/images/xp/icons/Default.png)]'} "
@@ -483,13 +547,26 @@
                         ></div>
                     {/if}
                     <p
-                        class="px-1 mx-0.5 text-[11px] break-words line-clamp-2 text-ellipsis leading-tight
+                        class="px-1 mx-0.5 text-[11px] {view_mode === 'List' ||
+                        view_mode === 'Details'
+                            ? 'truncate grow'
+                            : 'break-words line-clamp-2 text-ellipsis'} leading-tight
                         {$selectingItems.includes(item.id) && is_focus
                             ? 'bg-blue-600 text-slate-50'
                             : ''}"
                     >
                         {item.name}
                     </p>
+                    {#if view_mode === 'Details'}
+                        <span
+                            class="w-[90px] shrink-0 text-[11px] text-slate-600 truncate"
+                            >{type_label(item)}</span
+                        >
+                        <span
+                            class="w-[70px] shrink-0 text-[11px] text-slate-600 text-right pr-2"
+                            >{size_label(item)}</span
+                        >
+                    {/if}
                     {#if $selectingItems.includes(item.id) && renaming}
                         <textarea
                             autofocus
@@ -523,7 +600,10 @@
         <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
         {#each computer.filter((el) => el.type == 'folder') as item}
             <div
-                class="w-[150px] ml-4 mr-8 overflow-hidden inline-flex flex-row items-center font-MSSS"
+                class="fs-item w-[150px] ml-4 mr-8 overflow-hidden inline-flex flex-row items-center font-MSSS"
+                on:click={(e) => {
+                    select_root_item(e, item.id);
+                }}
                 on:dblclick={() => {
                     open(item.id);
                 }}
@@ -548,7 +628,11 @@
                         : `url(${item.icon})`}
                 ></div>
                 <div
-                    class="px-1 text-[11px] line-clamp-2 text-ellipsis leading-tight"
+                    class="px-1 text-[11px] line-clamp-2 text-ellipsis leading-tight {$selectingItems.includes(
+                        item.id,
+                    ) && is_focus
+                        ? 'bg-blue-600 text-slate-50'
+                        : ''}"
                 >
                     {item.display_name != null ? item.display_name : item.name}
                 </div>
@@ -564,7 +648,10 @@
         <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
         {#each computer.filter((el) => el.type == 'drive') as item}
             <div
-                class="w-[150px] ml-4 mr-8 overflow-hidden inline-flex flex-row items-center font-MSSS"
+                class="fs-item w-[150px] ml-4 mr-8 overflow-hidden inline-flex flex-row items-center font-MSSS"
+                on:click={(e) => {
+                    select_root_item(e, item.id);
+                }}
                 on:dblclick={() => {
                     open(item.id);
                 }}
@@ -586,7 +673,11 @@
                     class="w-[50px] h-[50px] shrink-0 bg-[url(/images/xp/icons/LocalDisk.png)] bg-contain bg-no-repeat bg-center"
                 ></div>
                 <div
-                    class="px-1 text-[11px] line-clamp-2 text-ellipsis leading-tight"
+                    class="px-1 text-[11px] line-clamp-2 text-ellipsis leading-tight {$selectingItems.includes(
+                        item.id,
+                    ) && is_focus
+                        ? 'bg-blue-600 text-slate-50'
+                        : ''}"
                 >
                     {item.display_name != null ? item.display_name : item.name}
                 </div>
@@ -602,7 +693,10 @@
         <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
         {#each computer.filter((el) => el.type == 'removable_storage') as item}
             <div
-                class="w-[150px] ml-4 mr-8 overflow-hidden inline-flex flex-row items-center font-MSSS"
+                class="fs-item w-[150px] ml-4 mr-8 overflow-hidden inline-flex flex-row items-center font-MSSS"
+                on:click={(e) => {
+                    select_root_item(e, item.id);
+                }}
                 on:dblclick={() => {
                     open(item.id);
                 }}
@@ -624,7 +718,11 @@
                     class="w-[50px] h-[50px] shrink-0 bg-[url(/images/xp/icons/RemovableMedia.png)] bg-contain bg-no-repeat bg-center"
                 ></div>
                 <div
-                    class="px-1 text-[11px] line-clamp-2 text-ellipsis leading-tight"
+                    class="px-1 text-[11px] line-clamp-2 text-ellipsis leading-tight {$selectingItems.includes(
+                        item.id,
+                    ) && is_focus
+                        ? 'bg-blue-600 text-slate-50'
+                        : ''}"
                 >
                     {item.display_name != null ? item.display_name : item.name}
                 </div>

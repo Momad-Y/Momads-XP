@@ -3,9 +3,10 @@
 <script lang="ts">
     import Window from '../../../lib/components/xp/Window.svelte';
     import RButton from '../../../lib/components/xp/RButton.svelte';
-    import { onMount, unmount } from 'svelte';
+    import { onMount, tick, unmount } from 'svelte';
     import { runningPrograms } from '../../../lib/store';
     import { profile } from '../../../lib/profile';
+    import * as fs from '../../../lib/fs';
     import { required } from '../../../lib/types';
     import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist';
     import pdf_worker_url from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
@@ -30,11 +31,27 @@
     const item = fs_item as VfsItem | undefined;
 
     // Dual entry (spec D6): the desktop "My CV.exe" launch passes no fs_item
-    // and falls back to the resume; the .pdf doctype passes the seeded file.
-    const pdf_url =
-        item?.storage_type === 'remote' && item.url != null
-            ? item.url
-            : profile.meta.resumePdf;
+    // and falls back to the resume; the .pdf doctype passes the opened file —
+    // remote (seeded asset) or local (user-uploaded IndexedDB blob).
+    let pdf_url: string | null = null;
+    let object_url: string | null = null;
+
+    async function resolve_pdf_url(): Promise<string> {
+        if (item != null) {
+            try {
+                const resolved = await fs.get_url(item.id);
+                if (resolved != null) {
+                    if (resolved.startsWith('blob:')) {
+                        object_url = resolved;
+                    }
+                    return resolved;
+                }
+            } catch (error) {
+                console.error('pdf url resolution failed', error);
+            }
+        }
+        return profile.meta.resumePdf;
+    }
 
     let pages_node: HTMLDivElement | undefined;
     let zoom = 1;
@@ -50,6 +67,7 @@
         if (node == null) return;
         const token = ++render_token;
         try {
+            pdf_url ??= await resolve_pdf_url();
             const task = getDocument({ url: pdf_url });
             const doc = await task.promise;
             if (token !== render_token) {
@@ -79,6 +97,15 @@
         }
     }
 
+    async function retry() {
+        load_error = false;
+        // a failed remote fetch may have cached nothing — resolve fresh
+        pdf_url = null;
+        // the error view swaps out and pages_node re-binds on the next tick
+        await tick();
+        await render();
+    }
+
     onMount(() => void render());
 
     function set_zoom(next: number) {
@@ -86,14 +113,17 @@
         void render();
     }
 
-    function download() {
+    async function download() {
         const a = document.createElement('a');
-        a.href = pdf_url;
-        a.download = '';
+        a.href = pdf_url ?? (await resolve_pdf_url());
+        a.download = item?.name ?? '';
         a.click();
     }
 
     export function destroy() {
+        if (object_url != null) {
+            URL.revokeObjectURL(object_url);
+        }
         runningPrograms.update((programs) =>
             programs.filter((p) => p != get_self()),
         );
@@ -120,17 +150,23 @@
             <RButton
                 title="Download"
                 icon="/images/xp/icons/FloppyDisk.png"
-                on_click={download}
+                on_click={() => {
+                    void download();
+                }}
             />
             <div class="w-px h-5 bg-[#aca899] mx-1"></div>
             <RButton
                 title="−"
+                icon="/images/xp/icons/Magnifier.png"
+                tooltip_message="Zoom out"
                 on_click={() => {
                     set_zoom(zoom - 0.25);
                 }}
             />
             <RButton
                 title="+"
+                icon="/images/xp/icons/Magnifier.png"
+                tooltip_message="Zoom in"
                 on_click={() => {
                     set_zoom(zoom + 0.25);
                 }}
@@ -142,11 +178,20 @@
             >
         </div>
         {#if load_error}
-            <div class="grow flex items-center justify-center">
-                <p class="text-[11px] text-white font-Tahoma">
-                    The document could not be displayed. Use Download to view
-                    it.
+            <div
+                class="grow flex flex-col items-center justify-center gap-3 px-8"
+            >
+                <p class="text-[12px] text-white font-Tahoma text-center">
+                    This document could not be loaded — this can happen on a
+                    weak Internet connection. Check your connection, then try
+                    again.
                 </p>
+                <RButton
+                    title="Try Again"
+                    on_click={() => {
+                        void retry();
+                    }}
+                />
             </div>
         {:else}
             <div bind:this={pages_node} class="grow overflow-auto p-3"></div>

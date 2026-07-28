@@ -59,19 +59,37 @@
                 rect.top = rect.top + nudge.top;
                 rect.left = rect.left + nudge.left;
 
-                if (
-                    rect.left + rect.width <= workspace.offsetWidth &&
-                    rect.top + rect.height <= workspace.offsetHeight
-                ) {
-                    options.top = rect.top;
-                    options.left = rect.left;
-                    options.width = rect.width;
-                    options.height = rect.height;
-                }
+                // Clamp instead of trusting the stored rect: legacy rects
+                // were captured via getBoundingClientRect (transform- and
+                // viewport-sensitive) and could restore with a negative top —
+                // title-bar buttons off-screen — or a size larger than the
+                // current workspace (Phase 2 fix batch).
+                rect.width = Math.min(rect.width, workspace.offsetWidth);
+                rect.height = Math.min(rect.height, workspace.offsetHeight);
+                rect.top = Math.max(
+                    0,
+                    Math.min(rect.top, workspace.offsetHeight - rect.height),
+                );
+                rect.left = Math.max(
+                    0,
+                    Math.min(rect.left, workspace.offsetWidth - rect.width),
+                );
+                options.top = rect.top;
+                options.left = rect.left;
+                options.width = rect.width;
+                options.height = rect.height;
             }
         }
 
         const parent = required(win().parentElement, 'window parent element');
+        // Programs declare desktop-sized defaults (e.g. pdf_viewer 640×720);
+        // on short/narrow workspaces cap them so the chrome stays reachable.
+        if (options.height != null) {
+            options.height = Math.min(options.height, parent.offsetHeight);
+        }
+        if (options.width != null) {
+            options.width = Math.min(options.width, parent.offsetWidth);
+        }
         if (
             options.top == null &&
             options.left == null &&
@@ -267,8 +285,23 @@
         el.style.height = `${String(height)}px`;
 
         if (options.exec_path) {
-            void set(options.exec_path, el.getBoundingClientRect());
+            void set(options.exec_path, current_rect());
         }
+    }
+
+    /**
+     * Workspace-relative rect via offset* — unlike getBoundingClientRect,
+     * immune to in-flight open/minimize transforms, which could persist a
+     * corrupted (e.g. negative-top) rect.
+     */
+    function current_rect(): WindowRect {
+        const el = win();
+        return {
+            top: el.offsetTop,
+            left: el.offsetLeft,
+            width: el.offsetWidth,
+            height: el.offsetHeight,
+        };
     }
 
     function setup_gestures() {
@@ -279,10 +312,7 @@
                 handle: '.titlebar',
                 stop: async () => {
                     if (options.exec_path) {
-                        await set(
-                            options.exec_path,
-                            el.getBoundingClientRect(),
-                        );
+                        await set(options.exec_path, current_rect());
                     }
                 },
             });
@@ -307,10 +337,7 @@
                 },
                 stop: async () => {
                     if (options.exec_path) {
-                        await set(
-                            options.exec_path,
-                            el.getBoundingClientRect(),
-                        );
+                        await set(options.exec_path, current_rect());
                     }
                     const iframe = el.querySelector('iframe');
                     if (iframe) {

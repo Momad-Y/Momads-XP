@@ -24,6 +24,7 @@ Thumbs.db
 *.local
 .env
 .env.*
+!.env.example
 
 # Local development notes
 docs/overthinking.txt

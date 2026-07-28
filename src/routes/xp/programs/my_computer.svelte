@@ -13,7 +13,11 @@
     import RButton from '../../../lib/components/xp/RButton.svelte';
     import Viewer from './my_computer/viewer.svelte';
     import * as finder from '../../../lib/finder';
+    import * as utils from '../../../lib/utils';
+    import { favorites } from '../../../lib/favorites';
     import Sidebar from './my_computer/sidebar.svelte';
+    import SearchPanel from './my_computer/search_panel.svelte';
+    import FoldersTree from './my_computer/folders_tree.svelte';
     import { required } from '../../../lib/types';
     import type {
         MenuBarEntry,
@@ -65,7 +69,19 @@
 
     export let viewer: Viewer | undefined = undefined;
 
-    const menu: MenuBarEntry[] = [
+    // File view mode (§ View menu / Views toolbar dropdown)
+    type ViewMode = 'Thumbnails' | 'Tiles' | 'Icons' | 'List' | 'Details';
+    let view_mode: ViewMode = 'Icons';
+    const view_modes: ViewMode[] = [
+        'Thumbnails',
+        'Tiles',
+        'Icons',
+        'List',
+        'Details',
+    ];
+    let views_menu = false;
+
+    $: menu = [
         {
             name: 'File',
             items: [
@@ -92,40 +108,36 @@
                 [
                     {
                         name: 'Toolbars',
+                        disabled: true,
                     },
                     {
                         name: 'Status Bar',
+                        disabled: true,
                     },
                     {
                         name: 'Explorer Bar',
+                        disabled: true,
                     },
                 ],
-                [
-                    {
-                        name: 'Thumbnails',
+                view_modes.map((m) => ({
+                    name: m,
+                    check: view_mode === m,
+                    action: () => {
+                        view_mode = m;
                     },
-                    {
-                        name: 'Tiles',
-                    },
-                    {
-                        name: 'Icons',
-                    },
-                    {
-                        name: 'List',
-                    },
-                    {
-                        name: 'Details',
-                    },
-                ],
+                })),
                 [
                     {
                         name: 'Choose Details...',
+                        disabled: true,
                     },
                     {
                         name: 'Go To',
+                        disabled: true,
                     },
                     {
                         name: 'Refresh',
+                        disabled: true,
                     },
                 ],
             ],
@@ -136,25 +148,24 @@
                 [
                     {
                         name: 'Add to Favorites...',
+                        action: () => {
+                            open_favorite('https://wiby.me/');
+                        },
                     },
                     {
                         name: 'Organize Favorites',
+                        action: () => {
+                            open_favorite('https://wiby.me/');
+                        },
                     },
                 ],
-                [
-                    {
-                        name: 'Links',
-                        icon: '/images/xp/icons/FolderClosed.png',
+                $favorites.map((fav) => ({
+                    name: fav.name,
+                    icon: '/images/xp/icons/URL.png',
+                    action: () => {
+                        open_favorite(fav.url);
                     },
-                    {
-                        name: 'MSN.com',
-                        icon: '/images/xp/icons/URL.png',
-                    },
-                    {
-                        name: 'Radio Station Guide',
-                        icon: '/images/xp/icons/URL.png',
-                    },
-                ],
+                })),
             ],
         },
         {
@@ -163,17 +174,21 @@
                 [
                     {
                         name: 'Map Network Drive...',
+                        disabled: true,
                     },
                     {
                         name: 'Disconnect Network Drive...',
+                        disabled: true,
                     },
                     {
                         name: 'Synchronize...',
+                        disabled: true,
                     },
                 ],
                 [
                     {
                         name: 'Folder Options...',
+                        disabled: true,
                     },
                 ],
             ],
@@ -185,13 +200,13 @@
                     {
                         name: 'Help and Support Center',
                         action: () => {
-                            open_link('https://docs.win32.run');
+                            open_link('/help.html');
                         },
                     },
                     {
                         name: 'Is this copy legal?',
                         action: () => {
-                            open_link('https://docs.win32.run');
+                            open_link('/help.html#legal');
                         },
                     },
                 ],
@@ -199,13 +214,13 @@
                     {
                         name: 'About Windows',
                         action: () => {
-                            open_link('https://docs.win32.run');
+                            open_link('/help.html#about');
                         },
                     },
                 ],
             ],
         },
-    ];
+    ] satisfies MenuBarEntry[];
 
     $: mc_interface = { window, up, open };
 
@@ -274,6 +289,38 @@
         page_index = Math.min(history.length - 1, page_index + 1);
     }
 
+    // Left explorer bar: common tasks (default), search, or folders tree
+    let left_panel: 'tasks' | 'search' | 'folders' = 'tasks';
+    function toggle_panel(mode: 'search' | 'folders') {
+        left_panel = left_panel === mode ? 'tasks' : mode;
+    }
+
+    // Back/Forward history dropdowns
+    let history_menu: 'back' | 'forward' | null = null;
+    function history_label(id: string | null | undefined): string {
+        if (id == null) return 'My Computer';
+        const item = $hardDrive?.[id];
+        return item?.display_name ?? item?.name ?? 'My Computer';
+    }
+    interface HistoryOption {
+        label: string;
+        idx: number;
+    }
+    $: back_options = history
+        .slice(0, page_index)
+        .map((id, i): HistoryOption => ({ label: history_label(id), idx: i }))
+        .reverse();
+    $: forward_options = history
+        .slice(page_index + 1)
+        .map((id, i): HistoryOption => ({
+            label: history_label(id),
+            idx: page_index + 1 + i,
+        }));
+    function pick_history(idx: number) {
+        history_menu = null;
+        page_index = idx;
+    }
+
     export function up() {
         const current_id = required(history[page_index], 'current folder id');
         const parent_id = required(
@@ -281,6 +328,13 @@
             'fs item ' + current_id,
         ).parent;
         open(parent_id);
+    }
+
+    function open_favorite(url: string) {
+        queueProgram.set({
+            path: './programs/internet_explorer.svelte',
+            fs_item: { url },
+        });
     }
 
     function open_link(link: string) {
@@ -311,20 +365,69 @@
         <div
             class="shrink-0 flex flex-row items-center border-b border-stone-300"
         >
-            <RButton
-                icon="/images/xp/icons/Back.png"
-                title="Back"
-                on_click={back}
-                expandable={true}
-                disabled={page_index == 0}
-                tooltip_message="Back to Previous"
-            ></RButton>
-            <RButton
-                icon="/images/xp/icons/Forward.png"
-                on_click={next}
-                expandable={true}
-                disabled={page_index == history.length - 1}
-            ></RButton>
+            <div class="relative">
+                <RButton
+                    icon="/images/xp/icons/Back.png"
+                    title="Back"
+                    on_click={back}
+                    expandable={true}
+                    disabled={page_index == 0}
+                    on_expand={() => {
+                        history_menu = history_menu === 'back' ? null : 'back';
+                    }}
+                    tooltip_message="Back to Previous"
+                ></RButton>
+                {#if history_menu === 'back'}
+                    <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+                    <div
+                        use:utils.click_outside
+                        on:click_outside={() => (history_menu = null)}
+                        class="absolute left-0 top-full z-30 min-w-[160px] border border-slate-400 bg-slate-50 shadow text-[11px]"
+                    >
+                        {#each back_options as opt (opt.idx)}
+                            <div
+                                class="px-3 py-1 hover:bg-blue-600 hover:text-slate-50 cursor-pointer"
+                                on:click={() => {
+                                    pick_history(opt.idx);
+                                }}
+                            >
+                                {opt.label}
+                            </div>
+                        {/each}
+                    </div>
+                {/if}
+            </div>
+            <div class="relative">
+                <RButton
+                    icon="/images/xp/icons/Forward.png"
+                    on_click={next}
+                    expandable={true}
+                    disabled={page_index == history.length - 1}
+                    on_expand={() => {
+                        history_menu =
+                            history_menu === 'forward' ? null : 'forward';
+                    }}
+                ></RButton>
+                {#if history_menu === 'forward'}
+                    <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+                    <div
+                        use:utils.click_outside
+                        on:click_outside={() => (history_menu = null)}
+                        class="absolute left-0 top-full z-30 min-w-[160px] border border-slate-400 bg-slate-50 shadow text-[11px]"
+                    >
+                        {#each forward_options as opt (opt.idx)}
+                            <div
+                                class="px-3 py-1 hover:bg-blue-600 hover:text-slate-50 cursor-pointer"
+                                on:click={() => {
+                                    pick_history(opt.idx);
+                                }}
+                            >
+                                {opt.label}
+                            </div>
+                        {/each}
+                    </div>
+                {/if}
+            </div>
 
             <RButton
                 icon="/images/xp/icons/Up.png"
@@ -336,19 +439,59 @@
                 <div class=" w-full h-full border-l border-stone-300"></div>
             </div>
 
-            <RButton icon="/images/xp/icons/Search.png" title="Search"
+            <RButton
+                icon="/images/xp/icons/Search.png"
+                title="Search"
+                on_click={() => {
+                    toggle_panel('search');
+                }}
+                tooltip_message="Search"
             ></RButton>
-            <RButton icon="/images/xp/icons/FolderView.png" title="Folders"
+            <RButton
+                icon="/images/xp/icons/FolderView.png"
+                title="Folders"
+                on_click={() => {
+                    toggle_panel('folders');
+                }}
+                tooltip_message="Folders"
             ></RButton>
 
             <div class="w-[1px] h-full py-1">
                 <div class=" w-full h-full border-l border-stone-300"></div>
             </div>
 
-            <RButton
-                icon="/images/xp/icons/FolderView-Classic.png"
-                expandable={true}
-            ></RButton>
+            <div class="relative">
+                <RButton
+                    icon="/images/xp/icons/FolderView-Classic.png"
+                    expandable={true}
+                    on_click={() => (views_menu = !views_menu)}
+                    on_expand={() => (views_menu = !views_menu)}
+                    tooltip_message="Views"
+                ></RButton>
+                {#if views_menu}
+                    <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+                    <div
+                        use:utils.click_outside
+                        on:click_outside={() => (views_menu = false)}
+                        class="absolute right-0 top-full z-30 min-w-[120px] border border-slate-400 bg-slate-50 shadow text-[11px]"
+                    >
+                        {#each view_modes as m (m)}
+                            <div
+                                class="px-3 py-1 flex flex-row items-center gap-1 hover:bg-blue-600 hover:text-slate-50 cursor-pointer"
+                                on:click={() => {
+                                    view_mode = m;
+                                    views_menu = false;
+                                }}
+                            >
+                                <span class="w-3 text-[9px]"
+                                    >{view_mode === m ? '●' : ''}</span
+                                >
+                                {m}
+                            </div>
+                        {/each}
+                    </div>
+                {/if}
+            </div>
         </div>
         <div
             class="shrink-0 flex flex-row items-center border-b border-stone-300 text-[11px] items-center"
@@ -378,14 +521,24 @@
         </div>
 
         <div class="grow flex flex-row overflow-hidden">
-            <Sidebar
-                my_computer_instance={mc_interface}
-                id={history[page_index]}
-            ></Sidebar>
+            {#if left_panel === 'search'}
+                <SearchPanel my_computer_instance={mc_interface} />
+            {:else if left_panel === 'folders'}
+                <FoldersTree
+                    my_computer_instance={mc_interface}
+                    current_id={history[page_index]}
+                />
+            {:else}
+                <Sidebar
+                    my_computer_instance={mc_interface}
+                    id={history[page_index]}
+                ></Sidebar>
+            {/if}
             <div class="grow relative bg-blue-100">
                 <Viewer
                     bind:this={viewer}
                     id={history[page_index]}
+                    {view_mode}
                     on:open={(e: CustomEvent<{ id: string | null }>) => {
                         open(e.detail.id);
                     }}

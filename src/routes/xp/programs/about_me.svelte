@@ -3,12 +3,16 @@
 <script lang="ts">
     import Window from '../../../lib/components/xp/Window.svelte';
     import RButton from '../../../lib/components/xp/RButton.svelte';
-    import { unmount } from 'svelte';
+    import Menu from '../../../lib/components/xp/Menu.svelte';
+    import Dialog from '../../../lib/components/xp/Dialog.svelte';
+    import { mount, unmount } from 'svelte';
     import { queueProgram, runningPrograms } from '../../../lib/store';
     import { profile } from '../../../lib/profile';
     import { PROJECTS_FOLDER_ID } from '../../../lib/generated/vfs_ids';
     import { required } from '../../../lib/types';
     import type {
+        MenuBarEntry,
+        MountedComponent,
         ProgramInstance,
         WindowController,
         WindowOptions,
@@ -27,20 +31,35 @@
                 url: s.url,
             })),
             lines: [] as string[],
+            groups: [] as { name: string; items: readonly string[] }[],
         },
         {
             name: 'Skills',
             links: [] as { label: string; url: string }[],
-            lines: Object.keys(profile.skills),
+            lines: [] as string[],
+            groups: Object.entries(profile.skills).map(([name, items]) => ({
+                name,
+                items,
+            })),
         },
         {
             name: 'Languages',
             links: [] as { label: string; url: string }[],
             lines: profile.languages.map((l) => `${l.language} — ${l.level}`),
+            groups: [] as { name: string; items: readonly string[] }[],
         },
     ];
 
     const collapsed: Record<string, boolean> = {};
+    /** Per-category expansion inside the Skills panel. */
+    let expanded_groups: Record<string, boolean> = {};
+
+    function toggle_group(name: string) {
+        expanded_groups = {
+            ...expanded_groups,
+            [name]: !expanded_groups[name],
+        };
+    }
 
     function open_projects() {
         queueProgram.set({
@@ -52,6 +71,60 @@
     function open_resume() {
         queueProgram.set({ path: './programs/pdf_viewer.svelte' });
     }
+
+    function show_about_dialog() {
+        const target = required(
+            document.querySelector('#desktop'),
+            'desktop element',
+        );
+        const dialog: MountedComponent = mount(Dialog, {
+            target,
+            props: {
+                title: 'About Momad',
+                message: `${profile.meta.name} — ${profile.meta.title}, ${profile.meta.location}. Built into Momad's XP. Very Professional.`,
+                icon: '/assets/icons/about-me.png',
+                get_self: () => dialog,
+                buttons: [
+                    {
+                        name: 'OK',
+                        focus: true,
+                        action: () => {
+                            void unmount(dialog);
+                        },
+                    },
+                ],
+            },
+        });
+    }
+
+    const menu: MenuBarEntry[] = [
+        {
+            name: 'File',
+            items: [
+                [
+                    {
+                        name: 'Close',
+                        action: () => {
+                            destroy();
+                        },
+                    },
+                ],
+            ],
+        },
+        {
+            name: 'View',
+            items: [
+                [
+                    { name: 'My Projects', action: open_projects },
+                    { name: 'My Resume', action: open_resume },
+                ],
+            ],
+        },
+        {
+            name: 'Help',
+            items: [[{ name: 'About Momad', action: show_about_dialog }]],
+        },
+    ];
 
     export function destroy() {
         runningPrograms.update((programs) =>
@@ -78,13 +151,10 @@
         slot="content"
         class="absolute inset-0 flex flex-col bg-xp-yellow font-Tahoma"
     >
-        <!-- menu bar (decorative, like the Explorer stubs) -->
-        <div
-            class="shrink-0 flex flex-row gap-4 px-2 py-1 text-[11px] text-slate-800 border-b border-stone-300"
-        >
-            <span>File</span>
-            <span>View</span>
-            <span class="text-slate-400">Help</span>
+        <!-- menu bar: relative+z so the dropdowns paint above the toolbar
+             (Menu's own z-10 needs a positioned/flex context to matter) -->
+        <div class="shrink-0 border-b border-stone-300 px-1 relative z-20">
+            <Menu {menu} />
         </div>
 
         <!-- toolbar -->
@@ -177,6 +247,32 @@
                                 >
                             {/each}
                             <!-- eslint-enable svelte/no-navigation-without-resolve -->
+                            {#each section.groups as group (group.name)}
+                                <button
+                                    type="button"
+                                    class="flex w-full flex-row items-center mt-1.5 ml-1 text-[12px] text-blue-600 leading-tight text-left"
+                                    on:click={() => {
+                                        toggle_group(group.name);
+                                    }}
+                                >
+                                    <span
+                                        class="w-3 shrink-0 text-[9px] text-blue-700"
+                                        >{expanded_groups[group.name]
+                                            ? '▾'
+                                            : '▸'}</span
+                                    >
+                                    {group.name}
+                                </button>
+                                {#if expanded_groups[group.name]}
+                                    {#each group.items as skill (skill)}
+                                        <p
+                                            class="mt-1 ml-6 text-[11px] text-slate-700 leading-tight"
+                                        >
+                                            {skill}
+                                        </p>
+                                    {/each}
+                                {/if}
+                            {/each}
                             {#each section.lines as line (line)}
                                 <p
                                     class="mt-1.5 ml-1 text-[12px] text-blue-600 leading-tight"

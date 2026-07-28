@@ -9,7 +9,42 @@ test('About Me renders bio, sidebar and toolbar actions', async ({ page }) => {
     await expect(win.getByText('NLP & LLMs')).toBeVisible();
     await expect(win.getByText(/Hi, I'm Mohamed Abdelnasser/)).toBeVisible();
 
-    await win.getByText('My Projects').click();
+    // .last(): the View menu holds a hidden "My Projects" item too — the
+    // toolbar button renders after it in DOM order
+    await win.getByText('My Projects', { exact: true }).last().click();
     const explorer = page.locator('#work-space .window').nth(1);
     await expect(explorer.getByText("Momad's XP.txt")).toBeVisible();
+});
+
+test('Skills categories expand and collapse', async ({ page }) => {
+    await bootToDesktop(page);
+    await page.locator('#work-space p', { hasText: 'About Me' }).dblclick();
+    const win = page.locator('#work-space .window').first();
+    await expect(win.getByText('NLP & LLMs')).toBeVisible();
+    await expect(win.getByText('RAG Pipelines')).toBeHidden();
+
+    await win.getByText('NLP & LLMs').click();
+    await expect(win.getByText('RAG Pipelines')).toBeVisible();
+    await expect(win.getByText('LangGraph')).toBeVisible();
+
+    await win.getByText('NLP & LLMs').click();
+    await expect(win.getByText('RAG Pipelines')).toBeHidden();
+});
+
+test('About Me menu bar has working File/View/Help menus', async ({ page }) => {
+    await bootToDesktop(page);
+    await page.locator('#work-space p', { hasText: 'About Me' }).dblclick();
+    const win = page.locator('#work-space .window').first();
+    await expect(win.getByText('Social Links')).toBeVisible();
+
+    // Help -> About Momad opens an XP dialog
+    await win.locator('.toolbar-menu').getByText('Help').click();
+    await win.getByText('About Momad', { exact: true }).click();
+    await expect(page.getByText(/Very Professional/)).toBeVisible();
+    await page.getByText('OK', { exact: true }).click();
+
+    // File -> Close closes the window
+    await win.locator('.toolbar-menu').getByText('File').click();
+    await win.getByText('Close', { exact: true }).click();
+    await expect(win).toBeHidden();
 });

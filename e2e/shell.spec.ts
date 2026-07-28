@@ -51,7 +51,7 @@ test('two rect-less windows cascade instead of stacking', async ({ page }) => {
     expect(Math.round(second.y - first.y)).toBe(24);
 });
 
-test('double-clicking an unassociated file shows the XP dialog', async ({
+test('a new Text Document opens as an empty page (txt is associated now)', async ({
     page,
 }) => {
     await bootToDesktop(page);
@@ -67,6 +67,84 @@ test('double-clicking an unassociated file shows the XP dialog', async ({
     await page
         .locator('#work-space p', { hasText: 'New Text Document' })
         .dblclick();
+    const win = page.locator('#work-space .window').first();
+    await expect(win).toBeVisible();
+    await expect(win.locator('.titlebar')).toContainText('New Text Document');
+    await expect(page.getByText('Windows cannot open this file')).toBeHidden();
+});
+
+test('double-clicking an unassociated file shows the XP dialog', async ({
+    page,
+}) => {
+    await bootToDesktop(page);
+    // inject a file with a genuinely unassociated extension
+    await page.evaluate(async () => {
+        const open = indexedDB.open('keyval-store');
+        const db = await new Promise<IDBDatabase>((resolve, reject) => {
+            open.onsuccess = () => {
+                resolve(open.result);
+            };
+            open.onerror = () => {
+                reject(new Error('idb open failed'));
+            };
+        });
+        const put = (key: string, val: unknown) =>
+            new Promise<void>((resolve, reject) => {
+                const tx = db
+                    .transaction('keyval', 'readwrite')
+                    .objectStore('keyval')
+                    .put(val, key);
+                tx.onsuccess = () => {
+                    resolve();
+                };
+                tx.onerror = () => {
+                    reject(new Error('idb put failed'));
+                };
+            });
+        const get = (key: string) =>
+            new Promise<Record<string, { children: string[] }>>(
+                (resolve, reject) => {
+                    const tx = db
+                        .transaction('keyval')
+                        .objectStore('keyval')
+                        .get(key);
+                    tx.onsuccess = () => {
+                        resolve(
+                            tx.result as Record<string, { children: string[] }>,
+                        );
+                    };
+                    tx.onerror = () => {
+                        reject(new Error('idb get failed'));
+                    };
+                },
+            );
+        const drive = await get('hard_drive');
+        const DESKTOP = 'nt1QdU9Sws26H26UNQZcQU';
+        drive['e2eUnassociated000001'] = {
+            id: 'e2eUnassociated000001',
+            type: 'file',
+            name: 'mystery.xyz',
+            basename: 'mystery',
+            ext: '.xyz',
+            storage_type: 'local',
+            url: 'e2eUnassociatedBlob01',
+            parent: DESKTOP,
+            size: 1,
+            children: [],
+            date_created: 1,
+            date_modified: 1,
+            sort_option: 0,
+            sort_order: 0,
+        } as never;
+        const desktop = drive[DESKTOP];
+        if (desktop == null) throw new Error('desktop missing');
+        desktop.children = [...desktop.children, 'e2eUnassociated000001'];
+        await put('hard_drive', drive);
+    });
+    await page.reload();
+    await bootToDesktop(page);
+
+    await page.locator('#work-space p', { hasText: 'mystery.xyz' }).dblclick();
     await expect(
         page.getByText(
             'Windows cannot open this file — no program is associated with it.',

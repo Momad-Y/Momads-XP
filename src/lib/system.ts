@@ -174,6 +174,7 @@ export const doctypes: Record<string, ProgramDescriptor[]> = {
     '.jpeg': [image_viewer, paint_program],
     '.gif': [image_viewer],
     '.html': [ie_program],
+    '.url': [ie_program],
     '.pdf': [
         {
             path: './programs/pdf_viewer.svelte',
@@ -211,7 +212,9 @@ export const icons: Record<string, string> = {
     '.png': 'TIFF.png',
     '.webp': 'TIFF.png',
     '.bmp': 'Bitmap.png',
-    '.pdf': 'PDF.png',
+    // Adobe-style icon (owner asset); the inherited PDF.png is Foxit's
+    // leftover branding from the base repo's pruned viewer
+    '.pdf': 'AdobePDF.png',
     '.docx': 'DOC.png',
     '.epub': 'BOOK.png',
     '.azw3': 'BOOK.png',

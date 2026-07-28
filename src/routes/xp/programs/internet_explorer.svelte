@@ -3,13 +3,19 @@
 <script lang="ts">
     import Window from '../../../lib/components/xp/Window.svelte';
     import { onMount, unmount } from 'svelte';
-    import { runningPrograms, zIndex } from '../../../lib/store';
+    import {
+        favorites,
+        add_favorite,
+        remove_favorite,
+    } from '../../../lib/favorites';
+    import { runningPrograms, zIndex, queueProgram } from '../../../lib/store';
     import Menu from '../../../lib/components/xp/Menu.svelte';
     import RButton from '../../../lib/components/xp/RButton.svelte';
     import ProgressBar from '../../../lib/components/xp/ProgressBar.svelte';
     import buildUrl from 'build-url';
     import isURL from 'is-valid-http-url';
     import * as fs from '../../../lib/fs';
+    import { desktop_folder } from '../../../lib/system';
     import * as utils from '../../../lib/utils';
     import * as finder from '../../../lib/finder';
     import { required } from '../../../lib/types';
@@ -46,41 +52,9 @@
     let sidebar_mode: SidebarMode | null = null;
     let search_query = '';
 
-    // Favorites
-    interface Favorite {
-        name: string;
-        url: string;
-    }
-    let favorites: Favorite[] = [];
+    // Favorites — shared store (also backs My Computer's Favorites menu)
     let adding_fav = false;
     let pending_fav_name = '';
-
-    /** Validate one entry of the persisted ie_favorites JSON. */
-    function is_favorite(value: unknown): value is Favorite {
-        return (
-            typeof value === 'object' &&
-            value !== null &&
-            'name' in value &&
-            'url' in value &&
-            typeof value.name === 'string' &&
-            typeof value.url === 'string'
-        );
-    }
-
-    function load_favorites() {
-        try {
-            const parsed: unknown = JSON.parse(
-                localStorage.getItem('ie_favorites') || '[]',
-            );
-            favorites = Array.isArray(parsed) ? parsed.filter(is_favorite) : [];
-        } catch {
-            favorites = [];
-        }
-    }
-
-    function save_favorites() {
-        localStorage.setItem('ie_favorites', JSON.stringify(favorites));
-    }
 
     function start_add_favorite() {
         pending_fav_name = hostname_of(address_text);
@@ -90,17 +64,30 @@
 
     function confirm_add_favorite() {
         if (!pending_fav_name.trim()) return;
-        favorites = [
-            ...favorites,
-            { name: pending_fav_name.trim(), url: address_text },
-        ];
-        save_favorites();
+        add_favorite({ name: pending_fav_name.trim(), url: address_text });
         adding_fav = false;
     }
 
-    function remove_favorite(i: number) {
-        favorites = favorites.filter((_, idx) => idx !== i);
-        save_favorites();
+    function remove_fav(i: number) {
+        remove_favorite(i);
+    }
+
+    async function create_desktop_shortcut() {
+        const target = address_text;
+        const name = hostname_of(target) || 'Web Page';
+        await fs.new_fs_item_raw(
+            {
+                basename: name,
+                ext: '.url',
+                storage_type: 'remote',
+                url: target,
+                icon: '/images/xp/icons/InternetShortcut.png',
+            },
+            desktop_folder,
+        );
+        window?.show_toast({
+            message: `Shortcut to ${name} created on the desktop.`,
+        });
     }
 
     function hostname_of(u: string) {
@@ -112,7 +99,6 @@
     }
 
     onMount(async () => {
-        load_favorites();
         real_url = await to_real_url(
             required(nav_history[page_index], 'history entry'),
         );
@@ -127,6 +113,8 @@
 
         if (/^[A-Z]:\\/.test(u)) {
             // local file — pass through
+        } else if (u.startsWith('/')) {
+            // same-origin page (e.g. /help.html) — pass through
         } else if (!u.startsWith('https://') && !u.startsWith('http://')) {
             u = 'https://' + u;
             if (!isURL(u)) {
@@ -163,6 +151,27 @@
     }
     function forward() {
         void navigate_to(page_index + 1);
+    }
+
+    // Back/Forward history dropdowns (XP shows the pages you'd step through)
+    let history_menu: 'back' | 'forward' | null = null;
+    interface HistoryOption {
+        label: string;
+        idx: number;
+    }
+    $: back_options = nav_history
+        .slice(0, page_index)
+        .map((u, i): HistoryOption => ({ label: hostname_of(u), idx: i }))
+        .reverse();
+    $: forward_options = nav_history
+        .slice(page_index + 1)
+        .map((u, i): HistoryOption => ({
+            label: hostname_of(u),
+            idx: page_index + 1 + i,
+        }));
+    function pick_history(idx: number) {
+        history_menu = null;
+        void navigate_to(idx);
     }
 
     function stop() {
@@ -297,7 +306,14 @@
         {
             name: 'File',
             items: [
-                [{ name: 'Create Shortcut', disabled: true, action: () => {} }],
+                [
+                    {
+                        name: 'Create Shortcut',
+                        action: () => {
+                            void create_desktop_shortcut();
+                        },
+                    },
+                ],
                 [
                     {
                         name: 'Close',
@@ -330,7 +346,7 @@
                         },
                     },
                 ],
-                ...favorites.map((fav) => [
+                ...$favorites.map((fav) => [
                     {
                         name: fav.name,
                         icon: '/images/xp/icons/URL.png',
@@ -356,9 +372,18 @@
             items: [
                 [
                     {
+                        name: 'Help and Support Center',
+                        action: () => {
+                            void load_page('/help.html#ie');
+                        },
+                    },
+                ],
+                [
+                    {
                         name: 'About Internet Explorer',
-                        disabled: true,
-                        action: () => {},
+                        action: () => {
+                            void load_page('/help.html#about');
+                        },
                     },
                 ],
             ],
@@ -391,22 +416,71 @@
         <div
             class="shrink-0 flex flex-row items-center border-b border-stone-300 overflow-hidden flex-wrap"
         >
-            <RButton
-                icon="/images/xp/icons/Back.png"
-                title="Back"
-                on_click={back}
-                expandable={true}
-                disabled={page_index === 0}
-                tooltip_message="Back"
-            ></RButton>
-            <RButton
-                icon="/images/xp/icons/Forward.png"
-                title="Forward"
-                on_click={forward}
-                expandable={true}
-                disabled={page_index >= nav_history.length - 1}
-                tooltip_message="Forward"
-            ></RButton>
+            <div class="relative">
+                <RButton
+                    icon="/images/xp/icons/Back.png"
+                    title="Back"
+                    on_click={back}
+                    expandable={true}
+                    disabled={page_index === 0}
+                    on_expand={() => {
+                        history_menu = history_menu === 'back' ? null : 'back';
+                    }}
+                    tooltip_message="Back"
+                ></RButton>
+                {#if history_menu === 'back'}
+                    <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+                    <div
+                        use:utils.click_outside
+                        on:click_outside={() => (history_menu = null)}
+                        class="absolute left-0 top-full z-30 min-w-[160px] border border-slate-400 bg-slate-50 shadow text-[11px]"
+                    >
+                        {#each back_options as opt (opt.idx)}
+                            <div
+                                class="px-3 py-1 hover:bg-blue-600 hover:text-slate-50 cursor-pointer"
+                                on:click={() => {
+                                    pick_history(opt.idx);
+                                }}
+                            >
+                                {opt.label}
+                            </div>
+                        {/each}
+                    </div>
+                {/if}
+            </div>
+            <div class="relative">
+                <RButton
+                    icon="/images/xp/icons/Forward.png"
+                    title="Forward"
+                    on_click={forward}
+                    expandable={true}
+                    disabled={page_index >= nav_history.length - 1}
+                    on_expand={() => {
+                        history_menu =
+                            history_menu === 'forward' ? null : 'forward';
+                    }}
+                    tooltip_message="Forward"
+                ></RButton>
+                {#if history_menu === 'forward'}
+                    <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+                    <div
+                        use:utils.click_outside
+                        on:click_outside={() => (history_menu = null)}
+                        class="absolute left-0 top-full z-30 min-w-[160px] border border-slate-400 bg-slate-50 shadow text-[11px]"
+                    >
+                        {#each forward_options as opt (opt.idx)}
+                            <div
+                                class="px-3 py-1 hover:bg-blue-600 hover:text-slate-50 cursor-pointer"
+                                on:click={() => {
+                                    pick_history(opt.idx);
+                                }}
+                            >
+                                {opt.label}
+                            </div>
+                        {/each}
+                    </div>
+                {/if}
+            </div>
             <RButton
                 icon="/images/xp/icons/IEStop.png"
                 title="Stop"
@@ -456,7 +530,13 @@
 
             <div class="w-[1px] h-[30px] mx-1 border-l border-stone-300"></div>
 
-            <RButton icon="/images/xp/icons/Email.png" expandable={true}
+            <RButton
+                icon="/images/xp/icons/Email.png"
+                title="Mail"
+                tooltip_message="Read Mail"
+                on_click={() => {
+                    queueProgram.set({ path: './programs/contact_me.svelte' });
+                }}
             ></RButton>
         </div>
 
@@ -592,7 +672,7 @@
                                 </div>
                             {/if}
                             <div class="overflow-y-auto grow">
-                                {#if favorites.length === 0}
+                                {#if $favorites.length === 0}
                                     <p
                                         class="text-[11px] font-MSSS text-slate-500 p-2"
                                     >
@@ -601,7 +681,7 @@
                                     </p>
                                 {:else}
                                     <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
-                                    {#each favorites as fav, i}
+                                    {#each $favorites as fav, i}
                                         <div
                                             class="flex items-center group hover:bg-blue-600 px-1 py-[3px] cursor-pointer"
                                             on:click={() => {
@@ -622,7 +702,7 @@
                                             <!-- svelte-ignore a11y-no-static-element-interactions -->
                                             <div
                                                 on:click|stopPropagation={() => {
-                                                    remove_favorite(i);
+                                                    remove_fav(i);
                                                 }}
                                                 class="text-[10px] text-slate-400 group-hover:text-white px-1 hover:text-red-300 shrink-0"
                                             >

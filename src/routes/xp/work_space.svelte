@@ -5,7 +5,6 @@
     import short from 'short-uuid';
     import DesktopFolder from './desktop_folder.svelte';
     import * as finder from '../../lib/finder';
-    import { show_no_association_dialog } from '../../lib/no_association';
     import { full_vfs_item } from '../../lib/types';
     import type {
         ProgramInstance,
@@ -193,6 +192,22 @@
             runningPrograms.update((values) => {
                 return [...values, program];
             });
+        } else if (path == './programs/system_properties.svelte') {
+            const Program = (
+                await import('./programs/system_properties.svelte')
+            ).default;
+            const program: ProgramInstance = mount(Program, {
+                target: node_ref,
+                props: {
+                    id: short.generate(),
+                    exec_path: path,
+                    get_self: () => program,
+                },
+            });
+            //add to program tray
+            runningPrograms.update((values) => {
+                return [...values, program];
+            });
         } else if (path == './programs/contact_me.svelte') {
             const Program = (await import('./programs/contact_me.svelte'))
                 .default;
@@ -240,29 +255,23 @@
                 return [...values, program];
             });
         } else if (path == './programs/portfolio_viewer.svelte') {
-            const full = full_vfs_item(fs_item);
-            if (full?.portfolio_ref == null) {
-                // A .txt without a generator-stamped ref (e.g. a renamed user
-                // file) has nothing to display — same dialog as no handler.
-                show_no_association_dialog(full?.name ?? 'Unknown file');
-            } else {
-                const Program = (
-                    await import('./programs/portfolio_viewer.svelte')
-                ).default;
-                const program: ProgramInstance = mount(Program, {
-                    target: node_ref,
-                    props: {
-                        id: short.generate(),
-                        fs_item: full,
-                        exec_path: path,
-                        get_self: () => program,
-                    },
-                });
-                //add to program tray
-                runningPrograms.update((values) => {
-                    return [...values, program];
-                });
-            }
+            // portfolio_ref entries render resolved profile content; plain
+            // .txt files (user-created/uploaded) render their raw text
+            const Program = (await import('./programs/portfolio_viewer.svelte'))
+                .default;
+            const program: ProgramInstance = mount(Program, {
+                target: node_ref,
+                props: {
+                    id: short.generate(),
+                    fs_item: full_vfs_item(fs_item),
+                    exec_path: path,
+                    get_self: () => program,
+                },
+            });
+            //add to program tray
+            runningPrograms.update((values) => {
+                return [...values, program];
+            });
         } else if (path == './programs/placeholder.svelte') {
             const Program = (await import('./programs/placeholder.svelte'))
                 .default;

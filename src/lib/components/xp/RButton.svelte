@@ -8,6 +8,8 @@
     export let expandable = false;
 
     export let on_click: () => void = () => {};
+    /** Fired when the expand arrow is clicked (independent of on_click). */
+    export let on_expand: (() => void) | null = null;
 </script>
 
 <div
@@ -22,17 +24,33 @@
         }
     }}
 >
-    <div
-        class="h-[25px] w-[25px] bg-contain bg-no-repeat {disabled
-            ? 'grayscale'
-            : ''}"
-        style:background-image="url({icon})"
-    ></div>
+    {#if icon.trim() != ''}
+        <div
+            class="h-[25px] w-[25px] bg-contain bg-no-repeat {disabled
+                ? 'grayscale'
+                : ''}"
+            style:background-image="url({icon})"
+        ></div>
+    {/if}
     {#if title.trim() != ''}
-        <div class="text-[12px] text-slate-900 ml-2">{title}</div>
+        <div
+            class="text-[12px] {disabled
+                ? 'text-slate-400'
+                : 'text-slate-900'} {icon.trim() != '' ? 'ml-2' : 'mx-1'}"
+        >
+            {title}
+        </div>
     {/if}
     {#if expandable}
-        <div class="w-[10px] ml-1">
+        <div
+            class="w-[10px] ml-1"
+            on:click={(e) => {
+                if (!disabled && on_expand != null) {
+                    e.stopPropagation();
+                    on_expand();
+                }
+            }}
+        >
             <svg
                 class="{disabled
                     ? 'fill-gray-400'
