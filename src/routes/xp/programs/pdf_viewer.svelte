@@ -3,7 +3,7 @@
 <script lang="ts">
     import Window from '../../../lib/components/xp/Window.svelte';
     import RButton from '../../../lib/components/xp/RButton.svelte';
-    import { onMount, unmount } from 'svelte';
+    import { onMount, tick, unmount } from 'svelte';
     import { runningPrograms } from '../../../lib/store';
     import { profile } from '../../../lib/profile';
     import * as fs from '../../../lib/fs';
@@ -97,6 +97,15 @@
         }
     }
 
+    async function retry() {
+        load_error = false;
+        // a failed remote fetch may have cached nothing — resolve fresh
+        pdf_url = null;
+        // the error view swaps out and pages_node re-binds on the next tick
+        await tick();
+        await render();
+    }
+
     onMount(() => void render());
 
     function set_zoom(next: number) {
@@ -169,11 +178,20 @@
             >
         </div>
         {#if load_error}
-            <div class="grow flex items-center justify-center">
-                <p class="text-[11px] text-white font-Tahoma">
-                    The document could not be displayed. Use Download to view
-                    it.
+            <div
+                class="grow flex flex-col items-center justify-center gap-3 px-8"
+            >
+                <p class="text-[12px] text-white font-Tahoma text-center">
+                    This document could not be loaded — this can happen on a
+                    weak Internet connection. Check your connection, then try
+                    again.
                 </p>
+                <RButton
+                    title="Try Again"
+                    on_click={() => {
+                        void retry();
+                    }}
+                />
             </div>
         {:else}
             <div bind:this={pages_node} class="grow overflow-auto p-3"></div>
