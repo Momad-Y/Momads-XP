@@ -14,6 +14,7 @@
     import Viewer from './my_computer/viewer.svelte';
     import * as finder from '../../../lib/finder';
     import * as utils from '../../../lib/utils';
+    import { favorites } from '../../../lib/favorites';
     import Sidebar from './my_computer/sidebar.svelte';
     import SearchPanel from './my_computer/search_panel.svelte';
     import FoldersTree from './my_computer/folders_tree.svelte';
@@ -80,7 +81,7 @@
     ];
     let views_menu = false;
 
-    const menu: MenuBarEntry[] = [
+    $: menu = [
         {
             name: 'File',
             items: [
@@ -147,30 +148,24 @@
                 [
                     {
                         name: 'Add to Favorites...',
-                        disabled: true,
+                        action: () => {
+                            open_favorite('https://wiby.me/');
+                        },
                     },
                     {
                         name: 'Organize Favorites',
-                        disabled: true,
+                        action: () => {
+                            open_favorite('https://wiby.me/');
+                        },
                     },
                 ],
-                [
-                    {
-                        name: 'Links',
-                        disabled: true,
-                        icon: '/images/xp/icons/FolderClosed.png',
+                $favorites.map((fav) => ({
+                    name: fav.name,
+                    icon: '/images/xp/icons/URL.png',
+                    action: () => {
+                        open_favorite(fav.url);
                     },
-                    {
-                        name: 'MSN.com',
-                        disabled: true,
-                        icon: '/images/xp/icons/URL.png',
-                    },
-                    {
-                        name: 'Radio Station Guide',
-                        disabled: true,
-                        icon: '/images/xp/icons/URL.png',
-                    },
-                ],
+                })),
             ],
         },
         {
@@ -225,7 +220,7 @@
                 ],
             ],
         },
-    ];
+    ] satisfies MenuBarEntry[];
 
     $: mc_interface = { window, up, open };
 
@@ -333,6 +328,13 @@
             'fs item ' + current_id,
         ).parent;
         open(parent_id);
+    }
+
+    function open_favorite(url: string) {
+        queueProgram.set({
+            path: './programs/internet_explorer.svelte',
+            fs_item: { url },
+        });
     }
 
     function open_link(link: string) {
