@@ -185,13 +185,13 @@
                     {
                         name: 'Help and Support Center',
                         action: () => {
-                            open_link('https://docs.win32.run');
+                            open_link('/help.html');
                         },
                     },
                     {
                         name: 'Is this copy legal?',
                         action: () => {
-                            open_link('https://docs.win32.run');
+                            open_link('/help.html#legal');
                         },
                     },
                 ],
@@ -199,7 +199,7 @@
                     {
                         name: 'About Windows',
                         action: () => {
-                            open_link('https://docs.win32.run');
+                            open_link('/help.html#about');
                         },
                     },
                 ],
