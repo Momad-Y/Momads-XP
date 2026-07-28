@@ -3,6 +3,11 @@
 <script lang="ts">
     import Window from '../../../lib/components/xp/Window.svelte';
     import { onMount, unmount } from 'svelte';
+    import {
+        favorites,
+        add_favorite,
+        remove_favorite,
+    } from '../../../lib/favorites';
     import { runningPrograms, zIndex, queueProgram } from '../../../lib/store';
     import Menu from '../../../lib/components/xp/Menu.svelte';
     import RButton from '../../../lib/components/xp/RButton.svelte';
@@ -47,41 +52,9 @@
     let sidebar_mode: SidebarMode | null = null;
     let search_query = '';
 
-    // Favorites
-    interface Favorite {
-        name: string;
-        url: string;
-    }
-    let favorites: Favorite[] = [];
+    // Favorites — shared store (also backs My Computer's Favorites menu)
     let adding_fav = false;
     let pending_fav_name = '';
-
-    /** Validate one entry of the persisted ie_favorites JSON. */
-    function is_favorite(value: unknown): value is Favorite {
-        return (
-            typeof value === 'object' &&
-            value !== null &&
-            'name' in value &&
-            'url' in value &&
-            typeof value.name === 'string' &&
-            typeof value.url === 'string'
-        );
-    }
-
-    function load_favorites() {
-        try {
-            const parsed: unknown = JSON.parse(
-                localStorage.getItem('ie_favorites') || '[]',
-            );
-            favorites = Array.isArray(parsed) ? parsed.filter(is_favorite) : [];
-        } catch {
-            favorites = [];
-        }
-    }
-
-    function save_favorites() {
-        localStorage.setItem('ie_favorites', JSON.stringify(favorites));
-    }
 
     function start_add_favorite() {
         pending_fav_name = hostname_of(address_text);
@@ -91,17 +64,12 @@
 
     function confirm_add_favorite() {
         if (!pending_fav_name.trim()) return;
-        favorites = [
-            ...favorites,
-            { name: pending_fav_name.trim(), url: address_text },
-        ];
-        save_favorites();
+        add_favorite({ name: pending_fav_name.trim(), url: address_text });
         adding_fav = false;
     }
 
-    function remove_favorite(i: number) {
-        favorites = favorites.filter((_, idx) => idx !== i);
-        save_favorites();
+    function remove_fav(i: number) {
+        remove_favorite(i);
     }
 
     async function create_desktop_shortcut() {
@@ -131,7 +99,6 @@
     }
 
     onMount(async () => {
-        load_favorites();
         real_url = await to_real_url(
             required(nav_history[page_index], 'history entry'),
         );
@@ -379,7 +346,7 @@
                         },
                     },
                 ],
-                ...favorites.map((fav) => [
+                ...$favorites.map((fav) => [
                     {
                         name: fav.name,
                         icon: '/images/xp/icons/URL.png',
@@ -705,7 +672,7 @@
                                 </div>
                             {/if}
                             <div class="overflow-y-auto grow">
-                                {#if favorites.length === 0}
+                                {#if $favorites.length === 0}
                                     <p
                                         class="text-[11px] font-MSSS text-slate-500 p-2"
                                     >
@@ -714,7 +681,7 @@
                                     </p>
                                 {:else}
                                     <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
-                                    {#each favorites as fav, i}
+                                    {#each $favorites as fav, i}
                                         <div
                                             class="flex items-center group hover:bg-blue-600 px-1 py-[3px] cursor-pointer"
                                             on:click={() => {
@@ -735,7 +702,7 @@
                                             <!-- svelte-ignore a11y-no-static-element-interactions -->
                                             <div
                                                 on:click|stopPropagation={() => {
-                                                    remove_favorite(i);
+                                                    remove_fav(i);
                                                 }}
                                                 class="text-[10px] text-slate-400 group-hover:text-white px-1 hover:text-red-300 shrink-0"
                                             >
