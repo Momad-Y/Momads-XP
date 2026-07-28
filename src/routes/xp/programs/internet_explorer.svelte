@@ -127,6 +127,8 @@
 
         if (/^[A-Z]:\\/.test(u)) {
             // local file — pass through
+        } else if (u.startsWith('/')) {
+            // same-origin page (e.g. /help.html) — pass through
         } else if (!u.startsWith('https://') && !u.startsWith('http://')) {
             u = 'https://' + u;
             if (!isURL(u)) {
@@ -357,8 +359,9 @@
                 [
                     {
                         name: 'About Internet Explorer',
-                        disabled: true,
-                        action: () => {},
+                        action: () => {
+                            void load_page('/help.html#about');
+                        },
                     },
                 ],
             ],
