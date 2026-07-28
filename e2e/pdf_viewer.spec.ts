@@ -110,6 +110,29 @@ test('an uploaded (local) PDF opens with its own content, not the resume', async
     await expect(win.getByText('1 page', { exact: true })).toBeVisible();
 });
 
+test('a failed PDF load shows the connection message and Try Again recovers', async ({
+    page,
+}) => {
+    // simulate a dead connection for the resume asset
+    await page.route('**/Mohamed_Abdelnasser_Resume.pdf', (route) =>
+        route.abort(),
+    );
+    await bootToDesktop(page);
+    await page.locator('#work-space p', { hasText: 'My CV' }).dblclick();
+    const win = page.locator('#work-space .window').first();
+    await expect(win.getByText(/weak Internet connection/)).toBeVisible({
+        timeout: 15000,
+    });
+
+    // connection recovers
+    await page.unroute('**/Mohamed_Abdelnasser_Resume.pdf');
+    // .last(): RButton's wrapper and its inner text node both match
+    await win.getByText('Try Again', { exact: true }).last().click();
+    await expect(win.locator('canvas').first()).toBeVisible({
+        timeout: 15000,
+    });
+});
+
 test('My CV opens the PDF viewer and renders a page', async ({ page }) => {
     await bootToDesktop(page);
     await page.locator('#work-space p', { hasText: 'My CV' }).dblclick();
