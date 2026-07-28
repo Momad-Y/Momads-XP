@@ -13,6 +13,7 @@
     import RButton from '../../../lib/components/xp/RButton.svelte';
     import Viewer from './my_computer/viewer.svelte';
     import * as finder from '../../../lib/finder';
+    import * as utils from '../../../lib/utils';
     import Sidebar from './my_computer/sidebar.svelte';
     import { required } from '../../../lib/types';
     import type {
@@ -294,6 +295,32 @@
         page_index = Math.min(history.length - 1, page_index + 1);
     }
 
+    // Back/Forward history dropdowns
+    let history_menu: 'back' | 'forward' | null = null;
+    function history_label(id: string | null | undefined): string {
+        if (id == null) return 'My Computer';
+        const item = $hardDrive?.[id];
+        return item?.display_name ?? item?.name ?? 'My Computer';
+    }
+    interface HistoryOption {
+        label: string;
+        idx: number;
+    }
+    $: back_options = history
+        .slice(0, page_index)
+        .map((id, i): HistoryOption => ({ label: history_label(id), idx: i }))
+        .reverse();
+    $: forward_options = history
+        .slice(page_index + 1)
+        .map((id, i): HistoryOption => ({
+            label: history_label(id),
+            idx: page_index + 1 + i,
+        }));
+    function pick_history(idx: number) {
+        history_menu = null;
+        page_index = idx;
+    }
+
     export function up() {
         const current_id = required(history[page_index], 'current folder id');
         const parent_id = required(
@@ -331,20 +358,69 @@
         <div
             class="shrink-0 flex flex-row items-center border-b border-stone-300"
         >
-            <RButton
-                icon="/images/xp/icons/Back.png"
-                title="Back"
-                on_click={back}
-                expandable={true}
-                disabled={page_index == 0}
-                tooltip_message="Back to Previous"
-            ></RButton>
-            <RButton
-                icon="/images/xp/icons/Forward.png"
-                on_click={next}
-                expandable={true}
-                disabled={page_index == history.length - 1}
-            ></RButton>
+            <div class="relative">
+                <RButton
+                    icon="/images/xp/icons/Back.png"
+                    title="Back"
+                    on_click={back}
+                    expandable={true}
+                    disabled={page_index == 0}
+                    on_expand={() => {
+                        history_menu = history_menu === 'back' ? null : 'back';
+                    }}
+                    tooltip_message="Back to Previous"
+                ></RButton>
+                {#if history_menu === 'back'}
+                    <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+                    <div
+                        use:utils.click_outside
+                        on:click_outside={() => (history_menu = null)}
+                        class="absolute left-0 top-full z-30 min-w-[160px] border border-slate-400 bg-slate-50 shadow text-[11px]"
+                    >
+                        {#each back_options as opt (opt.idx)}
+                            <div
+                                class="px-3 py-1 hover:bg-blue-600 hover:text-slate-50 cursor-pointer"
+                                on:click={() => {
+                                    pick_history(opt.idx);
+                                }}
+                            >
+                                {opt.label}
+                            </div>
+                        {/each}
+                    </div>
+                {/if}
+            </div>
+            <div class="relative">
+                <RButton
+                    icon="/images/xp/icons/Forward.png"
+                    on_click={next}
+                    expandable={true}
+                    disabled={page_index == history.length - 1}
+                    on_expand={() => {
+                        history_menu =
+                            history_menu === 'forward' ? null : 'forward';
+                    }}
+                ></RButton>
+                {#if history_menu === 'forward'}
+                    <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+                    <div
+                        use:utils.click_outside
+                        on:click_outside={() => (history_menu = null)}
+                        class="absolute left-0 top-full z-30 min-w-[160px] border border-slate-400 bg-slate-50 shadow text-[11px]"
+                    >
+                        {#each forward_options as opt (opt.idx)}
+                            <div
+                                class="px-3 py-1 hover:bg-blue-600 hover:text-slate-50 cursor-pointer"
+                                on:click={() => {
+                                    pick_history(opt.idx);
+                                }}
+                            >
+                                {opt.label}
+                            </div>
+                        {/each}
+                    </div>
+                {/if}
+            </div>
 
             <RButton
                 icon="/images/xp/icons/Up.png"
