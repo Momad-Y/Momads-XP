@@ -126,7 +126,8 @@ test('a failed PDF load shows the connection message and Try Again recovers', as
 
     // connection recovers
     await page.unroute('**/Mohamed_Abdelnasser_Resume.pdf');
-    await win.getByText('Try Again').click();
+    // .last(): RButton's wrapper and its inner text node both match
+    await win.getByText('Try Again', { exact: true }).last().click();
     await expect(win.locator('canvas').first()).toBeVisible({
         timeout: 15000,
     });
