@@ -28,21 +28,29 @@ test('Create Shortcut makes a working .lnk that opens its target', async ({
 }) => {
     await openMyComputer(page);
     const win = page.locator('#work-space .window').first();
-    // right-click the Experience folder → Create Shortcut
-    await win.getByText('Experience', { exact: true }).click({
-        button: 'right',
-    });
-    await page
-        .locator('.context-menu')
-        .getByText('Create Shortcut', { exact: true })
-        .click();
-    const shortcut = win.getByText('Shortcut to Experience.lnk');
-    await expect(shortcut).toBeVisible();
-
-    // opening the shortcut opens the Experience folder
-    await shortcut.dblclick();
+    // navigate into C: then into Experience (unique entry files live there)
+    await win.getByText('Local Disk (C:)').dblclick();
+    await win.locator('.dialog').getByText('OK').click();
     await page.waitForTimeout(450);
-    await expect(win.getByText('Printerpix — AI Engineer.txt')).toBeVisible();
+    await win.locator('.fs-item', { hasText: 'Experience' }).first().dblclick();
+    await page.waitForTimeout(450);
+    const entry = win.getByText('Printerpix — AI Engineer.txt');
+    await expect(entry).toBeVisible();
+
+    // right-click the entry file → Create Shortcut (lands beside it)
+    await entry.click({ button: 'right' });
+    const menu = page.locator('.context-menu');
+    await expect(menu).toBeVisible();
+    await menu.getByText('Create Shortcut', { exact: true }).click();
+    const shortcut = win.getByText('Shortcut to Printerpix — AI Engineer.lnk');
+    await expect(shortcut).toBeVisible({ timeout: 15000 });
+
+    // opening the shortcut opens the target file's detail window
+    await shortcut.dblclick();
+    const detail = page.locator('#work-space .window').nth(1);
+    await expect(detail.getByText('AI Engineer', { exact: true })).toBeVisible({
+        timeout: 15000,
+    });
 });
 
 test('IE Mail button opens Contact Me', async ({ page }) => {
