@@ -53,3 +53,46 @@ describe('extension normalization (XP is case-insensitive)', () => {
         expect(get(hardDrive)?.[id ?? '']?.ext).toBe('');
     });
 });
+
+describe('create_shortcut', () => {
+    it('creates a .lnk in the target parent that points back at the target', () => {
+        hardDrive.set({
+            desktop: folder('desktop', ['target']),
+            target: {
+                ...folder('target'),
+                parent: 'desktop',
+                basename: 'target',
+                name: 'target',
+                icon: '/icons/x.png',
+            },
+        });
+        fs.create_shortcut('target', 'desktop');
+        const drive = get(hardDrive) ?? {};
+        const lnk = Object.values(drive).find((i) => i.ext === '.lnk');
+        expect(lnk?.name).toBe('Shortcut to target.lnk');
+        expect(lnk?.shortcut_target).toBe('target');
+        expect(lnk?.icon).toBe('/icons/x.png');
+        expect(drive['desktop']?.children).toContain(lnk?.id);
+    });
+
+    it('dedupes the shortcut name on repeat', () => {
+        hardDrive.set({
+            desktop: folder('desktop', ['target']),
+            target: {
+                ...folder('target'),
+                parent: 'desktop',
+                basename: 'target',
+                name: 'target',
+            },
+        });
+        fs.create_shortcut('target', 'desktop');
+        fs.create_shortcut('target', 'desktop');
+        const names = Object.values(get(hardDrive) ?? {})
+            .filter((i) => i.ext === '.lnk')
+            .map((i) => i.name);
+        expect(names).toEqual([
+            'Shortcut to target.lnk',
+            'Shortcut to target (2).lnk',
+        ]);
+    });
+});
