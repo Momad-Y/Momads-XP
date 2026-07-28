@@ -358,6 +358,14 @@
             items: [
                 [
                     {
+                        name: 'Help and Support Center',
+                        action: () => {
+                            void load_page('/help.html#ie');
+                        },
+                    },
+                ],
+                [
+                    {
                         name: 'About Internet Explorer',
                         action: () => {
                             void load_page('/help.html#about');
