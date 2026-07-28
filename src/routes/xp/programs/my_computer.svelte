@@ -15,6 +15,8 @@
     import * as finder from '../../../lib/finder';
     import * as utils from '../../../lib/utils';
     import Sidebar from './my_computer/sidebar.svelte';
+    import SearchPanel from './my_computer/search_panel.svelte';
+    import FoldersTree from './my_computer/folders_tree.svelte';
     import { required } from '../../../lib/types';
     import type {
         MenuBarEntry,
@@ -295,6 +297,12 @@
         page_index = Math.min(history.length - 1, page_index + 1);
     }
 
+    // Left explorer bar: common tasks (default), search, or folders tree
+    let left_panel: 'tasks' | 'search' | 'folders' = 'tasks';
+    function toggle_panel(mode: 'search' | 'folders') {
+        left_panel = left_panel === mode ? 'tasks' : mode;
+    }
+
     // Back/Forward history dropdowns
     let history_menu: 'back' | 'forward' | null = null;
     function history_label(id: string | null | undefined): string {
@@ -435,12 +443,18 @@
             <RButton
                 icon="/images/xp/icons/Search.png"
                 title="Search"
-                disabled={true}
+                on_click={() => {
+                    toggle_panel('search');
+                }}
+                tooltip_message="Search"
             ></RButton>
             <RButton
                 icon="/images/xp/icons/FolderView.png"
                 title="Folders"
-                disabled={true}
+                on_click={() => {
+                    toggle_panel('folders');
+                }}
+                tooltip_message="Folders"
             ></RButton>
 
             <div class="w-[1px] h-full py-1">
@@ -481,10 +495,19 @@
         </div>
 
         <div class="grow flex flex-row overflow-hidden">
-            <Sidebar
-                my_computer_instance={mc_interface}
-                id={history[page_index]}
-            ></Sidebar>
+            {#if left_panel === 'search'}
+                <SearchPanel my_computer_instance={mc_interface} />
+            {:else if left_panel === 'folders'}
+                <FoldersTree
+                    my_computer_instance={mc_interface}
+                    current_id={history[page_index]}
+                />
+            {:else}
+                <Sidebar
+                    my_computer_instance={mc_interface}
+                    id={history[page_index]}
+                ></Sidebar>
+            {/if}
             <div class="grow relative bg-blue-100">
                 <Viewer
                     bind:this={viewer}
