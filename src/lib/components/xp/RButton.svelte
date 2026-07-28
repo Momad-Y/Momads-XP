@@ -8,6 +8,8 @@
     export let expandable = false;
 
     export let on_click: () => void = () => {};
+    /** Fired when the expand arrow is clicked (independent of on_click). */
+    export let on_expand: (() => void) | null = null;
 </script>
 
 <div
@@ -40,7 +42,15 @@
         </div>
     {/if}
     {#if expandable}
-        <div class="w-[10px] ml-1">
+        <div
+            class="w-[10px] ml-1"
+            on:click={(e) => {
+                if (!disabled && on_expand != null) {
+                    e.stopPropagation();
+                    on_expand();
+                }
+            }}
+        >
             <svg
                 class="{disabled
                     ? 'fill-gray-400'
