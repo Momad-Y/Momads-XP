@@ -174,6 +174,7 @@ export const doctypes: Record<string, ProgramDescriptor[]> = {
     '.jpeg': [image_viewer, paint_program],
     '.gif': [image_viewer],
     '.html': [ie_program],
+    '.url': [ie_program],
     '.pdf': [
         {
             path: './programs/pdf_viewer.svelte',

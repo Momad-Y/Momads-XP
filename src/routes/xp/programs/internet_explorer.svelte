@@ -3,13 +3,14 @@
 <script lang="ts">
     import Window from '../../../lib/components/xp/Window.svelte';
     import { onMount, unmount } from 'svelte';
-    import { runningPrograms, zIndex } from '../../../lib/store';
+    import { runningPrograms, zIndex, queueProgram } from '../../../lib/store';
     import Menu from '../../../lib/components/xp/Menu.svelte';
     import RButton from '../../../lib/components/xp/RButton.svelte';
     import ProgressBar from '../../../lib/components/xp/ProgressBar.svelte';
     import buildUrl from 'build-url';
     import isURL from 'is-valid-http-url';
     import * as fs from '../../../lib/fs';
+    import { desktop_folder } from '../../../lib/system';
     import * as utils from '../../../lib/utils';
     import * as finder from '../../../lib/finder';
     import { required } from '../../../lib/types';
@@ -101,6 +102,24 @@
     function remove_favorite(i: number) {
         favorites = favorites.filter((_, idx) => idx !== i);
         save_favorites();
+    }
+
+    async function create_desktop_shortcut() {
+        const target = address_text;
+        const name = hostname_of(target) || 'Web Page';
+        await fs.new_fs_item_raw(
+            {
+                basename: name,
+                ext: '.url',
+                storage_type: 'remote',
+                url: target,
+                icon: '/images/xp/icons/InternetShortcut.png',
+            },
+            desktop_folder,
+        );
+        window?.show_toast({
+            message: `Shortcut to ${name} created on the desktop.`,
+        });
     }
 
     function hostname_of(u: string) {
@@ -299,7 +318,14 @@
         {
             name: 'File',
             items: [
-                [{ name: 'Create Shortcut', disabled: true, action: () => {} }],
+                [
+                    {
+                        name: 'Create Shortcut',
+                        action: () => {
+                            void create_desktop_shortcut();
+                        },
+                    },
+                ],
                 [
                     {
                         name: 'Close',
@@ -469,8 +495,11 @@
 
             <RButton
                 icon="/images/xp/icons/Email.png"
-                expandable={true}
-                disabled={true}
+                title="Mail"
+                tooltip_message="Read Mail"
+                on_click={() => {
+                    queueProgram.set({ path: './programs/contact_me.svelte' });
+                }}
             ></RButton>
         </div>
 

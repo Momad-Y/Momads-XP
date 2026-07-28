@@ -208,7 +208,17 @@
 
         is_focus = false;
         clear_selection();
-        const fs_item = required($hardDrive?.[id], 'fs item ' + id);
+        const clicked = required($hardDrive?.[id], 'fs item ' + id);
+        // .lnk shortcut: resolve to its target before opening
+        let fs_item = clicked;
+        if (clicked.shortcut_target != null) {
+            const target = $hardDrive?.[clicked.shortcut_target];
+            if (target == null) {
+                show_no_association_dialog(clicked.name);
+                return;
+            }
+            fs_item = target;
+        }
         const handlers = doctypes[fs_item.ext.toLowerCase()];
         if (fs_item.type == 'file') {
             if (fs_item.executable) {
