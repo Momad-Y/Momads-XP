@@ -146,17 +146,17 @@
             name: 'Favorites',
             items: [
                 [
+                    // Favorites are web links (shared with IE); a file Explorer
+                    // has no page/URL to favorite, so these are greyed like the
+                    // other inert XP controls. The list below still opens each
+                    // favorite in IE.
                     {
                         name: 'Add to Favorites...',
-                        action: () => {
-                            open_favorite('https://wiby.me/');
-                        },
+                        disabled: true,
                     },
                     {
                         name: 'Organize Favorites',
-                        action: () => {
-                            open_favorite('https://wiby.me/');
-                        },
+                        disabled: true,
                     },
                 ],
                 $favorites.map((fav) => ({

@@ -11,10 +11,12 @@ export const MAX_MESSAGE_LENGTH = 5000;
 export const MIN_FILL_TIME_MS = 3000;
 
 /**
- * Practical email shape, aligned with what Resend accepts: dot-atom local
- * part, domain labels without leading/trailing hyphens or empty segments,
- * alphabetic TLD. The old permissive `[^\s@]` pattern let through addresses
- * like `a@b.com.` that Resend 422s after our validation passed.
+ * Practical email shape, aligned with what Resend accepts: an RFC-5321
+ * dot-atom local part (incl. apostrophes and the other valid specials, plus
+ * Unicode letters for SMTPUTF8), domain labels without leading/trailing
+ * hyphens or empty segments, and a ≥2-letter TLD. Blocks the shapes Resend
+ * 422s (trailing dot `a@b.com.`, bare single-char TLD `a@b.c`) while no
+ * longer rejecting real people (`o'brien@…`) or IDN domains (`user@münchen.de`).
  */
 export const EMAIL_RE =
-    /^[A-Za-z0-9._%+-]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*\.[A-Za-z]{2,}$/;
+    /^[\p{L}0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[\p{L}0-9!#$%&'*+/=?^_`{|}~-]+)*@[\p{L}0-9](?:[\p{L}0-9-]*[\p{L}0-9])?(?:\.[\p{L}0-9](?:[\p{L}0-9-]*[\p{L}0-9])?)*\.[\p{L}]{2,}$/u;

@@ -682,6 +682,7 @@
                                 {:else}
                                     <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
                                     {#each $favorites as fav, i}
+                                        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
                                         <div
                                             class="flex items-center group hover:bg-blue-600 px-1 py-[3px] cursor-pointer"
                                             on:click={() => {
@@ -770,6 +771,15 @@
             <div class="grow relative overflow-hidden">
                 {#if real_url}
                     <!-- svelte-ignore a11y-missing-attribute -->
+                    <!--
+                      sandbox WITHOUT allow-same-origin: user-dropped .html
+                      files open via a same-origin blob: URL, so without this a
+                      malicious page would inherit our origin (full VFS +
+                      localStorage + a valid Origin header to /api/email). The
+                      opaque-origin sandbox denies all of that; allow-scripts/
+                      forms/popups keep normal pages usable. help.html has no
+                      scripts and renders fine. (red-team #7)
+                    -->
                     <iframe
                         bind:this={iframe}
                         class="w-full h-full bg-slate-50 {window?.z_index ==
@@ -779,6 +789,8 @@
                         src={real_url}
                         on:load={iframe_loaded}
                         frameborder="0"
+                        sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"
+                        referrerpolicy="no-referrer"
                     >
                     </iframe>
                 {/if}

@@ -63,12 +63,17 @@ export function validate_email_payload(
     const trimmed_subject = subject.trim();
     const trimmed_message = message.trim();
 
+    // The subject becomes a mail header; reject control chars (CR/LF/NUL) so a
+    // crafted subject can't inject headers regardless of Resend's own MIME
+    // handling (red-team #17, defense-in-depth).
     if (
         trimmed_from.length === 0 ||
         trimmed_from.length > MAX_FROM_LENGTH ||
         !EMAIL_RE.test(trimmed_from) ||
         trimmed_subject.length === 0 ||
         trimmed_subject.length > MAX_SUBJECT_LENGTH ||
+        // eslint-disable-next-line no-control-regex -- intentional CR/LF/NUL/control-char header-injection guard
+        /[\u0000-\u001f\u007f]/.test(trimmed_subject) ||
         trimmed_message.length === 0 ||
         trimmed_message.length > MAX_MESSAGE_LENGTH
     ) {
