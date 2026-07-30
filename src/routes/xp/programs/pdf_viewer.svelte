@@ -36,21 +36,26 @@
     let pdf_url: string | null = null;
     let object_url: string | null = null;
 
-    async function resolve_pdf_url(): Promise<string> {
-        if (item != null) {
-            try {
-                const resolved = await fs.get_url(item.id);
-                if (resolved != null) {
-                    if (resolved.startsWith('blob:')) {
-                        object_url = resolved;
-                    }
-                    return resolved;
+    async function resolve_pdf_url(): Promise<string | null> {
+        // No fs_item → the "My CV.exe" desktop launch → show the résumé.
+        if (item == null) return profile.meta.resumePdf;
+        // An fs_item was supplied (a real .pdf file). If its content can't be
+        // resolved (idb blob evicted, etc.), surface an error rather than
+        // silently substituting the owner's résumé under this file's name
+        // (red-team #6).
+        try {
+            const resolved = await fs.get_url(item.id);
+            if (resolved != null) {
+                if (resolved.startsWith('blob:')) {
+                    release_object_url();
+                    object_url = resolved;
                 }
-            } catch (error) {
-                console.error('pdf url resolution failed', error);
+                return resolved;
             }
+        } catch (error) {
+            console.error('pdf url resolution failed', error);
         }
-        return profile.meta.resumePdf;
+        return null;
     }
 
     let pages_node: HTMLDivElement | undefined;
@@ -68,6 +73,10 @@
         const token = ++render_token;
         try {
             pdf_url ??= await resolve_pdf_url();
+            if (pdf_url == null) {
+                if (token === render_token) load_error = true;
+                return;
+            }
             const task = getDocument({ url: pdf_url });
             const doc = await task.promise;
             if (token !== render_token) {
@@ -93,13 +102,25 @@
             void task.destroy();
         } catch (error) {
             console.error('pdf render failed', error);
-            load_error = true;
+            // only the newest render pass may flip the error screen, or a stale
+            // failure could hide a succeeding one (red-team #11)
+            if (token === render_token) load_error = true;
+        }
+    }
+
+    /** Revoke and forget the current object URL before it's overwritten. */
+    function release_object_url() {
+        if (object_url != null) {
+            URL.revokeObjectURL(object_url);
+            object_url = null;
         }
     }
 
     async function retry() {
         load_error = false;
-        // a failed remote fetch may have cached nothing — resolve fresh
+        // a failed fetch may have cached nothing — revoke the stale blob URL
+        // (red-team #11) and resolve fresh
+        release_object_url();
         pdf_url = null;
         // the error view swaps out and pages_node re-binds on the next tick
         await tick();
@@ -114,16 +135,16 @@
     }
 
     async function download() {
+        const href = pdf_url ?? (await resolve_pdf_url());
+        if (href == null) return;
         const a = document.createElement('a');
-        a.href = pdf_url ?? (await resolve_pdf_url());
+        a.href = href;
         a.download = item?.name ?? '';
         a.click();
     }
 
     export function destroy() {
-        if (object_url != null) {
-            URL.revokeObjectURL(object_url);
-        }
+        release_object_url();
         runningPrograms.update((programs) =>
             programs.filter((p) => p != get_self()),
         );

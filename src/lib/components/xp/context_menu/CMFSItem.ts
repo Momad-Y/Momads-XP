@@ -93,7 +93,8 @@ export const make = ({
             ],
             [
                 ...(['file', 'folder'].includes(originator.item.type) &&
-                originator.item.parent != recycle_bin_id
+                originator.item.parent != recycle_bin_id &&
+                originator.item.storage_type != 'fake'
                     ? [
                           {
                               name: 'Add to archive...',

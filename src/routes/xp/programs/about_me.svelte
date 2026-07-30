@@ -219,6 +219,7 @@
                             : 'rounded-t'}"
                         style:background={'linear-gradient(rgb(246 246 246) 0%, rgb(210 216 252) 100%)'}
                     >
+                        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
                         <div
                             class="grow-0 h-7 flex flex-row items-center justify-between bg-gradient-to-r from-blue-600 to-blue-700"
                             on:click={() =>

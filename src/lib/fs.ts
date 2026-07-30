@@ -117,9 +117,12 @@ export function create_shortcut(target_id: string, parent_id: string): void {
     const parent = required(data[parent_id], `fs item ${parent_id}`);
 
     const seed = `Shortcut to ${target.basename}`;
-    const existing = parent.children.map(
-        (el) => required(data[el], `fs item ${el}`).name,
-    );
+    // Filter (don't throw) on missing children: an offline stale cached drive
+    // can carry dangling ids (same reason viewer.svelte filters — red-team #9).
+    const existing = parent.children.flatMap((el) => {
+        const child = data[el];
+        return child == null ? [] : [child.name];
+    });
     let basename = seed;
     let appendix = 2;
     while (existing.includes(basename + '.lnk')) {

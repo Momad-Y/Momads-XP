@@ -102,4 +102,29 @@ describe('validate_email_payload', () => {
             code: 'invalid_payload',
         });
     });
+
+    it('accepts real addresses the strict regex must not reject', () => {
+        // red-team #4: apostrophes, RFC specials, IDN, plus-tagging
+        for (const from_email of [
+            "o'brien@example.com",
+            'müller@example.com',
+            'user@münchen.de',
+            'a!b@example.com',
+            'user+tag@example.co.uk',
+        ]) {
+            expect(
+                validate_email_payload({ ...valid, from_email }, NOW).ok,
+                from_email,
+            ).toBe(true);
+        }
+    });
+
+    it('rejects CRLF injection in the subject (header safety)', () => {
+        expect(
+            validate_email_payload(
+                { ...valid, subject: 'Hi\r\nBcc: victim@example.com' },
+                NOW,
+            ),
+        ).toEqual({ ok: false, code: 'invalid_payload' });
+    });
 });

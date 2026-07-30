@@ -225,8 +225,17 @@
             const obj = required(drive[key], 'fs item ' + key);
             // Pre-fix uploads stored extensions case-preserved (PHOTO.PNG →
             // '.PNG'), breaking doctype/icon lookups — normalize old drives.
-            if (obj.ext !== obj.ext.toLowerCase()) {
+            // Guard the access: a legacy/partial cached item missing `ext`
+            // must not throw here (it would abort load_hard_drive and brick
+            // the boot). Also recompute `name` so basename+ext stays
+            // consistent with the sibling-name dedupe checks (red-team #8).
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- persisted pre-migration data may miss `ext` despite the type
+            if (obj.ext != null && obj.ext !== obj.ext.toLowerCase()) {
                 obj.ext = obj.ext.toLowerCase();
+                // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- same: legacy items may lack `basename`
+                if (obj.basename != null) {
+                    obj.name = obj.basename + obj.ext;
+                }
             }
             // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- persisted pre-migration data may genuinely miss this field despite the type
             if (obj.children == null) {

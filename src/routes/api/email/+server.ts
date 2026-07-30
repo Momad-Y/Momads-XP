@@ -119,14 +119,15 @@ export const POST: RequestHandler = async (event) => {
             }),
         });
         if (!res.ok) {
-            // Log Resend's error body server-side (never echoed to the
-            // client) — a bare status left 4xx causes undiagnosable.
+            // Log Resend's error body server-side (never echoed to the client),
+            // but redact email-shaped substrings first — Resend's errors echo
+            // the account owner's and the visitor's addresses, and these logs
+            // are retained third-party PII otherwise (red-team #16).
             const detail = await res.text().catch(() => '(unreadable)');
-            console.error(
-                '/api/email: resend responded',
-                res.status,
-                detail.slice(0, 500),
-            );
+            const redacted = detail
+                .replace(/[^\s@]+@[^\s@]+\.[^\s@]+/g, '[email]')
+                .slice(0, 500);
+            console.error('/api/email: resend responded', res.status, redacted);
             return json({ error: 'send_failed' }, { status: 502 });
         }
         return json({ ok: true }, { status: 202 });
