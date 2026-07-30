@@ -84,11 +84,28 @@
         const parent = required(win().parentElement, 'window parent element');
         // Programs declare desktop-sized defaults (e.g. pdf_viewer 640×720);
         // on short/narrow workspaces cap them so the chrome stays reachable.
+        // The min_* caps matter too: CSS min-height wins over the height cap,
+        // so a non-resizable dialog with min_height > workspace would clip its
+        // buttons off the bottom otherwise (red-team #5).
+        options.min_height = Math.min(
+            options.min_height ?? 0,
+            parent.offsetHeight,
+        );
+        options.min_width = Math.min(
+            options.min_width ?? 0,
+            parent.offsetWidth,
+        );
         if (options.height != null) {
-            options.height = Math.min(options.height, parent.offsetHeight);
+            options.height = Math.max(
+                Math.min(options.height, parent.offsetHeight),
+                options.min_height,
+            );
         }
         if (options.width != null) {
-            options.width = Math.min(options.width, parent.offsetWidth);
+            options.width = Math.max(
+                Math.min(options.width, parent.offsetWidth),
+                options.min_width,
+            );
         }
         if (
             options.top == null &&

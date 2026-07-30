@@ -3,14 +3,16 @@
 <script lang="ts">
     import Window from '../../../lib/components/xp/Window.svelte';
     import Button from '../../../lib/components/xp/Button.svelte';
-    import { onMount, unmount } from 'svelte';
+    import { onMount, mount, unmount } from 'svelte';
     import { runningPrograms, hardDrive } from '../../../lib/store';
     import * as utils from '../../../lib/utils';
     import * as fs from '../../../lib/fs';
+    import Dialog from '../../../lib/components/xp/Dialog.svelte';
     import DumbProgress from '../../../lib/components/xp/DumbProgress.svelte';
     import JSZip from 'jszip';
     import { required } from '../../../lib/types';
     import type {
+        MountedComponent,
         ProgramInstance,
         VfsItem,
         WindowController,
@@ -53,9 +55,10 @@
     }
 
     async function compress(item: VfsItem) {
-        const zip = new JSZip();
-        await add_to_archive(zip, item);
-        void zip.generateAsync({ type: 'blob' }).then(async (content) => {
+        try {
+            const zip = new JSZip();
+            await add_to_archive(zip, item);
+            const content = await zip.generateAsync({ type: 'blob' });
             const filename = item.basename + '.zip';
             const file = new File([content], filename, {
                 type: utils.ext_to_mime(filename) ?? undefined,
@@ -68,11 +71,43 @@
                 file,
             );
             destroy();
+        } catch (error) {
+            console.error('compression failed', error);
+            show_error();
+        }
+    }
+
+    function show_error() {
+        const target = required(
+            document.querySelector('#desktop'),
+            'desktop element',
+        );
+        const dialog: MountedComponent = mount(Dialog, {
+            target,
+            props: {
+                title: 'Compressing',
+                message: 'The archive could not be created.',
+                icon: '/images/xp/icons/SecurityError.png',
+                get_self: () => dialog,
+                buttons: [
+                    {
+                        name: 'OK',
+                        focus: true,
+                        action: () => {
+                            void unmount(dialog);
+                        },
+                    },
+                ],
+            },
         });
+        destroy();
     }
 
     async function add_to_archive(parent: JSZip, item: VfsItem) {
         if (cancelled) return;
+        // shortcuts / executables (storage_type 'fake') have no real payload —
+        // fs.get_file would throw, so skip them rather than hang the archive.
+        if (item.storage_type === 'fake') return;
         if (item.type == 'folder') {
             const folder = required(
                 parent.folder(item.name),

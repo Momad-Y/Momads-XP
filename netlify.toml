@@ -4,3 +4,14 @@
 
 [build.environment]
   NODE_VERSION = "22"
+
+# Clickjacking protection (red-team #7 defense-in-depth). 'self' — NOT 'none' —
+# because Paint frames the same-origin jspaint bundle and needs contentDocument
+# access. The IE iframe's own sandbox attribute contains dropped .html files.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    Content-Security-Policy = "frame-ancestors 'self'"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    X-Content-Type-Options = "nosniff"

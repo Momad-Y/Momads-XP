@@ -17,13 +17,28 @@
             return;
         }
         const drive = $hardDrive ?? {};
+        // Walk the parent chain: a deleted folder's children keep the clone's
+        // id as their parent, not recycle_bin_id directly, so a flat
+        // `parent !== recycle_bin_id` check would surface recycled files that
+        // then dead-end when opened (red-team #12).
+        const in_recycle_bin = (item: VfsItem): boolean => {
+            let cursor: string | undefined = item.parent;
+            // Cap the walk instead of a visited-set: bounds a malformed
+            // cyclic parent chain without a mutable Set in component scope
+            // (svelte/prefer-svelte-reactivity). 1000 hops >> any real depth.
+            for (let hops = 0; cursor != null && hops < 1000; hops++) {
+                if (cursor === recycle_bin_id) return true;
+                cursor = drive[cursor]?.parent;
+            }
+            return false;
+        };
         results = Object.values(drive)
             .filter(
                 (item) =>
                     !hidden_items.includes(item.id) &&
-                    item.parent !== recycle_bin_id &&
                     item.type !== 'drive' &&
                     item.type !== 'removable_storage' &&
+                    !in_recycle_bin(item) &&
                     item.name.toLowerCase().includes(q),
             )
             .slice(0, 100);

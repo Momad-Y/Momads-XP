@@ -199,6 +199,7 @@
             >
                 <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
                 {#each section.items as item}
+                    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
                     <div
                         class="flex flex-row items-center mt-2 {item.disabled
                             ? 'cursor-default'
