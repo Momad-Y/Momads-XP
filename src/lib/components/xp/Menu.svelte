@@ -37,7 +37,14 @@
     function hide() {
         active = false;
     }
+
+    /** XP closes an open menu on Escape. */
+    function on_keydown(event: KeyboardEvent) {
+        if (event.key === 'Escape' && active) hide();
+    }
 </script>
+
+<svelte:window on:keydown={on_keydown} />
 
 <div
     class="toolbar-menu flex flex-row items-center justify-evenly w-min font-MSSS z-10"

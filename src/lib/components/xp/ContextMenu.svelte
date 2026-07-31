@@ -93,7 +93,14 @@
         visible = false;
         contextMenu.set(null);
     };
+
+    /** XP dismisses a context menu on Escape. */
+    function on_keydown(event: KeyboardEvent) {
+        if (event.key === 'Escape' && visible) hide();
+    }
 </script>
+
+<svelte:window on:keydown={on_keydown} />
 
 <div
     bind:this={menu_el}
