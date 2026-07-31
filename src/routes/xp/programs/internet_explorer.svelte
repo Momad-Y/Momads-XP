@@ -405,7 +405,7 @@
         <div
             class="shrink-0 w-full border-b border-stone-300 flex flex-row items-center justify-between"
         >
-            <Menu {menu}></Menu>
+            <Menu {menu} focused={window?.z_index === $zIndex}></Menu>
             <div
                 class="w-[40px] h-full bg-slate-50 flex items-center justify-center overflow-hidden"
             >

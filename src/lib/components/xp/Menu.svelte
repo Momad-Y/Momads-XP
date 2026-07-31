@@ -1,5 +1,6 @@
 <script lang="ts">
     import { click_outside } from '../../utils';
+    import { contextMenu } from '../../store';
     import type { MenuBarEntry } from '../../types';
     export let menu: MenuBarEntry[] = [
         {
@@ -38,9 +39,20 @@
         active = false;
     }
 
-    /** XP closes an open menu on Escape. */
+    /**
+     * Whether the window owning this menu bar is the focused one. Every program
+     * window mounts its own Menu, and each registers a window-level keydown
+     * listener — without this gate a single Escape closed the menus of EVERY
+     * open window at once (red-team M2).
+     */
+    export let focused = true;
+
+    /** XP closes an open menu on Escape — the focused window's, one level. */
     function on_keydown(event: KeyboardEvent) {
-        if (event.key === 'Escape' && active) hide();
+        if (event.key !== 'Escape' || !active || !focused) return;
+        // A context menu is "on top" of the menu bar; it consumes Escape first.
+        if ($contextMenu != null) return;
+        hide();
     }
 </script>
 
@@ -139,7 +151,7 @@
                                         <div
                                             class="absolute left-full top-0 py-0.5 hidden group-sub-hover:flex flex-col w-[190px] bg-slate-50 border border-slate-200 shadow"
                                         >
-                                            {#each item.items.filter((el) => el != null) as sub_item (sub_item.name)}
+                                            {#each item.items.filter((el) => el != null) as sub_item, sub_i (sub_i)}
                                                 <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
                                                 <div
                                                     class="py-1 w-full flex flex-row items-center group-sub1 {sub_item.disabled

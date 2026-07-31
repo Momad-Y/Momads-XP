@@ -64,6 +64,51 @@ describe('profile integrity', () => {
         }
     });
 
+    // These three blocks drive the XP property-sheet dialogs and are meant to be
+    // edited by hand. TypeScript only catches a MISSING required key at compile
+    // time — it cannot catch an emptied array or a wrong-shaped element, and
+    // `npm run build` strips types entirely. These assertions are the only gate
+    // that a hand-edit doesn't ship a dialog that renders blank or throws.
+    it('systemProperties has content for every tab', () => {
+        const sp = profile.systemProperties;
+        expect(sp.general.system.length).toBeGreaterThan(0);
+        expect(sp.general.computer.length).toBeGreaterThan(0);
+        expect(sp.general.footer.length).toBeGreaterThan(0);
+        expect(sp.computerName.fullName.length).toBeGreaterThan(0);
+        expect(sp.hardware.devices.length).toBeGreaterThan(0);
+        expect(sp.advanced.sections.length).toBeGreaterThan(0);
+        for (const section of sp.advanced.sections) {
+            expect(section.title.length).toBeGreaterThan(0);
+            expect(section.note.length).toBeGreaterThan(0);
+        }
+    });
+
+    it('folderOptions has content for every tab', () => {
+        const fo = profile.folderOptions;
+        expect(fo.general.sections.length).toBeGreaterThan(0);
+        for (const section of fo.general.sections) {
+            expect(section.title.length).toBeGreaterThan(0);
+            expect(section.lines.length).toBeGreaterThan(0);
+        }
+        expect(fo.view.settings.length).toBeGreaterThan(0);
+        expect(fo.fileTypes.types.length).toBeGreaterThan(0);
+        for (const type of fo.fileTypes.types) {
+            expect(type.ext.startsWith('.')).toBe(true);
+            expect(type.desc.length).toBeGreaterThan(0);
+        }
+    });
+
+    it('internetOptions has content for every tab', () => {
+        const io = profile.internetOptions;
+        expect(io.general.sections.length).toBeGreaterThan(0);
+        for (const section of io.general.sections) {
+            expect(section.title.length).toBeGreaterThan(0);
+            expect(section.lines.length).toBeGreaterThan(0);
+        }
+        expect(io.security.zones.length).toBeGreaterThan(0);
+        expect(io.advanced.settings.length).toBeGreaterThan(0);
+    });
+
     it('is deeply frozen', () => {
         expect(Object.isFrozen(profile)).toBe(true);
         expect(Object.isFrozen(profile.meta)).toBe(true);

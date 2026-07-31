@@ -6,7 +6,7 @@
     import Menu from '../../../lib/components/xp/Menu.svelte';
     import Dialog from '../../../lib/components/xp/Dialog.svelte';
     import { mount, unmount } from 'svelte';
-    import { queueProgram, runningPrograms } from '../../../lib/store';
+    import { queueProgram, runningPrograms, zIndex } from '../../../lib/store';
     import { profile } from '../../../lib/profile';
     import { PROJECTS_FOLDER_ID } from '../../../lib/generated/vfs_ids';
     import { required } from '../../../lib/types';
@@ -154,7 +154,7 @@
         <!-- menu bar: relative+z so the dropdowns paint above the toolbar
              (Menu's own z-10 needs a positioned/flex context to matter) -->
         <div class="shrink-0 border-b border-stone-300 px-1 relative z-20">
-            <Menu {menu} />
+            <Menu {menu} focused={window?.z_index === $zIndex} />
         </div>
 
         <!-- toolbar -->

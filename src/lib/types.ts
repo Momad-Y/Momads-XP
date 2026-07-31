@@ -198,7 +198,8 @@ export interface MenuBarEntry {
  */
 export interface ViewerController {
     rename: () => void;
-    renaming: boolean;
+    /** Opens an item the way a double-click does (resolves .lnk, launches). */
+    open_item: (item_id: string) => void;
 }
 
 /** Originator for folder-scoped menus (Desktop, FSVoid): the folder's VFS id. */

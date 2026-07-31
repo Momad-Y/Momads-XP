@@ -5,7 +5,7 @@
     import Button from '../../../lib/components/xp/Button.svelte';
     import Tab from '../../../lib/components/xp/Tab.svelte';
     import { unmount } from 'svelte';
-    import { runningPrograms } from '../../../lib/store';
+    import { runningPrograms, zIndex, contextMenu } from '../../../lib/store';
     import { profile } from '../../../lib/profile';
     import { required } from '../../../lib/types';
     import type {
@@ -41,8 +41,19 @@
         min_height: 460,
         resizable: false,
         maximize_btn: false,
+        minimize_btn: false,
     };
+
+    /** XP: Escape is Cancel on a property sheet (focused window only). */
+    function on_keydown(event: KeyboardEvent) {
+        if (event.key !== 'Escape') return;
+        if ($contextMenu != null) return;
+        if (window?.z_index !== $zIndex) return;
+        destroy();
+    }
 </script>
+
+<svelte:window on:keydown={on_keydown} />
 
 <Window {options} bind:this={window} on_click_close={destroy}>
     <div
@@ -56,10 +67,10 @@
         >
             {#if selected === 'General'}
                 <div class="flex flex-col p-4 gap-3 leading-snug">
-                    {#each io.general.sections as section (section.title)}
+                    {#each io.general.sections as section, i (i)}
                         <div class="flex flex-col gap-1">
                             <p class="font-bold">{section.title}</p>
-                            {#each section.lines as line, i (i)}
+                            {#each section.lines as line, j (j)}
                                 <p class="ml-3">{line}</p>
                             {/each}
                         </div>
@@ -122,6 +133,7 @@
         <div class="shrink-0 flex flex-row justify-end gap-2 pt-2">
             <Button title="OK" focus={true} on_click={destroy}></Button>
             <Button title="Cancel" on_click={destroy}></Button>
+            <Button title="Apply" disabled={true}></Button>
         </div>
     </div>
 </Window>
