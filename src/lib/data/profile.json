@@ -264,5 +264,63 @@
             "language": "English",
             "level": "Full Professional"
         }
-    ]
+    ],
+    "systemProperties": {
+        "general": {
+            "system": [
+                "Momad's XP",
+                "Professional Edition",
+                "Version 2001, Genuine JavaScript"
+            ],
+            "computer": [
+                "Neural Processing Unit",
+                "RoboCup @Home Edition",
+                "1.337 GHz of raw ambition",
+                "640 KB RAM (ought to be enough)",
+                "∞ TB of side projects"
+            ],
+            "footer": "This system is protected by strong coffee and stronger Git commits."
+        },
+        "computerName": {
+            "intro": "Windows uses the following information to identify your computer on the network.",
+            "descriptionLabel": "Computer description:",
+            "description": "Momad's daily driver & side-project foundry",
+            "fullNameLabel": "Full computer name:",
+            "fullName": "momad-xp.local",
+            "workgroupLabel": "Workgroup:",
+            "workgroup": "PORTFOLIO",
+            "note": "To rename this computer, ship a better one. (Change… is disabled — this one's staying.)"
+        },
+        "hardware": {
+            "intro": "Device Manager lists all the hardware devices installed on this computer. Use it to change properties you'll never actually change.",
+            "devices": [
+                "Neural Processing Unit (overclocked on curiosity)",
+                "RoboCup @Home Sensor Array",
+                "Caffeine Intake Controller (USB, always-on)",
+                "Dual-Monitor Ambition Adapter",
+                "Git Commit Accelerator v2001"
+            ],
+            "problemDevices": [
+                "Impostor Syndrome Suppressor — driver not found"
+            ],
+            "note": "Drivers are up to date. The Impostor Syndrome Suppressor has been flagged since 2019; we're coping."
+        },
+        "advanced": {
+            "intro": "You must be logged on as an Administrator to make most of these changes. You are — obviously.",
+            "sections": [
+                {
+                    "title": "Performance",
+                    "note": "Visual effects, processor scheduling, and how fast the coffee kicks in. Currently optimized for: shipping features."
+                },
+                {
+                    "title": "User Profiles",
+                    "note": "Desktop settings related to your logon. 1 profile: Momad (Administrator)."
+                },
+                {
+                    "title": "Startup and Recovery",
+                    "note": "System startup and debugging. On critical error: blame the cache, clear it, try again."
+                }
+            ]
+        }
+    }
 }

@@ -19,6 +19,17 @@ test('View System Information opens the funny System Properties', async ({
     });
     await expect(sys.getByText('Mohamed Abdelnasser')).toBeVisible();
     await expect(sys.getByText(/raw ambition/)).toBeVisible();
+
+    // the other three tabs are implemented too (profile-driven funny content)
+    await sys.getByText('Computer Name', { exact: true }).click();
+    await expect(sys.getByText('momad-xp.local')).toBeVisible();
+    await sys.getByText('Hardware', { exact: true }).click();
+    await expect(
+        sys.getByText('Caffeine Intake Controller (USB, always-on)'),
+    ).toBeVisible();
+    await sys.getByText('Advanced', { exact: true }).click();
+    await expect(sys.getByText('User Profiles')).toBeVisible();
+
     await sys.getByText('OK', { exact: true }).click();
     await expect(sys).toBeHidden();
 });

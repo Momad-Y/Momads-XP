@@ -75,6 +75,47 @@ export interface LanguageEntry {
     level: string;
 }
 
+export interface SystemPropertiesGeneral {
+    system: string[];
+    computer: string[];
+    footer: string;
+}
+
+export interface SystemPropertiesComputerName {
+    intro: string;
+    descriptionLabel: string;
+    description: string;
+    fullNameLabel: string;
+    fullName: string;
+    workgroupLabel: string;
+    workgroup: string;
+    note: string;
+}
+
+export interface SystemPropertiesHardware {
+    intro: string;
+    devices: string[];
+    problemDevices: string[];
+    note: string;
+}
+
+export interface SystemPropertiesAdvancedSection {
+    title: string;
+    note: string;
+}
+
+export interface SystemPropertiesAdvanced {
+    intro: string;
+    sections: SystemPropertiesAdvancedSection[];
+}
+
+export interface ProfileSystemProperties {
+    general: SystemPropertiesGeneral;
+    computerName: SystemPropertiesComputerName;
+    hardware: SystemPropertiesHardware;
+    advanced: SystemPropertiesAdvanced;
+}
+
 export interface Profile {
     meta: ProfileMeta;
     about: ProfileAbout;
@@ -86,6 +127,7 @@ export interface Profile {
     certifications: Certification[];
     projects: Project[];
     languages: LanguageEntry[];
+    systemProperties: ProfileSystemProperties;
 }
 
 function is_record(value: unknown): value is Record<string, unknown> {
