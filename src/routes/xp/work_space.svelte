@@ -192,6 +192,36 @@
             runningPrograms.update((values) => {
                 return [...values, program];
             });
+        } else if (path == './programs/folder_options.svelte') {
+            const Program = (await import('./programs/folder_options.svelte'))
+                .default;
+            const program: ProgramInstance = mount(Program, {
+                target: node_ref,
+                props: {
+                    id: short.generate(),
+                    exec_path: path,
+                    get_self: () => program,
+                },
+            });
+            //add to program tray
+            runningPrograms.update((values) => {
+                return [...values, program];
+            });
+        } else if (path == './programs/internet_options.svelte') {
+            const Program = (await import('./programs/internet_options.svelte'))
+                .default;
+            const program: ProgramInstance = mount(Program, {
+                target: node_ref,
+                props: {
+                    id: short.generate(),
+                    exec_path: path,
+                    get_self: () => program,
+                },
+            });
+            //add to program tray
+            runningPrograms.update((values) => {
+                return [...values, program];
+            });
         } else if (path == './programs/system_properties.svelte') {
             const Program = (
                 await import('./programs/system_properties.svelte')

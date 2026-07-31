@@ -188,7 +188,15 @@
 
     function open_properties() {
         const target = properties_target;
-        if (target == null) return;
+        if (target == null) {
+            // My Computer root: XP opens System Properties here (same dialog
+            // as right-clicking My Computer / the sidebar's "View System
+            // Information"), so the root's File menu is never fully dead.
+            queueProgram.set({
+                path: './programs/system_properties.svelte',
+            });
+            return;
+        }
         queueProgram.set({
             path:
                 target.type == 'drive' || target.type == 'removable_storage'
@@ -317,8 +325,9 @@
                 ],
                 [
                     {
+                        // never inert: falls back to System Properties at the
+                        // My Computer root, exactly like XP
                         name: 'Properties',
-                        disabled: properties_target == null,
                         action: open_properties,
                     },
                     {
@@ -417,7 +426,11 @@
                 [
                     {
                         name: 'Folder Options...',
-                        disabled: true,
+                        action: () => {
+                            queueProgram.set({
+                                path: './programs/folder_options.svelte',
+                            });
+                        },
                     },
                 ],
             ],

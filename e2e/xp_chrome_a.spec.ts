@@ -124,6 +124,43 @@ test('Explorer File menu greys selection-only actions, like XP', async ({
     });
 });
 
+test('Explorer Tools > Folder Options opens', async ({ page }) => {
+    await bootToDesktop(page);
+    await page.locator('#work-space p', { hasText: 'My Computer' }).dblclick();
+    const win = page.locator('#work-space .window').first();
+    await win.locator('.toolbar-menu').getByText('Tools').click();
+    await win.getByText('Folder Options...', { exact: true }).click();
+    // .last(): the Explorer window also contains the text "Folder Options..."
+    const dlg = page
+        .locator('#work-space .window', { hasText: 'Folder Options' })
+        .last();
+    await expect(dlg.getByText(/defaults were never that good/)).toBeVisible({
+        timeout: 15000,
+    });
+    await dlg.getByText('View', { exact: true }).click();
+    await expect(dlg.getByText(/checked in spirit/)).toBeVisible();
+    await dlg.getByText('File Types', { exact: true }).click();
+    await expect(dlg.getByText(/Paint's finest hour/)).toBeVisible();
+});
+
+test('IE Tools > Internet Options opens', async ({ page }) => {
+    await bootToDesktop(page);
+    await page
+        .locator('#work-space p', { hasText: 'Internet Explorer' })
+        .dblclick();
+    const ie = page.locator('#work-space .window').first();
+    await ie.locator('.toolbar-menu').getByText('Tools').click();
+    await ie.getByText('Internet Options...', { exact: true }).click();
+    const dlg = page
+        .locator('#work-space .window', { hasText: 'Internet Options' })
+        .last();
+    await expect(dlg.getByText(/about:momad/)).toBeVisible({ timeout: 15000 });
+    await dlg.getByText('Security', { exact: true }).click();
+    await expect(dlg.getByText(/autoplays sound/)).toBeVisible();
+    await dlg.getByText('Advanced', { exact: true }).click();
+    await expect(dlg.getByText(/careful tinkering/)).toBeVisible();
+});
+
 test('IE Mail button opens Contact Me', async ({ page }) => {
     await bootToDesktop(page);
     await page

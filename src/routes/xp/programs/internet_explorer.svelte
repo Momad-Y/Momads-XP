@@ -361,8 +361,11 @@
                 [
                     {
                         name: 'Internet Options...',
-                        disabled: true,
-                        action: () => {},
+                        action: () => {
+                            queueProgram.set({
+                                path: './programs/internet_options.svelte',
+                            });
+                        },
                     },
                 ],
             ],
