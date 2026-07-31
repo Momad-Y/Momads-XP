@@ -322,5 +322,125 @@
                 }
             ]
         }
+    },
+    "folderOptions": {
+        "general": {
+            "sections": [
+                {
+                    "title": "Tasks",
+                    "lines": [
+                        "Show common tasks in folders",
+                        "Use Windows classic folders"
+                    ]
+                },
+                {
+                    "title": "Browse folders",
+                    "lines": [
+                        "Open each folder in the same window",
+                        "Open each folder in its own window (chaos mode)"
+                    ]
+                },
+                {
+                    "title": "Click items as follows",
+                    "lines": [
+                        "Single-click to open an item",
+                        "Double-click to open an item (as nature intended)"
+                    ]
+                }
+            ],
+            "note": "Restore Defaults is disabled — the defaults were never that good."
+        },
+        "view": {
+            "title": "Advanced settings:",
+            "settings": [
+                "Display the full path in the title bar",
+                "Hide extensions for known file types",
+                "Hide protected operating system files (recommended)",
+                "Show hidden files and folders",
+                "Remember each folder's view settings",
+                "Launch folder windows in a separate process"
+            ],
+            "note": "Every one of these is checked in spirit and unchecked in practice."
+        },
+        "fileTypes": {
+            "title": "Registered file types:",
+            "types": [
+                {
+                    "ext": ".txt",
+                    "desc": "Text Document — opens in Notepad, obviously"
+                },
+                {
+                    "ext": ".pdf",
+                    "desc": "Portable Document Format — the CV lives here"
+                },
+                {
+                    "ext": ".lnk",
+                    "desc": "Shortcut — points at something better"
+                },
+                {
+                    "ext": ".exe",
+                    "desc": "Application — 100% safe, trust me"
+                },
+                {
+                    "ext": ".bmp",
+                    "desc": "Bitmap Image — Paint's finest hour"
+                },
+                {
+                    "ext": ".wav",
+                    "desc": "Wave Sound — the startup chime, probably"
+                }
+            ],
+            "note": "Change and Advanced are disabled. These associations are perfect as-is."
+        }
+    },
+    "internetOptions": {
+        "general": {
+            "sections": [
+                {
+                    "title": "Home page",
+                    "lines": [
+                        "You can change which page to use for your home page.",
+                        "Address:  about:momad"
+                    ]
+                },
+                {
+                    "title": "Temporary Internet files",
+                    "lines": [
+                        "Pages you view are stored for quick viewing later.",
+                        "Currently storing: 4 pages and a lot of optimism."
+                    ]
+                },
+                {
+                    "title": "History",
+                    "lines": [
+                        "Days to keep pages in history:  20",
+                        "2001 was a good year; we kept all of it."
+                    ]
+                }
+            ],
+            "note": "Delete Files... would free up 0 KB. Everything here is load-bearing."
+        },
+        "security": {
+            "title": "Select a Web content zone to specify its security settings:",
+            "zones": [
+                "Internet — Medium. Blocks nothing, warns about everything.",
+                "Local intranet — Medium-low. It's just this computer, relax.",
+                "Trusted sites — momad-xp.local, and nowhere else.",
+                "Restricted sites — anything that autoplays sound."
+            ],
+            "note": "Security level for this zone: Medium. Custom Level... is disabled — you cannot be trusted."
+        },
+        "advanced": {
+            "title": "Settings:",
+            "settings": [
+                "Always send URLs as UTF-8 (requires restart)",
+                "Enable page transitions",
+                "Show friendly HTTP error messages",
+                "Play animations in web pages",
+                "Underline links: on hover",
+                "Reuse windows for launching shortcuts"
+            ],
+            "note": "Restore Defaults would undo years of careful tinkering."
+        }
     }
 }
