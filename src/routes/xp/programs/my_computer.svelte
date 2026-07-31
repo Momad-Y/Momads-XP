@@ -7,8 +7,10 @@
         runningPrograms,
         hardDrive,
         queueProgram,
+        selectingItems,
     } from '../../../lib/store';
     import { recycle_bin_id, icons } from '../../../lib/system';
+    import * as fs from '../../../lib/fs';
     import Menu from '../../../lib/components/xp/Menu.svelte';
     import RButton from '../../../lib/components/xp/RButton.svelte';
     import Viewer from './my_computer/viewer.svelte';
@@ -81,6 +83,19 @@
     ];
     let views_menu = false;
 
+    // File → Create Shortcut acts on the current selection (like XP), reusing
+    // the same fs.create_shortcut the right-click menu uses. Eligible = real
+    // fs items that live in a normal folder and aren't already shortcuts.
+    $: shortcut_targets = $selectingItems
+        .map((sid) => $hardDrive?.[sid])
+        .filter(
+            (it): it is VfsItem =>
+                it != null &&
+                it.parent != null &&
+                it.parent != recycle_bin_id &&
+                it.ext != '.lnk',
+        );
+
     $: menu = [
         {
             name: 'File',
@@ -88,7 +103,16 @@
                 [
                     {
                         name: 'Create Shortcut',
-                        disabled: true,
+                        // greyed until an eligible item is selected (XP-honest)
+                        disabled: shortcut_targets.length === 0,
+                        action: () => {
+                            for (const it of shortcut_targets) {
+                                fs.create_shortcut(
+                                    it.id,
+                                    required(it.parent, 'parent of ' + it.id),
+                                );
+                            }
+                        },
                     },
                 ],
                 [
