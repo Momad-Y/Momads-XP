@@ -305,7 +305,9 @@
         }
     }
 
-    function rename() {
+    // exported so the Explorer File menu can trigger it too (accessors={true});
+    // requires a selection — callers must gate on $selectingItems
+    export function rename() {
         renaming = true;
         void tick().then(() => {
             const item_id = required($selectingItems[0], 'renaming selection');

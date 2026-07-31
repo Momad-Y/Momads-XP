@@ -88,6 +88,42 @@ test('File menu > Create Shortcut works in Explorer once an item is selected', a
     ).toBeVisible({ timeout: 15000 });
 });
 
+test('Explorer File menu greys selection-only actions, like XP', async ({
+    page,
+}) => {
+    await openMyComputer(page);
+    const win = page.locator('#work-space .window').first();
+    await win.getByText('Local Disk (C:)').dblclick();
+    await win.locator('.dialog').getByText('OK').click();
+    await page.waitForTimeout(450);
+    await win.locator('.fs-item', { hasText: 'Experience' }).first().dblclick();
+    await page.waitForTimeout(450);
+
+    const row = (name: string) =>
+        win
+            .locator('p', { hasText: new RegExp(`^${name}$`) })
+            .first()
+            .locator('..');
+
+    await win.locator('.toolbar-menu').getByText('File').click();
+    // real XP greys the selection-driven verbs when nothing is selected
+    for (const name of ['Open', 'Create Shortcut', 'Delete', 'Rename']) {
+        await expect(row(name)).toHaveClass(/text-slate-400/);
+    }
+    // …while New/Properties/Close stay live
+    for (const name of ['New', 'Properties', 'Close']) {
+        await expect(row(name)).not.toHaveClass(/text-slate-400/);
+    }
+
+    // New ▸ opens its flyout and creates a real file
+    await win.locator('p', { hasText: /^New$/ }).first().hover();
+    await expect(win.getByText('Text Document')).toBeVisible();
+    await win.getByText('Text Document').click();
+    await expect(win.getByText('New Text Document.txt')).toBeVisible({
+        timeout: 15000,
+    });
+});
+
 test('IE Mail button opens Contact Me', async ({ page }) => {
     await bootToDesktop(page);
     await page

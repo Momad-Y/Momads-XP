@@ -74,9 +74,13 @@
                                         ? ''
                                         : 'hover:bg-blue-600'} relative group-sub"
                                     on:click={() => {
-                                        if (!item.disabled) {
+                                        // a submenu parent only opens on hover;
+                                        // clicking it must not close the menu
+                                        if (
+                                            !item.disabled &&
+                                            item.items == null
+                                        ) {
                                             hide();
-                                            console.log(active);
                                             void item.action?.();
                                         }
                                     }}
@@ -108,7 +112,69 @@
                                     >
                                         <p class="line-clamp-1">{item.name}</p>
                                     </div>
-                                    <div class="w-[10px]"></div>
+                                    <div class="w-[10px]">
+                                        {#if item.items != null}
+                                            <!-- XP's submenu arrow -->
+                                            <svg
+                                                class="w-[10px] h-[10px] {item.disabled
+                                                    ? 'fill-slate-400'
+                                                    : 'fill-slate-900 group-sub-hover:fill-slate-50'}"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                viewBox="0 0 256 512"
+                                                ><path
+                                                    d="M246.6 278.6c12.5-12.5 12.5-32.8 0-45.3l-128-128c-9.2-9.2-22.9-11.9-34.9-6.9s-19.8 16.6-19.8 29.6l0 256c0 12.9 7.8 24.6 19.8 29.6s25.7 2.2 34.9-6.9l128-128z"
+                                                /></svg
+                                            >
+                                        {/if}
+                                    </div>
+                                    {#if item.items != null && !item.disabled}
+                                        <!-- one level of flyout (XP's New ▸) -->
+                                        <div
+                                            class="absolute left-full top-0 py-0.5 hidden group-sub-hover:flex flex-col w-[190px] bg-slate-50 border border-slate-200 shadow"
+                                        >
+                                            {#each item.items.filter((el) => el != null) as sub_item (sub_item.name)}
+                                                <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+                                                <div
+                                                    class="py-1 w-full flex flex-row items-center group-sub1 {sub_item.disabled
+                                                        ? 'pointer-events-none'
+                                                        : 'hover:bg-blue-600'}"
+                                                    on:click|stopPropagation={() => {
+                                                        if (
+                                                            !sub_item.disabled
+                                                        ) {
+                                                            hide();
+                                                            void sub_item.action?.();
+                                                        }
+                                                    }}
+                                                >
+                                                    <div
+                                                        class="w-[20px] ml-1 shrink-0"
+                                                    >
+                                                        {#if sub_item.icon}
+                                                            <img
+                                                                class={sub_item.disabled
+                                                                    ? 'grayscale opacity-60'
+                                                                    : ''}
+                                                                src={sub_item.icon}
+                                                                width="17px"
+                                                                height="17px"
+                                                                alt=""
+                                                            />
+                                                        {/if}
+                                                    </div>
+                                                    <div
+                                                        class="grow text-[11px] {sub_item.disabled
+                                                            ? 'text-slate-400'
+                                                            : 'text-slate-900 group-sub1-hover:text-slate-50'}"
+                                                    >
+                                                        <p class="line-clamp-1">
+                                                            {sub_item.name}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            {/each}
+                                        </div>
+                                    {/if}
                                 </div>
                             {/each}
                         </div>
