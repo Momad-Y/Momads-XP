@@ -1,5 +1,6 @@
 <script lang="ts">
-    import { onMount, onDestroy, mount } from 'svelte';
+    import { onMount, onDestroy, mount, tick } from 'svelte';
+    import { get } from 'svelte/store';
     import Wallpaper from './wallpaper.svelte';
     import { queueProgram, runningPrograms } from '../../lib/store';
     import short from 'short-uuid';
@@ -29,9 +30,41 @@
 
     onDestroy(() => {});
 
+    /**
+     * XP's property sheets are single-instance: invoking Folder Options (etc.)
+     * again raises the open one rather than stacking a second copy with its own
+     * taskbar button (red-team M6).
+     */
+    const singleton_programs = [
+        './programs/system_properties.svelte',
+        './programs/folder_options.svelte',
+        './programs/internet_options.svelte',
+    ];
+
+    function focus_existing(path: string | undefined): boolean {
+        if (path == null || !singleton_programs.includes(path)) return false;
+        const open = get(runningPrograms).find(
+            (p) => p.options.exec_path === path,
+        );
+        if (open == null) return false;
+        // Deferred a tick: the click that re-invoked us also focuses the window
+        // it came from, and `Window.focus()` no-ops when it sees its own
+        // z-index already equal to the store's — so raising in the same tick
+        // leaves the two tied and the sheet buried.
+        void tick().then(() => {
+            open.window?.restore(); // restore() focuses too
+        });
+        return true;
+    }
+
     async function launch(program: ProgramLaunchRequest) {
         const { fs_item, exe_item, copying_obj, target_folder_id, path } =
             program;
+
+        if (focus_existing(path)) {
+            queueProgram.set(null);
+            return;
+        }
 
         if (path == './programs/my_computer.svelte') {
             const Program = (await import('./programs/my_computer.svelte'))

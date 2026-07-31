@@ -8,6 +8,8 @@
         hardDrive,
         queueProgram,
         selectingItems,
+        zIndex,
+        contextMenu,
     } from '../../../lib/store';
     import {
         recycle_bin_id,
@@ -15,6 +17,11 @@
         protected_items,
     } from '../../../lib/system';
     import * as fs from '../../../lib/fs';
+    import {
+        is_permanent_delete,
+        delete_prompt_icon,
+        delete_prompt_message,
+    } from '../../../lib/delete_prompt';
     import Dialog from '../../../lib/components/xp/Dialog.svelte';
     import Menu from '../../../lib/components/xp/Menu.svelte';
     import RButton from '../../../lib/components/xp/RButton.svelte';
@@ -77,6 +84,8 @@
     }
 
     export let viewer: ViewerController | undefined = undefined;
+    /** Ids the viewer is currently rendering (bound below). */
+    let viewer_visible_ids: string[] = [];
 
     // File view mode (§ View menu / Views toolbar dropdown)
     type ViewMode = 'Thumbnails' | 'Tiles' | 'Icons' | 'List' | 'Details';
@@ -92,7 +101,10 @@
 
     /** XP closes an open dropdown on Escape. */
     function on_keydown(event: KeyboardEvent) {
-        if (event.key === 'Escape' && views_menu) views_menu = false;
+        if (event.key !== 'Escape' || !views_menu) return;
+        if ($contextMenu != null) return;
+        if (window?.z_index !== $zIndex) return; // focused window only
+        views_menu = false;
     }
 
     // ── File menu ────────────────────────────────────────────
@@ -100,7 +112,13 @@
     // / Delete / Rename grey out together when nothing is selected, which is
     // what makes the greying read as contextual rather than broken. Actions
     // reuse the same fs calls as the right-click menu.
+    // `selectingItems` is ONE global store shared by the desktop and every
+    // Explorer window, so it must be filtered to the ids this window is
+    // actually showing. Without this, an Explorer sitting on C:\ would happily
+    // Delete/Rename/Shortcut an item selected on the desktop — which was a
+    // real, reproducible data-loss path (red-team CRITICAL).
     $: selected_items = $selectingItems
+        .filter((sid) => viewer_visible_ids.includes(sid))
         .map((sid) => $hardDrive?.[sid])
         .filter((it): it is VfsItem => it != null);
     $: single_selected = selected_items.length === 1 ? selected_items[0] : null;
@@ -120,9 +138,16 @@
         single_selected.parent != recycle_bin_id
             ? single_selected
             : null;
-    // "New ▸" targets the folder we're browsing (absent at the My Computer root)
+    // "New ▸" targets the folder we are browsing. Gate on the item actually
+    // being a container: Explorer must never create a child under a FILE node,
+    // which corrupted the persisted tree (red-team H1).
     $: new_parent =
-        current_history_id != null && current_history_id != recycle_bin_id
+        current_history_id != null &&
+        current_history_id != recycle_bin_id &&
+        current_history_item != null &&
+        (current_history_item.type === 'folder' ||
+            current_history_item.type === 'drive' ||
+            current_history_item.type === 'removable_storage')
             ? current_history_id
             : null;
     // Properties falls back to the folder itself, like XP
@@ -138,44 +163,47 @@
     }
 
     function delete_selected() {
-        const ids = deletable.map((it) => it.id);
-        const first = deletable[0];
+        const batch = [...deletable];
+        const first = batch[0];
         if (first == null) return;
-        const in_bin = first.parent == recycle_bin_id;
-        const filename =
-            first.name.length > 70
-                ? first.name.slice(0, 70) + '...'
-                : first.name;
-        const plural =
-            ids.length === 1
-                ? ''
-                : ids.length === 2
-                  ? ' and 1 other item'
-                  : ` and ${String(ids.length - 1)} other items`;
-        // Mounted here rather than reusing the right-click menu's helper: that
-        // helper lives in a .ts module, and exporting it would put an
-        // untestable dialog-mounting line under the diff-coverage gate.
-        // Component-level UI is E2E-owned by design (vitest.config.ts).
+        // Per ITEM, never per batch: collapsing this to one verdict is what
+        // permanently destroyed a live file when a batch spanned the Recycle
+        // Bin and the desktop (red-team CRITICAL). The prompt only claims
+        // permanence when every item is already binned.
+        const all_permanent = batch.every((it) =>
+            is_permanent_delete(it.parent, recycle_bin_id),
+        );
+        // Wording lives in src/lib/delete_prompt.ts (unit-tested).
         const dialog: MountedComponent = mount(Dialog, {
             target: window?.node_ref ?? document.body,
             props: {
                 title: 'Confirm Delete File',
-                icon: in_bin
-                    ? '/images/xp/icons/DeleteConfirmation.png'
-                    : '/images/xp/icons/RecycleBinempty.png',
-                message: in_bin
-                    ? `Do you want to permanently delete ${filename}${plural}? This action can't be undone?`
-                    : `Do you want to move ${filename}${plural} to the Recycle Bin?`,
+                icon: delete_prompt_icon(all_permanent),
+                message: delete_prompt_message(
+                    first.name,
+                    batch.length,
+                    all_permanent,
+                ),
                 get_self: () => dialog,
                 buttons: [
                     {
                         name: 'OK',
                         focus: true,
                         action: () => {
-                            for (const did of ids) {
-                                if (!in_bin)
-                                    fs.clone_fs(did, recycle_bin_id, null);
-                                fs.del_fs(did);
+                            for (const it of batch) {
+                                // re-check per item; a folder deleted earlier
+                                // in this loop may have taken a descendant
+                                // with it, so skip ids that are already gone
+                                if ($hardDrive?.[it.id] == null) continue;
+                                if (
+                                    !is_permanent_delete(
+                                        it.parent,
+                                        recycle_bin_id,
+                                    )
+                                ) {
+                                    fs.clone_fs(it.id, recycle_bin_id, null);
+                                }
+                                fs.del_fs(it.id);
                             }
                             void unmount(dialog);
                         },
@@ -290,8 +318,10 @@
                         name: 'Open',
                         disabled: single_selected == null,
                         action: () => {
+                            // viewer.open_item, NOT this component's navigate-only
+                            // open() — that sent Explorer *inside* files.
                             if (single_selected != null)
-                                open(single_selected.id);
+                                viewer?.open_item(single_selected.id);
                         },
                     },
                     {
@@ -602,7 +632,7 @@
         <div
             class="shrink-0 w-full border-b border-stone-300 flex flex-row items-center justify-between"
         >
-            <Menu {menu}></Menu>
+            <Menu {menu} focused={window?.z_index === $zIndex}></Menu>
             <div
                 class="w-[40px] h-full bg-slate-50 flex items-center justify-center"
             >
@@ -786,6 +816,7 @@
             <div class="grow relative bg-blue-100">
                 <Viewer
                     bind:this={viewer}
+                    bind:visible_ids={viewer_visible_ids}
                     id={history[page_index]}
                     {view_mode}
                     on:open={(e: CustomEvent<{ id: string | null }>) => {

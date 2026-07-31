@@ -106,6 +106,9 @@ test('Explorer File menu greys selection-only actions, like XP', async ({
             .locator('..');
 
     await win.locator('.toolbar-menu').getByText('File').click();
+    // The menu must actually be OPEN: toHaveClass does not imply visibility, so
+    // without this guard every assertion below passes with the menu shut.
+    await expect(row('Open')).toBeVisible();
     // real XP greys the selection-driven verbs when nothing is selected
     for (const name of ['Open', 'Create Shortcut', 'Delete', 'Rename']) {
         await expect(row(name)).toHaveClass(/text-slate-400/);

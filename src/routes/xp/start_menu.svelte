@@ -1,6 +1,6 @@
 <script lang="ts">
     import { mount } from 'svelte';
-    import { queueProgram } from '../../lib/store';
+    import { queueProgram, contextMenu } from '../../lib/store';
     import { profile } from '../../lib/profile';
     import * as utils from '../../lib/utils';
     import { required } from '../../lib/types';
@@ -184,6 +184,8 @@
     /** XP closes the Start menu on Escape. */
     function on_keydown(event: KeyboardEvent) {
         if (event.key !== 'Escape') return;
+        // a context menu sits above the Start menu and consumes Escape first
+        if ($contextMenu != null) return;
         const el = document.querySelector('#start-menu');
         if (el != null && !el.classList.contains('hidden')) hide();
     }

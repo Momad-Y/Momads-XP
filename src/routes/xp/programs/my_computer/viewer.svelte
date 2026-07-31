@@ -99,9 +99,24 @@
 
     let sorted_items: VfsItem[] | null;
     $: sorted_items = id ? null : null; //reset sorted_items every time id changes
-    $: if (id !== undefined) {
+    // Clear on EVERY navigation. The old `if (id !== undefined)` guard missed
+    // the My Computer root, whose id is literally `undefined`, so a one-hop
+    // Back left a phantom selection actionable (red-team H3).
+    $: clear_on_navigate(id);
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- the param exists purely so the reactive statement re-runs when `id` changes
+    function clear_on_navigate(_id: string | null | undefined) {
         $selectingItems = [];
     }
+
+    /**
+     * Ids this window is actually showing right now. The File menu filters the
+     * global `selectingItems` through this so it can never act on an item that
+     * lives in another window or on the desktop (red-team CRITICAL).
+     */
+    export let visible_ids: string[] = [];
+    $: visible_ids =
+        id == null ? computer.map((el) => el.id) : items.map((el) => el.id);
     const worker = new Worker(new URL('./sort.js', import.meta.url), {
         type: 'module',
     });
@@ -305,6 +320,16 @@
         }
     }
 
+    /**
+     * The File menu's Open. Routes through THIS function — the one that
+     * resolves .lnk targets, launches executables and dispatches doctypes —
+     * rather than my_computer's navigate-only `open()`, which used to send
+     * Explorer *inside* a file (red-team H1).
+     */
+    export function open_item(item_id: string) {
+        open(item_id);
+    }
+
     // exported so the Explorer File menu can trigger it too (accessors={true});
     // requires a selection — callers must gate on $selectingItems
     export function rename() {
@@ -322,7 +347,16 @@
         });
     }
 
+    let rename_cancelled = false;
+
     function end_renaming(e: Event, item: VfsItem) {
+        // Escape abandoned the edit: swallow the blur that tearing down the
+        // textarea triggers, so the typed value is never committed.
+        if (rename_cancelled) {
+            rename_cancelled = false;
+            renaming = false;
+            return;
+        }
         const target = e.target;
         if (!(target instanceof HTMLTextAreaElement)) return;
         const name = utils.sanitize_filename(target.value);
@@ -356,6 +390,17 @@
             $hardDrive[item_id].name = basename + item.ext;
         }
 
+        renaming = false;
+    }
+
+    /**
+     * XP's Escape during an inline rename ABANDONS the edit. Without this the
+     * textarea's blur handler committed whatever had been typed — and PR #81
+     * taught users that Escape dismisses things, making the muscle memory
+     * destructive on exactly this surface (red-team M1).
+     */
+    function cancel_renaming() {
+        rename_cancelled = true;
         renaming = false;
     }
 
@@ -574,6 +619,7 @@
                             autofocus
                             on:keydown={(e) => {
                                 if (e.key == 'Enter') end_renaming(e, item);
+                                else if (e.key == 'Escape') cancel_renaming();
                             }}
                             on:blur={(e) => {
                                 end_renaming(e, item);
