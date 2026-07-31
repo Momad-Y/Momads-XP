@@ -191,6 +191,16 @@ export interface MenuBarEntry {
     items?: MenuItem[][];
 }
 
+/**
+ * viewer.svelte's public API (`accessors={true}`), used by my_computer.svelte's
+ * File menu. Mirrors the WindowController pattern: an explicit interface rather
+ * than the component type, so calls are typed instead of `any`.
+ */
+export interface ViewerController {
+    rename: () => void;
+    renaming: boolean;
+}
+
 /** Originator for folder-scoped menus (Desktop, FSVoid): the folder's VFS id. */
 export interface FolderOriginator {
     id: string;

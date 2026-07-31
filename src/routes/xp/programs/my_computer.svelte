@@ -2,15 +2,20 @@
 
 <script lang="ts">
     import Window from '../../../lib/components/xp/Window.svelte';
-    import { unmount } from 'svelte';
+    import { unmount, mount } from 'svelte';
     import {
         runningPrograms,
         hardDrive,
         queueProgram,
         selectingItems,
     } from '../../../lib/store';
-    import { recycle_bin_id, icons } from '../../../lib/system';
+    import {
+        recycle_bin_id,
+        icons,
+        protected_items,
+    } from '../../../lib/system';
     import * as fs from '../../../lib/fs';
+    import Dialog from '../../../lib/components/xp/Dialog.svelte';
     import Menu from '../../../lib/components/xp/Menu.svelte';
     import RButton from '../../../lib/components/xp/RButton.svelte';
     import Viewer from './my_computer/viewer.svelte';
@@ -24,7 +29,9 @@
     import type {
         MenuBarEntry,
         ProgramInstance,
+        MountedComponent,
         VfsItem,
+        ViewerController,
         WindowController,
         WindowOptions,
     } from '../../../lib/types';
@@ -69,7 +76,7 @@
         }
     }
 
-    export let viewer: Viewer | undefined = undefined;
+    export let viewer: ViewerController | undefined = undefined;
 
     // File view mode (§ View menu / Views toolbar dropdown)
     type ViewMode = 'Thumbnails' | 'Tiles' | 'Icons' | 'List' | 'Details';
@@ -83,18 +90,183 @@
     ];
     let views_menu = false;
 
-    // File → Create Shortcut acts on the current selection (like XP), reusing
-    // the same fs.create_shortcut the right-click menu uses. Eligible = real
-    // fs items that live in a normal folder and aren't already shortcuts.
-    $: shortcut_targets = $selectingItems
+    // ── File menu ────────────────────────────────────────────
+    // Real XP's Explorer File menu is selection-driven: Open / Create Shortcut
+    // / Delete / Rename grey out together when nothing is selected, which is
+    // what makes the greying read as contextual rather than broken. Actions
+    // reuse the same fs calls as the right-click menu.
+    $: selected_items = $selectingItems
         .map((sid) => $hardDrive?.[sid])
-        .filter(
-            (it): it is VfsItem =>
-                it != null &&
-                it.parent != null &&
-                it.parent != recycle_bin_id &&
-                it.ext != '.lnk',
-        );
+        .filter((it): it is VfsItem => it != null);
+    $: single_selected = selected_items.length === 1 ? selected_items[0] : null;
+    // eligible for shortcutting: lives in a real folder, isn't already a .lnk
+    $: shortcut_targets = selected_items.filter(
+        (it) =>
+            it.parent != null &&
+            it.parent != recycle_bin_id &&
+            it.ext != '.lnk',
+    );
+    $: deletable = selected_items.filter(
+        (it) => !protected_items.includes(it.id),
+    );
+    $: renamable =
+        single_selected != null &&
+        !protected_items.includes(single_selected.id) &&
+        single_selected.parent != recycle_bin_id
+            ? single_selected
+            : null;
+    // "New ▸" targets the folder we're browsing (absent at the My Computer root)
+    $: new_parent =
+        current_history_id != null && current_history_id != recycle_bin_id
+            ? current_history_id
+            : null;
+    // Properties falls back to the folder itself, like XP
+    $: properties_target = single_selected ?? current_history_item;
+
+    function make_shortcuts() {
+        for (const it of shortcut_targets) {
+            fs.create_shortcut(
+                it.id,
+                required(it.parent, 'parent of ' + it.id),
+            );
+        }
+    }
+
+    function delete_selected() {
+        const ids = deletable.map((it) => it.id);
+        const first = deletable[0];
+        if (first == null) return;
+        const in_bin = first.parent == recycle_bin_id;
+        const filename =
+            first.name.length > 70
+                ? first.name.slice(0, 70) + '...'
+                : first.name;
+        const plural =
+            ids.length === 1
+                ? ''
+                : ids.length === 2
+                  ? ' and 1 other item'
+                  : ` and ${String(ids.length - 1)} other items`;
+        // Mounted here rather than reusing the right-click menu's helper: that
+        // helper lives in a .ts module, and exporting it would put an
+        // untestable dialog-mounting line under the diff-coverage gate.
+        // Component-level UI is E2E-owned by design (vitest.config.ts).
+        const dialog: MountedComponent = mount(Dialog, {
+            target: window?.node_ref ?? document.body,
+            props: {
+                title: 'Confirm Delete File',
+                icon: in_bin
+                    ? '/images/xp/icons/DeleteConfirmation.png'
+                    : '/images/xp/icons/RecycleBinempty.png',
+                message: in_bin
+                    ? `Do you want to permanently delete ${filename}${plural}? This action can't be undone?`
+                    : `Do you want to move ${filename}${plural} to the Recycle Bin?`,
+                get_self: () => dialog,
+                buttons: [
+                    {
+                        name: 'OK',
+                        focus: true,
+                        action: () => {
+                            for (const did of ids) {
+                                if (!in_bin)
+                                    fs.clone_fs(did, recycle_bin_id, null);
+                                fs.del_fs(did);
+                            }
+                            void unmount(dialog);
+                        },
+                    },
+                    {
+                        name: 'Cancel',
+                        action: () => {
+                            void unmount(dialog);
+                        },
+                    },
+                ],
+            },
+        });
+    }
+
+    function open_properties() {
+        const target = properties_target;
+        if (target == null) return;
+        queueProgram.set({
+            path:
+                target.type == 'drive' || target.type == 'removable_storage'
+                    ? './programs/disk_properties.svelte'
+                    : './programs/properties.svelte',
+            fs_item: target,
+        });
+    }
+
+    /** XP's File > New ▸ — same entries as the folder-background menu. */
+    $: new_submenu =
+        new_parent == null
+            ? []
+            : [
+                  {
+                      name: 'Folder',
+                      icon: '/images/xp/icons/FolderClosed.png',
+                      action: () => {
+                          void fs.new_fs_item(
+                              'folder',
+                              '',
+                              'New Folder',
+                              new_parent,
+                          );
+                      },
+                  },
+                  {
+                      name: 'Shortcut',
+                      icon: '/images/xp/icons/Shortcutoverlay.png',
+                      disabled: true,
+                  },
+                  {
+                      name: 'Briefcase',
+                      icon: '/images/xp/icons/Briefcase.png',
+                      disabled: true,
+                  },
+                  {
+                      name: 'Bitmap Image',
+                      icon: '/images/xp/icons/Bitmap.png',
+                      action: () => {
+                          void fs.new_fs_item(
+                              'file',
+                              '.bmp',
+                              'New Bitmap Image',
+                              new_parent,
+                          );
+                      },
+                  },
+                  {
+                      name: 'Text Document',
+                      icon: '/images/xp/icons/TXT.png',
+                      action: () => {
+                          void fs.new_fs_item(
+                              'file',
+                              '.txt',
+                              'New Text Document',
+                              new_parent,
+                          );
+                      },
+                  },
+                  {
+                      name: 'Wave Sound',
+                      icon: '/images/xp/icons/WMV.png',
+                      action: () => {
+                          void fs.new_fs_item(
+                              'file',
+                              '.wav',
+                              'New Sound',
+                              new_parent,
+                          );
+                      },
+                  },
+                  {
+                      name: 'Compressed (zipped) Folder',
+                      icon: '/images/xp/icons/Zipfolder.png',
+                      disabled: true,
+                  },
+              ];
 
     $: menu = [
         {
@@ -102,20 +274,53 @@
             items: [
                 [
                     {
-                        name: 'Create Shortcut',
-                        // greyed until an eligible item is selected (XP-honest)
-                        disabled: shortcut_targets.length === 0,
+                        name: 'Open',
+                        disabled: single_selected == null,
                         action: () => {
-                            for (const it of shortcut_targets) {
-                                fs.create_shortcut(
-                                    it.id,
-                                    required(it.parent, 'parent of ' + it.id),
-                                );
-                            }
+                            if (single_selected != null)
+                                open(single_selected.id);
+                        },
+                    },
+                    {
+                        // the Send To targets live on the right-click menu; XP
+                        // shows it here too, inert like our other stubs
+                        name: 'Send To',
+                        disabled: true,
+                        items: [],
+                    },
+                ],
+                [
+                    {
+                        name: 'New',
+                        disabled: new_submenu.length === 0,
+                        items: new_submenu,
+                    },
+                ],
+                [
+                    {
+                        name: 'Create Shortcut',
+                        disabled: shortcut_targets.length === 0,
+                        action: make_shortcuts,
+                    },
+                    {
+                        name: 'Delete',
+                        disabled: deletable.length === 0,
+                        action: delete_selected,
+                    },
+                    {
+                        name: 'Rename',
+                        disabled: renamable == null,
+                        action: () => {
+                            viewer?.rename();
                         },
                     },
                 ],
                 [
+                    {
+                        name: 'Properties',
+                        disabled: properties_target == null,
+                        action: open_properties,
+                    },
                     {
                         name: 'Close',
                         action: () => {
