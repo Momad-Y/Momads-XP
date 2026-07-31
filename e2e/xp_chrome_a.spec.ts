@@ -64,6 +64,30 @@ test('Create Shortcut makes a working .lnk that opens its target', async ({
     });
 });
 
+test('File menu > Create Shortcut works in Explorer once an item is selected', async ({
+    page,
+}) => {
+    await openMyComputer(page);
+    const win = page.locator('#work-space .window').first();
+    await win.getByText('Local Disk (C:)').dblclick();
+    await win.locator('.dialog').getByText('OK').click();
+    await page.waitForTimeout(450);
+    await win.locator('.fs-item', { hasText: 'Experience' }).first().dblclick();
+    await page.waitForTimeout(450);
+
+    // select an entry, then use the File menu (not the right-click menu)
+    const entry = win
+        .locator('.fs-item', { hasText: 'Printerpix — AI Engineer.txt' })
+        .first();
+    await entry.click();
+    await win.locator('.toolbar-menu').getByText('File').click();
+    await win.getByText('Create Shortcut', { exact: true }).click();
+
+    await expect(
+        win.getByText('Shortcut to Printerpix — AI Engineer.lnk'),
+    ).toBeVisible({ timeout: 15000 });
+});
+
 test('IE Mail button opens Contact Me', async ({ page }) => {
     await bootToDesktop(page);
     await page
