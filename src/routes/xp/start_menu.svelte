@@ -181,6 +181,13 @@
         clearTimeout(l3_timer);
     }
 
+    /** XP closes the Start menu on Escape. */
+    function on_keydown(event: KeyboardEvent) {
+        if (event.key !== 'Escape') return;
+        const el = document.querySelector('#start-menu');
+        if (el != null && !el.classList.contains('hidden')) hide();
+    }
+
     function launch(item: StartMenuItem) {
         console.log(item);
         const { path, fs_item, webapp, link } = item;
@@ -215,6 +222,8 @@
         hide();
     }
 </script>
+
+<svelte:window on:keydown={on_keydown} />
 
 <div
     id="start-menu"

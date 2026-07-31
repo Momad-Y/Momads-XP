@@ -90,6 +90,11 @@
     ];
     let views_menu = false;
 
+    /** XP closes an open dropdown on Escape. */
+    function on_keydown(event: KeyboardEvent) {
+        if (event.key === 'Escape' && views_menu) views_menu = false;
+    }
+
     // ── File menu ────────────────────────────────────────────
     // Real XP's Explorer File menu is selection-driven: Open / Create Shortcut
     // / Delete / Rename grey out together when nothing is selected, which is
@@ -586,6 +591,8 @@
         });
     }
 </script>
+
+<svelte:window on:keydown={on_keydown} />
 
 <Window {options} bind:this={window} on_click_close={destroy}>
     <div
