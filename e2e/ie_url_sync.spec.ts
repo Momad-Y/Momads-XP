@@ -70,6 +70,13 @@ test('View > Source opens the page markup in a Notepad window', async ({
     // a Notepad-style window carrying the raw markup
     const notepad = page.locator('#work-space .window').last();
     await expect(notepad.getByText('Word Wrap')).toBeHidden(); // menu closed
+    // it must be the source of the page we are ON. Asserting only on "<!doctype"
+    // would pass for any page: a late "I've navigated" message from the slow
+    // homepage once overwrote the address bar, and View > Source then showed
+    // wiby's markup instead of this page's.
+    await expect(notepad).toContainText('help.html - Notepad', {
+        timeout: 15000,
+    });
     await expect(notepad).toContainText('<!doctype html', { timeout: 15000 });
     // …and none of the proxy's injected machinery
     await expect(notepad).not.toContainText('__momadxp');
