@@ -33,13 +33,16 @@ test('SECURITY: only app-owned pages get allow-same-origin', async ({
     const addr = ie.locator('input').first();
     const frame = ie.locator('iframe');
 
-    // an external site must never be able to script our origin
+    // an external site must never be able to script our origin.
+    // click before typing: fill() focuses without dispatching a click
+    await addr.click();
     await addr.fill('https://example.com/');
     await addr.press('Enter');
     await page.waitForTimeout(1200);
     await expect(frame).not.toHaveAttribute('sandbox', /allow-same-origin/, {});
 
     // …while our own page may be read (that is what restores title/URL sync)
+    await addr.click();
     await addr.fill('/help.html');
     await addr.press('Enter');
     await page.waitForTimeout(1200);
@@ -51,6 +54,7 @@ test('the address bar and Create Shortcut follow chrome navigation', async ({
 }) => {
     const ie = await openIE(page);
     const addr = ie.locator('input').first();
+    await addr.click();
     await addr.fill('/help.html');
     await addr.press('Enter');
     await page.waitForTimeout(1200);

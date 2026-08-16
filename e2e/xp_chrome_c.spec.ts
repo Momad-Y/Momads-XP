@@ -31,6 +31,9 @@ test('Search button finds files by name', async ({ page }) => {
     const win = page.locator('#work-space .window').first();
     await win.getByText('Search', { exact: true }).click();
 
+    // click before typing: fill() focuses without dispatching a click, so it
+    // can drive a path no user can reach (see e2e/favorites.spec.ts)
+    await win.getByPlaceholder('All or part of a name').click();
     await win.getByPlaceholder('All or part of a name').fill('Resume');
     // the panel's own Search button (last match; toolbar button is first)
     await win.getByText('Search', { exact: true }).last().click();
@@ -38,6 +41,7 @@ test('Search button finds files by name', async ({ page }) => {
     await expect(win.getByText('Mohamed_Abdelnasser_Resume.pdf')).toBeVisible();
 
     // a nonsense query yields the empty state
+    await win.getByPlaceholder('All or part of a name').click();
     await win.getByPlaceholder('All or part of a name').fill('zzzznope');
     await win.getByText('Search', { exact: true }).last().click();
     await expect(win.getByText('No items match your search.')).toBeVisible();

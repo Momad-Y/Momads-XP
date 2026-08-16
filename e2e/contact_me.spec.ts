@@ -45,10 +45,15 @@ test('successful send shows the success dialog (mocked API)', async ({
     await bootToDesktop(page);
     await page.locator('#work-space p', { hasText: 'Contact Me' }).dblclick();
     const win = page.locator('#work-space .window').first();
+    // click each field before typing: fill() focuses WITHOUT dispatching a
+    // click, which can drive a path no real user can take
+    await win.getByPlaceholder('Your email address').click();
     await win
         .getByPlaceholder('Your email address')
         .fill('visitor@example.com');
+    await win.getByPlaceholder('Subject of your message').click();
     await win.getByPlaceholder('Subject of your message').fill('Hello');
+    await win.getByPlaceholder('Write your message here').click();
     await win.getByPlaceholder('Write your message here').fill('Great site!');
     // no artificial wait: min-fill-time is server-only and the API is mocked
     await win.getByText('Send Message', { exact: true }).last().click();
