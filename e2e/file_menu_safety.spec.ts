@@ -85,6 +85,10 @@ test('Escape cancels an inline rename instead of committing it', async ({
     await page.locator('.context-menu').getByText('Rename').click();
     const box = win.locator('textarea');
     await expect(box).toBeVisible();
+    // click before typing: fill() focuses without dispatching a click, so it
+    // would not notice the editor being torn down by the row underneath it
+    await box.click();
+    await expect(box).toBeVisible();
     await box.fill('ESCAPED_NAME');
     await page.keyboard.press('Escape');
     await page.waitForTimeout(300);
