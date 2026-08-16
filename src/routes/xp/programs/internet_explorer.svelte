@@ -8,6 +8,7 @@
         add_favorite,
         remove_favorite,
         is_shell_favorite,
+        favorite_icon,
     } from '../../../lib/favorites';
     import {
         runningPrograms,
@@ -455,9 +456,7 @@
                 ...$favorites.map((fav) => [
                     {
                         name: fav.name,
-                        icon: is_shell_favorite(fav)
-                            ? '/images/xp/icons/FolderClosed.png'
-                            : '/images/xp/icons/URL.png',
+                        icon: favorite_icon(fav, $hardDrive),
                         action: () => {
                             // Shell favourites belong to Explorer, not IE. A
                             // folder opens directly; a FILE opens the folder

@@ -6,6 +6,8 @@
  */
 import { writable } from 'svelte/store';
 import { profile } from './profile';
+import { doctypes } from './system';
+import type { HardDrive } from './types';
 
 export interface Favorite {
     name: string;
@@ -27,6 +29,31 @@ export interface Favorite {
 /** A favourite that points into the file system rather than at a web page. */
 export function is_shell_favorite(fav: Favorite): boolean {
     return typeof fav.fs_id === 'string' && fav.fs_id !== '';
+}
+
+/**
+ * The icon a favourite should show, resolved from the live drive so a FILE
+ * gets its own icon rather than a folder glyph. Shared by the Explorer menu,
+ * the IE menu and the Organize dialog — they previously each hardcoded this
+ * and drifted apart.
+ */
+export function favorite_icon(
+    fav: Favorite,
+    drive: HardDrive | null | undefined,
+): string {
+    if (!is_shell_favorite(fav) || fav.fs_id == null) {
+        return '/images/xp/icons/URL.png';
+    }
+    const item = drive?.[fav.fs_id];
+    if (item?.icon != null && item.icon !== '') return item.icon;
+    if (item?.type === 'file') {
+        // fall back to the extension's registered handler icon
+        const handlers = doctypes[item.ext.toLowerCase()];
+        const handler_icon = handlers?.[0]?.icon;
+        if (handler_icon != null && handler_icon !== '') return handler_icon;
+        return '/images/xp/icons/Default.png';
+    }
+    return '/images/xp/icons/FolderClosed.png';
 }
 
 const STORAGE_KEY = 'xp_favorites';

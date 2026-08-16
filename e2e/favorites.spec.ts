@@ -135,6 +135,13 @@ test('a selected FILE can be favourited, and opens in its program', async ({
     // choosing it launches the file rather than navigating the folder
     const before = await page.locator('#work-space .window').count();
     await favMenu(win).click();
+    // a file favourite must show a FILE icon, never the folder glyph
+    const icons = await win
+        .locator('img')
+        .evaluateAll((els) =>
+            els.map((e) => (e as HTMLImageElement).getAttribute('src') ?? ''),
+        );
+    expect(icons.some((src) => src.includes('TXT'))).toBe(true);
     await win
         .locator('p', { hasText: /^Printerpix — AI Engineer$/ })
         .first()
