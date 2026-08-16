@@ -301,7 +301,6 @@
         if (renaming) return;
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- defensive guard kept from the base (id is a const today)
         if (id == null) return;
-        console.log('keyevent in desktop_folder');
 
         if (!(e.ctrlKey || e.metaKey)) return;
         if (e.key == 'c') {

@@ -117,9 +117,7 @@
                   ],
               ];
 
-    onMount(() => {
-        console.log(fs_item);
-    });
+    onMount(() => {});
 
     export function destroy() {
         runningPrograms.update((programs) =>

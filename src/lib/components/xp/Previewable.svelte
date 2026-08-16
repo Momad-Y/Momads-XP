@@ -27,7 +27,6 @@
     };
 
     async function load_preview() {
-        console.log(preview_url);
         if (preview_url != null) return;
         if (fs_id == null) return;
         const url = await fs.get_url(fs_id);

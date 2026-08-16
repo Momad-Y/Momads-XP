@@ -131,7 +131,6 @@
             curr_item.parent,
             'parent of ' + curr_item.id,
         );
-        console.log($hardDrive?.[parent_id]);
         const siblings = drive_item(parent_id).children.filter((child_id) =>
             supported_exts.includes(drive_item(child_id).ext),
         );

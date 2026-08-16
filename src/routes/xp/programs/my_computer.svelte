@@ -533,7 +533,6 @@
             if (id == null) {
                 id = finder.to_id_nocase(target.value);
             }
-            console.log('found id', id);
             if (id) {
                 open(id);
                 target.blur();
@@ -561,8 +560,6 @@
 
     export function open(fs_id: string | null | undefined) {
         if (fs_id == history[page_index]) return;
-        console.log('open', fs_id);
-        console.log(fs_id == null ? undefined : $hardDrive?.[fs_id]);
         history = [...history.slice(0, page_index + 1), fs_id];
         page_index = history.length - 1;
     }

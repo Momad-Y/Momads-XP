@@ -285,7 +285,6 @@
             iframe.style.inset = '0';
             iframe.src = url;
             iframe.onload = () => {
-                console.log('loaded ', url);
                 iframe.remove();
             };
             parent.appendChild(iframe);

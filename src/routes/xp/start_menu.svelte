@@ -191,7 +191,6 @@
     }
 
     function launch(item: StartMenuItem) {
-        console.log(item);
         const { path, fs_item, webapp, link } = item;
         if (link) {
             open_link(link);

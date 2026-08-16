@@ -17,7 +17,6 @@
     function on_click_expand() {
         cal_dropbox_pos();
         expand = true;
-        console.log({ expand });
     }
 
     function cal_dropbox_pos() {

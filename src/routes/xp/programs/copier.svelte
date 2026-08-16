@@ -50,9 +50,7 @@
 
     onMount(async () => {
         if (copying_obj && target_folder_id) {
-            console.log(copying_obj);
             for (const key of Object.keys(copying_obj)) {
-                console.log(key);
                 await save_to_disk(
                     required(copying_obj[key], 'copy entry ' + key),
                     target_folder_id,

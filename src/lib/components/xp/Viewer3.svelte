@@ -88,7 +88,6 @@
             if (id == null) {
                 id = finder.to_id_nocase(target.value);
             }
-            console.log('found id', id);
             if (id) {
                 open(id);
                 target.blur();

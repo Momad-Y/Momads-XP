@@ -43,7 +43,6 @@
 
         const selected = selectingItems.includes(item.id);
         if ((ev.ctrlKey || ev.metaKey) && multiple) {
-            console.log('ctrl key pressed');
             if (selected) {
                 selectingItems = selectingItems.filter((el) => el != item.id);
             } else {
@@ -55,8 +54,6 @@
     }
 
     function clear_selection() {
-        console.log(selectingItems);
-        console.log('clear_selection');
         selectingItems = [];
     }
 
@@ -111,7 +108,6 @@
             if (id == null) {
                 id = finder.to_id_nocase(target.value);
             }
-            console.log('found id', id);
             if (id) {
                 open(id);
                 target.blur();

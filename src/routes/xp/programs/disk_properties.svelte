@@ -53,7 +53,6 @@
     details.free_space = details.capacity - details.used_space;
 
     onMount(() => {
-        console.log(fs_item);
         draw_chart();
     });
 
