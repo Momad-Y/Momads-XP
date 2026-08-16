@@ -205,7 +205,14 @@
      * cross-origin regardless, so the flag would buy nothing.
      */
     $: iframe_sandbox =
-        real_url != null && real_url.startsWith('/')
+        real_url != null &&
+        real_url.startsWith('/') &&
+        // CRITICAL: /api/browse serves EXTERNAL pages from our own path. It
+        // must never be treated as app-owned — granting it same-origin would
+        // hand any website on the internet our localStorage and the whole VFS.
+        // Proxied pages stay on an opaque origin and report navigation over
+        // postMessage instead.
+        !real_url.startsWith('/api/browse')
             ? 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-same-origin'
             : 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox';
 
@@ -306,7 +313,46 @@
             );
             return URL.createObjectURL(file);
         }
+        // External pages go through our proxy so the frame is served from our
+        // origin with a navigation reporter injected — that is what lets the
+        // address bar, history, shortcuts and favourites follow the user.
+        // The frame is still sandboxed WITHOUT allow-same-origin, so the page
+        // runs on an opaque origin and cannot touch our storage.
+        if (
+            target_url.startsWith('http://') ||
+            target_url.startsWith('https://')
+        ) {
+            return `/api/browse?url=${encodeURIComponent(target_url)}`;
+        }
         return target_url;
+    }
+
+    /**
+     * Navigation reported by the proxy's injected script. The page is untrusted,
+     * so only http(s) URLs of sane length are accepted, and only from our own
+     * frame.
+     */
+    function on_frame_message(event: MessageEvent) {
+        if (iframe?.contentWindow == null) return;
+        if (event.source !== iframe.contentWindow) return;
+        const data: unknown = event.data;
+        if (typeof data !== 'object' || data === null) return;
+        if (!('__momadxp' in data) || data.__momadxp !== 1) return;
+        if (!('url' in data) || !('type' in data)) return;
+        const reported: unknown = data.url;
+        const kind: unknown = data.type;
+        if (typeof reported !== 'string' || reported.length > 2048) return;
+        if (!/^https?:\/\//i.test(reported)) return;
+
+        if (kind === 'navigate') {
+            void load_page(reported); // the user clicked a link inside the page
+        } else if (kind === 'navigated' && reported !== address_text) {
+            // the page landed somewhere (redirect) — record it without
+            // re-fetching
+            nav_history = [...nav_history.slice(0, page_index + 1), reported];
+            page_index = nav_history.length - 1;
+            address_text = reported;
+        }
     }
 
     export function destroy() {
@@ -431,7 +477,7 @@
     ];
 </script>
 
-<svelte:window on:keydown={on_keydown} />
+<svelte:window on:keydown={on_keydown} on:message={on_frame_message} />
 
 <Window {options} bind:this={window} on_click_close={destroy}>
     <div
