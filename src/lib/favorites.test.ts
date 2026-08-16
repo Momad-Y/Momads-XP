@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { get } from 'svelte/store';
+import type { HardDrive, VfsItem } from './types';
 
 // Deterministic localStorage for the module under test.
 const store = new Map<string, string>();
@@ -95,6 +96,61 @@ describe('favorites store', () => {
         const count = get(mod.favorites).length;
         mod.add_favorite({ name: 'Work2', url: 'C:\\Moved', fs_id: 'abc123' });
         expect(get(mod.favorites).length).toBe(count);
+    });
+
+    it('favorite_icon shows a file its own icon, not a folder glyph', () => {
+        const item = (
+            id: string,
+            type: VfsItem['type'],
+            ext: string,
+            icon?: string,
+        ): VfsItem => ({
+            id,
+            type,
+            name: id + ext,
+            basename: id,
+            ext,
+            children: [],
+            date_created: 0,
+            date_modified: 0,
+            sort_option: 0,
+            sort_order: 0,
+            ...(icon != null ? { icon } : {}),
+        });
+        const drive: HardDrive = {
+            folder1: item('folder1', 'folder', ''),
+            file1: item('file1', 'file', '.txt', '/images/xp/icons/TXT.png'),
+            file2: item('file2', 'file', '.txt'),
+        };
+
+        // a web favourite keeps the URL icon
+        expect(
+            mod.favorite_icon({ name: 'g', url: 'https://e.com' }, drive),
+        ).toContain('URL');
+        // a folder gets the folder glyph
+        expect(
+            mod.favorite_icon(
+                { name: 'w', url: 'C:\\Work', fs_id: 'folder1' },
+                drive,
+            ),
+        ).toContain('FolderClosed');
+        // a file with its own icon uses it — this is the reported bug
+        expect(
+            mod.favorite_icon({ name: 'a', url: 'x', fs_id: 'file1' }, drive),
+        ).toBe('/images/xp/icons/TXT.png');
+        // a file with no icon falls back to its doctype handler, never a folder
+        const fallback = mod.favorite_icon(
+            { name: 'b', url: 'x', fs_id: 'file2' },
+            drive,
+        );
+        expect(fallback).not.toContain('FolderClosed');
+        // an unknown id must not crash
+        expect(
+            mod.favorite_icon({ name: 'z', url: 'x', fs_id: 'nope' }, drive),
+        ).toContain('FolderClosed');
+        expect(
+            mod.favorite_icon({ name: 'z', url: 'x', fs_id: 'file1' }, null),
+        ).toBeTruthy();
     });
 
     it('is_favorite validates shape', () => {

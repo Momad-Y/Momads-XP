@@ -4,13 +4,18 @@
     import Window from '../../../lib/components/xp/Window.svelte';
     import Button from '../../../lib/components/xp/Button.svelte';
     import { unmount } from 'svelte';
-    import { runningPrograms, zIndex, contextMenu } from '../../../lib/store';
+    import {
+        runningPrograms,
+        zIndex,
+        contextMenu,
+        hardDrive,
+    } from '../../../lib/store';
     import {
         favorites,
         remove_favorite,
         rename_favorite,
         move_favorite,
-        is_shell_favorite,
+        favorite_icon,
     } from '../../../lib/favorites';
     import { required } from '../../../lib/types';
     import type {
@@ -111,9 +116,7 @@
                         }}
                     >
                         <img
-                            src={is_shell_favorite(fav)
-                                ? '/images/xp/icons/FolderClosed.png'
-                                : '/images/xp/icons/URL.png'}
+                            src={favorite_icon(fav, $hardDrive)}
                             alt=""
                             class="w-4 h-4 shrink-0"
                         />

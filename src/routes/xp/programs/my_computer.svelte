@@ -28,7 +28,7 @@
     import Viewer from './my_computer/viewer.svelte';
     import * as finder from '../../../lib/finder';
     import * as utils from '../../../lib/utils';
-    import { favorites } from '../../../lib/favorites';
+    import { favorites, favorite_icon } from '../../../lib/favorites';
     import Sidebar from './my_computer/sidebar.svelte';
     import SearchPanel from './my_computer/search_panel.svelte';
     import FoldersTree from './my_computer/folders_tree.svelte';
@@ -159,18 +159,6 @@
      * the same as double-clicking would.
      */
     $: favorite_target = single_selected ?? current_history_item;
-
-    /** A shell favourite shows its item's real icon; a web one shows the URL icon. */
-    function favorite_icon(fav: { fs_id?: string }): string {
-        if (fav.fs_id == null || fav.fs_id === '') {
-            return '/images/xp/icons/URL.png';
-        }
-        const item = $hardDrive?.[fav.fs_id];
-        if (item?.icon != null && item.icon !== '') return item.icon;
-        return item?.type === 'file'
-            ? '/images/xp/icons/Default.png'
-            : '/images/xp/icons/FolderClosed.png';
-    }
 
     function make_shortcuts() {
         for (const it of shortcut_targets) {
@@ -464,7 +452,7 @@
                 ],
                 $favorites.map((fav) => ({
                     name: fav.name,
-                    icon: favorite_icon(fav),
+                    icon: favorite_icon(fav, $hardDrive),
                     action: () => {
                         // A shell favourite goes through the viewer's opener,
                         // which navigates folders and launches files in their
