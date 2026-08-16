@@ -49,6 +49,27 @@ test('SECURITY: only app-owned pages get allow-same-origin', async ({
     await expect(frame).toHaveAttribute('sandbox', /allow-same-origin/);
 });
 
+test('View > Source opens the page markup in a Notepad window', async ({
+    page,
+}) => {
+    const ie = await openIE(page);
+    const addr = ie.locator('input').first();
+    await addr.click();
+    await addr.fill('/help.html');
+    await addr.press('Enter');
+    await page.waitForTimeout(1500);
+
+    await ie.getByText('View', { exact: true }).click();
+    await ie.getByText('Source', { exact: true }).click();
+
+    // a Notepad-style window carrying the raw markup
+    const notepad = page.locator('#work-space .window').last();
+    await expect(notepad.getByText('Word Wrap')).toBeHidden(); // menu closed
+    await expect(notepad).toContainText('<!doctype html', { timeout: 15000 });
+    // …and none of the proxy's injected machinery
+    await expect(notepad).not.toContainText('__momadxp');
+});
+
 test('the address bar and Create Shortcut follow chrome navigation', async ({
     page,
 }) => {

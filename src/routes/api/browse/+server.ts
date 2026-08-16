@@ -102,6 +102,10 @@ export const GET: RequestHandler = async (event) => {
     }
     clearTimeout(timer);
 
+    // `raw=1` backs IE's View Source: it must show the page as the server sent
+    // it, NOT the rewritten copy with our base tag and reporter injected.
+    const raw = event.url.searchParams.get('raw') === '1';
+
     const content_type = upstream.headers.get('content-type') ?? '';
     // Anything that is not a document is served by the real origin via <base>,
     // so a non-HTML response here means the user navigated straight to an
@@ -118,6 +122,19 @@ export const GET: RequestHandler = async (event) => {
         error(413, 'too_large');
     }
     const html = new TextDecoder('utf-8').decode(buffer);
+
+    if (raw) {
+        // text/plain + nosniff: the source is displayed, never executed.
+        return new Response(html, {
+            status: upstream.status,
+            headers: {
+                'content-type': 'text/plain; charset=utf-8',
+                'x-content-type-options': 'nosniff',
+                'cache-control': 'public, max-age=300',
+                'x-robots-tag': 'noindex, nofollow',
+            },
+        });
+    }
     // `upstream.url` reflects redirects, so the reporter announces where the
     // user actually landed rather than where they aimed.
     const body = rewrite_document(html, upstream.url || target);
