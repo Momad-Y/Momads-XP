@@ -62,6 +62,41 @@ describe('favorites store', () => {
         expect(Array.isArray(persisted)).toBe(true);
     });
 
+    it('rename_favorite renames by index and ignores blanks', () => {
+        mod.rename_favorite(0, '  Renamed  ');
+        expect(get(mod.favorites)[0]?.name).toBe('Renamed');
+        mod.rename_favorite(0, '   ');
+        expect(get(mod.favorites)[0]?.name).toBe('Renamed');
+    });
+
+    it('move_favorite reorders and clamps at the ends', () => {
+        const names = () => get(mod.favorites).map((f) => f.name);
+        const before = names();
+        mod.move_favorite(0, 1);
+        expect(names()[0]).toBe(before[1]);
+        expect(names()[1]).toBe(before[0]);
+        // out of range is a no-op rather than a crash
+        const now = names();
+        mod.move_favorite(0, -1);
+        mod.move_favorite(now.length - 1, 1);
+        mod.move_favorite(99, 1);
+        expect(names()).toEqual(now);
+    });
+
+    it('folder favourites are identified by fs_id, not url', () => {
+        const folder = { name: 'Work', url: 'C:\\Experience', fs_id: 'abc123' };
+        mod.add_favorite(folder);
+        expect(get(mod.favorites).some((f) => f.fs_id === 'abc123')).toBe(true);
+        expect(mod.is_folder_favorite(folder)).toBe(true);
+        expect(
+            mod.is_folder_favorite({ name: 'x', url: 'https://e.com' }),
+        ).toBe(false);
+        // same id under a different display path must not duplicate
+        const count = get(mod.favorites).length;
+        mod.add_favorite({ name: 'Work2', url: 'C:\\Moved', fs_id: 'abc123' });
+        expect(get(mod.favorites).length).toBe(count);
+    });
+
     it('is_favorite validates shape', () => {
         expect(mod.is_favorite({ name: 'a', url: 'b' })).toBe(true);
         expect(mod.is_favorite({ name: 'a' })).toBe(false);

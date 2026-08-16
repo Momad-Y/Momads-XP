@@ -39,6 +39,7 @@
         './programs/system_properties.svelte',
         './programs/folder_options.svelte',
         './programs/internet_options.svelte',
+        './programs/organize_favorites.svelte',
     ];
 
     function focus_existing(path: string | undefined): boolean {
@@ -221,6 +222,38 @@
                 },
             });
 
+            //add to program tray
+            runningPrograms.update((values) => {
+                return [...values, program];
+            });
+        } else if (path == './programs/organize_favorites.svelte') {
+            const Program = (
+                await import('./programs/organize_favorites.svelte')
+            ).default;
+            const program: ProgramInstance = mount(Program, {
+                target: node_ref,
+                props: {
+                    id: short.generate(),
+                    exec_path: path,
+                    get_self: () => program,
+                },
+            });
+            //add to program tray
+            runningPrograms.update((values) => {
+                return [...values, program];
+            });
+        } else if (path == './programs/add_to_favorites.svelte') {
+            const Program = (await import('./programs/add_to_favorites.svelte'))
+                .default;
+            const program: ProgramInstance = mount(Program, {
+                target: node_ref,
+                props: {
+                    id: short.generate(),
+                    fs_item,
+                    exec_path: path,
+                    get_self: () => program,
+                },
+            });
             //add to program tray
             runningPrograms.update((values) => {
                 return [...values, program];
