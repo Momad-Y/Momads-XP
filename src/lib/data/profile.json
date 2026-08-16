@@ -306,7 +306,7 @@
             "note": "Drivers are up to date. The Impostor Syndrome Suppressor has been flagged since 2019; we're coping."
         },
         "advanced": {
-            "intro": "You must be logged on as an Administrator to make most of these changes. You are — obviously.",
+            "intro": "You must be logged on as an Administrator to make most of these changes. You are not — obviously.",
             "sections": [
                 {
                     "title": "Performance",
