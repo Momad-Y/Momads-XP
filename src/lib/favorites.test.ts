@@ -87,10 +87,10 @@ describe('favorites store', () => {
         const folder = { name: 'Work', url: 'C:\\Experience', fs_id: 'abc123' };
         mod.add_favorite(folder);
         expect(get(mod.favorites).some((f) => f.fs_id === 'abc123')).toBe(true);
-        expect(mod.is_folder_favorite(folder)).toBe(true);
-        expect(
-            mod.is_folder_favorite({ name: 'x', url: 'https://e.com' }),
-        ).toBe(false);
+        expect(mod.is_shell_favorite(folder)).toBe(true);
+        expect(mod.is_shell_favorite({ name: 'x', url: 'https://e.com' })).toBe(
+            false,
+        );
         // same id under a different display path must not duplicate
         const count = get(mod.favorites).length;
         mod.add_favorite({ name: 'Work2', url: 'C:\\Moved', fs_id: 'abc123' });

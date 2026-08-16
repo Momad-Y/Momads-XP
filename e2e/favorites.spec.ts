@@ -107,6 +107,47 @@ test('a SELECTED folder is what gets favourited, not just the open one', async (
     await expect(dialog.locator('input').first()).toHaveValue('Experience');
 });
 
+test('a selected FILE can be favourited, and opens in its program', async ({
+    page,
+}) => {
+    const win = await openExperience(page);
+
+    await win
+        .locator('.fs-item', { hasText: 'Printerpix — AI Engineer.txt' })
+        .first()
+        .click();
+    await page.waitForTimeout(250);
+    await favMenu(win).click();
+    await win.getByText('Add to Favorites...', { exact: true }).click();
+
+    const dialog = page
+        .locator('#work-space .window')
+        .filter({ hasText: 'to your Favorites' })
+        .last();
+    await expect(dialog.getByText(/this file/)).toBeVisible();
+    // the basename is offered, so a rename does not drag ".txt" along
+    await expect(dialog.locator('input').first()).toHaveValue(
+        'Printerpix — AI Engineer',
+    );
+    await dialog.getByText('OK', { exact: true }).click();
+    await page.waitForTimeout(500);
+
+    // choosing it launches the file rather than navigating the folder
+    const before = await page.locator('#work-space .window').count();
+    await favMenu(win).click();
+    await win
+        .locator('p', { hasText: /^Printerpix — AI Engineer$/ })
+        .first()
+        .click();
+    await page.waitForTimeout(1500);
+    expect(await page.locator('#work-space .window').count()).toBe(before + 1);
+    // assert against the NEW window: a bare getByText('AI Engineer').first()
+    // matches the (now hidden) favourites menu entry instead
+    await expect(page.locator('#work-space .window').last()).toContainText(
+        'AI Engineer',
+    );
+});
+
 test('a folder favourite is shared with IE and opens Explorer, not a web page', async ({
     page,
 }) => {

@@ -28,7 +28,7 @@
     import Viewer from './my_computer/viewer.svelte';
     import * as finder from '../../../lib/finder';
     import * as utils from '../../../lib/utils';
-    import { favorites, is_folder_favorite } from '../../../lib/favorites';
+    import { favorites } from '../../../lib/favorites';
     import Sidebar from './my_computer/sidebar.svelte';
     import SearchPanel from './my_computer/search_panel.svelte';
     import FoldersTree from './my_computer/folders_tree.svelte';
@@ -153,18 +153,24 @@
     // Properties falls back to the folder itself, like XP
     $: properties_target = single_selected ?? current_history_item;
     /**
-     * Add to Favorites targets a SELECTED folder when there is one — that is
-     * what a user means after clicking a folder — and otherwise the folder the
-     * window is showing, which is XP's default. Files are not favouritable, so
-     * a selected file falls through to the current folder.
+     * Add to Favorites targets whatever is SELECTED — a file just as much as a
+     * folder — and otherwise the folder the window is showing, which is XP's
+     * default. Opening a file favourite launches it in its associated program,
+     * the same as double-clicking would.
      */
-    $: favorite_target =
-        single_selected != null &&
-        (single_selected.type === 'folder' ||
-            single_selected.type === 'drive' ||
-            single_selected.type === 'removable_storage')
-            ? single_selected
-            : current_history_item;
+    $: favorite_target = single_selected ?? current_history_item;
+
+    /** A shell favourite shows its item's real icon; a web one shows the URL icon. */
+    function favorite_icon(fav: { fs_id?: string }): string {
+        if (fav.fs_id == null || fav.fs_id === '') {
+            return '/images/xp/icons/URL.png';
+        }
+        const item = $hardDrive?.[fav.fs_id];
+        if (item?.icon != null && item.icon !== '') return item.icon;
+        return item?.type === 'file'
+            ? '/images/xp/icons/Default.png'
+            : '/images/xp/icons/FolderClosed.png';
+    }
 
     function make_shortcuts() {
         for (const it of shortcut_targets) {
@@ -458,14 +464,14 @@
                 ],
                 $favorites.map((fav) => ({
                     name: fav.name,
-                    icon: is_folder_favorite(fav)
-                        ? '/images/xp/icons/FolderClosed.png'
-                        : '/images/xp/icons/URL.png',
+                    icon: favorite_icon(fav),
                     action: () => {
-                        // a folder favourite navigates THIS window; a web one
-                        // still hands off to IE
+                        // A shell favourite goes through the viewer's opener,
+                        // which navigates folders and launches files in their
+                        // associated program — the same as double-clicking.
+                        // Web favourites still hand off to IE.
                         if (fav.fs_id != null && fav.fs_id !== '') {
-                            open(fav.fs_id);
+                            viewer?.open_item(fav.fs_id);
                         } else {
                             open_favorite(fav.url);
                         }
