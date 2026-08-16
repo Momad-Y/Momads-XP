@@ -9,6 +9,11 @@ async function openIE(page: Page) {
         .dblclick();
     const ie = page.locator('#work-space .window').first();
     await expect(ie).toBeVisible();
+    // Wait for the address bar to carry its bound value. The <input> is in the
+    // DOM before Svelte attaches its keydown handler, and under CI load typing
+    // into that gap silently swallowed the Enter — the test then saw the
+    // homepage URL and failed. This is a real readiness signal, not a sleep.
+    await expect(ie.locator('input').first()).toHaveValue(/\S/);
     return ie;
 }
 
