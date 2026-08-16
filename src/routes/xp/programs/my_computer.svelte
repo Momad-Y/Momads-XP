@@ -28,7 +28,7 @@
     import Viewer from './my_computer/viewer.svelte';
     import * as finder from '../../../lib/finder';
     import * as utils from '../../../lib/utils';
-    import { favorites } from '../../../lib/favorites';
+    import { favorites, is_folder_favorite } from '../../../lib/favorites';
     import Sidebar from './my_computer/sidebar.svelte';
     import SearchPanel from './my_computer/search_panel.svelte';
     import FoldersTree from './my_computer/folders_tree.svelte';
@@ -419,24 +419,42 @@
             name: 'Favorites',
             items: [
                 [
-                    // Favorites are web links (shared with IE); a file Explorer
-                    // has no page/URL to favorite, so these are greyed like the
-                    // other inert XP controls. The list below still opens each
-                    // favorite in IE.
+                    // XP keeps ONE Favorites list for Explorer and IE, and
+                    // Explorer favourites the folder you are looking at.
                     {
                         name: 'Add to Favorites...',
-                        disabled: true,
+                        // nothing to favourite at the My Computer root
+                        disabled: current_history_item == null,
+                        action: () => {
+                            if (current_history_item == null) return;
+                            queueProgram.set({
+                                path: './programs/add_to_favorites.svelte',
+                                fs_item: current_history_item,
+                            });
+                        },
                     },
                     {
                         name: 'Organize Favorites',
-                        disabled: true,
+                        action: () => {
+                            queueProgram.set({
+                                path: './programs/organize_favorites.svelte',
+                            });
+                        },
                     },
                 ],
                 $favorites.map((fav) => ({
                     name: fav.name,
-                    icon: '/images/xp/icons/URL.png',
+                    icon: is_folder_favorite(fav)
+                        ? '/images/xp/icons/FolderClosed.png'
+                        : '/images/xp/icons/URL.png',
                     action: () => {
-                        open_favorite(fav.url);
+                        // a folder favourite navigates THIS window; a web one
+                        // still hands off to IE
+                        if (fav.fs_id != null && fav.fs_id !== '') {
+                            open(fav.fs_id);
+                        } else {
+                            open_favorite(fav.url);
+                        }
                     },
                 })),
             ],

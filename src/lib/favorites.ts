@@ -9,7 +9,22 @@ import { profile } from './profile';
 
 export interface Favorite {
     name: string;
+    /**
+     * Web address for a page favourite. For a FOLDER favourite this holds the
+     * XP-style path (e.g. `C:\Experience`) purely for display — `fs_id` is what
+     * actually gets opened.
+     */
     url: string;
+    /**
+     * Set when the favourite points at a folder in the VFS rather than a web
+     * page. XP keeps one Favorites list for both Explorer and IE, so the two
+     * kinds live side by side and each app opens whichever it can.
+     */
+    fs_id?: string;
+}
+
+export function is_folder_favorite(fav: Favorite): boolean {
+    return typeof fav.fs_id === 'string' && fav.fs_id !== '';
 }
 
 const STORAGE_KEY = 'xp_favorites';
@@ -57,10 +72,41 @@ favorites.subscribe((list) => {
 export function add_favorite(fav: Favorite): void {
     if (fav.name.trim() === '' || fav.url.trim() === '') return;
     favorites.update((list) =>
-        list.some((f) => f.url === fav.url) ? list : [...list, fav],
+        // a folder is identified by its id (two folders can share a display
+        // path after a rename); a page is identified by its address
+        list.some((f) =>
+            is_folder_favorite(fav) ? f.fs_id === fav.fs_id : f.url === fav.url,
+        )
+            ? list
+            : [...list, fav],
     );
 }
 
 export function remove_favorite(index: number): void {
     favorites.update((list) => list.filter((_, i) => i !== index));
+}
+
+/** Organize Favorites → Rename. Blank names are ignored rather than stored. */
+export function rename_favorite(index: number, name: string): void {
+    const trimmed = name.trim();
+    if (trimmed === '') return;
+    favorites.update((list) =>
+        list.map((f, i) => (i === index ? { ...f, name: trimmed } : f)),
+    );
+}
+
+/** Order matters in XP's Favorites menu, so Organize can reorder. */
+export function move_favorite(index: number, delta: number): void {
+    favorites.update((list) => {
+        const target = index + delta;
+        if (index < 0 || index >= list.length) return list;
+        if (target < 0 || target >= list.length) return list;
+        const next = [...list];
+        const moved = next[index];
+        const other = next[target];
+        if (moved == null || other == null) return list;
+        next[index] = other;
+        next[target] = moved;
+        return next;
+    });
 }

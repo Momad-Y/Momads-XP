@@ -7,6 +7,7 @@
         favorites,
         add_favorite,
         remove_favorite,
+        is_folder_favorite,
     } from '../../../lib/favorites';
     import { runningPrograms, zIndex, queueProgram } from '../../../lib/store';
     import Menu from '../../../lib/components/xp/Menu.svelte';
@@ -425,15 +426,29 @@
                     {
                         name: 'Organize Favorites',
                         action: () => {
-                            toggle_sidebar('favorites');
+                            queueProgram.set({
+                                path: './programs/organize_favorites.svelte',
+                            });
                         },
                     },
                 ],
                 ...$favorites.map((fav) => [
                     {
                         name: fav.name,
-                        icon: '/images/xp/icons/URL.png',
-                        action: () => load_page(fav.url),
+                        icon: is_folder_favorite(fav)
+                            ? '/images/xp/icons/FolderClosed.png'
+                            : '/images/xp/icons/URL.png',
+                        action: () => {
+                            // a folder favourite belongs to Explorer, not IE
+                            if (is_folder_favorite(fav)) {
+                                queueProgram.set({
+                                    path: './programs/my_computer.svelte',
+                                    fs_item: { id: fav.fs_id },
+                                });
+                            } else {
+                                void load_page(fav.url);
+                            }
+                        },
                     },
                 ]),
             ],
