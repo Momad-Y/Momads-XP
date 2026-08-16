@@ -37,6 +37,54 @@ export function is_permanent_delete(
     return parent_id === recycle_bin_id;
 }
 
+export interface DeletePlan {
+    /** Ids to actually remove, in order. */
+    ids: string[];
+    /** True only when EVERY item is already in the bin. */
+    all_permanent: boolean;
+    /** Name the prompt should lead with. */
+    first_name: string;
+    /** Per-item: does this one get destroyed outright? */
+    permanent_ids: Set<string>;
+}
+
+/**
+ * Works out what a delete should actually do, given a selection.
+ *
+ * Every caller previously decided this inline, and they disagreed: the
+ * right-click menu applied one recycle-vs-permanent verdict to the whole batch
+ * (so a batch spanning the Recycle Bin and the desktop destroyed the live file
+ * outright) and did not skip protected items at all.
+ */
+export function plan_delete(
+    selected_ids: string[],
+    lookup: (id: string) => { name: string; parent?: string } | undefined,
+    is_protected: (id: string) => boolean,
+    recycle_bin_id: string,
+): DeletePlan {
+    const permanent_ids = new Set<string>();
+    const ids: string[] = [];
+    let first_name = '';
+
+    for (const id of selected_ids) {
+        const item = lookup(id);
+        if (item == null) continue; // stale id on a cached drive
+        if (is_protected(id)) continue; // e.g. portfolio entry files
+        ids.push(id);
+        if (first_name === '') first_name = item.name;
+        if (is_permanent_delete(item.parent, recycle_bin_id)) {
+            permanent_ids.add(id);
+        }
+    }
+
+    return {
+        ids,
+        all_permanent: ids.length > 0 && permanent_ids.size === ids.length,
+        first_name,
+        permanent_ids,
+    };
+}
+
 export function delete_prompt_icon(permanent: boolean): string {
     return permanent
         ? '/images/xp/icons/DeleteConfirmation.png'

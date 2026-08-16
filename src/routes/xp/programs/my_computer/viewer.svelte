@@ -1,6 +1,7 @@
 <svelte:options accessors={true} />
 
 <script lang="ts">
+    import { file_icon_url } from '../../../../lib/file_icon';
     import {
         contextMenu,
         selectingItems,
@@ -14,7 +15,6 @@
     import * as utils from '../../../../lib/utils';
     import {
         doctypes,
-        icons,
         my_computer,
         hidden_items,
         recycle_bin_id,
@@ -441,16 +441,6 @@
         e.preventDefault();
     }
 
-    function file_icon(item: VfsItem) {
-        if (item.icon != null) {
-            return `url(${item.icon})`;
-        }
-        if (icons[item.ext] != null) {
-            return `url(/images/xp/icons/${icons[item.ext] ?? ''})`;
-        }
-        return null;
-    }
-
     async function show_guide() {
         const read_transfer_guide = await get<boolean>(
             'my_computer::read_transfer_guide',
@@ -580,7 +570,7 @@
                     {#if previewable_exts.includes(item.ext)}
                         <div class="{icon_box} shrink-0">
                             <Previewable
-                                default_icon={file_icon(item)}
+                                default_icon={file_icon_url(item)}
                                 fs_id={item.id}
                             ></Previewable>
                         </div>
@@ -590,7 +580,7 @@
                         {item.type == 'folder'
                                 ? 'bg-[url(/images/xp/icons/FolderClosed.png)]'
                                 : 'bg-[url(/images/xp/icons/Default.png)]'} "
-                            style:background-image={file_icon(item)}
+                            style:background-image={file_icon_url(item)}
                         ></div>
                     {/if}
                     <p

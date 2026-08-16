@@ -3,6 +3,7 @@ import {
     truncate_name,
     other_items_suffix,
     is_permanent_delete,
+    plan_delete,
     delete_prompt_icon,
     delete_prompt_message,
 } from './delete_prompt';
@@ -62,6 +63,57 @@ describe('delete_prompt_icon', () => {
 
     it('uses the recycle-bin icon otherwise', () => {
         expect(delete_prompt_icon(false)).toContain('RecycleBin');
+    });
+});
+
+describe('plan_delete', () => {
+    const drive: Record<string, { name: string; parent?: string }> = {
+        live: { name: 'live.txt', parent: 'desktop' },
+        binned: { name: 'binned.txt', parent: BIN },
+        locked: { name: 'entry.txt', parent: 'folder' },
+    };
+    const lookup = (id: string) => drive[id];
+    const guarded = (id: string) => id === 'locked';
+
+    it('keeps only deletable, existing items', () => {
+        const plan = plan_delete(
+            ['live', 'locked', 'ghost', 'binned'],
+            lookup,
+            guarded,
+            BIN,
+        );
+        expect(plan.ids).toEqual(['live', 'binned']);
+    });
+
+    it('leads the prompt with the first item it will actually delete', () => {
+        expect(
+            plan_delete(['locked', 'live'], lookup, guarded, BIN).first_name,
+        ).toBe('live.txt');
+    });
+
+    // the CRITICAL bug: a mixed batch must NOT be called permanent
+    it('is only all_permanent when every item is already binned', () => {
+        expect(
+            plan_delete(['binned'], lookup, guarded, BIN).all_permanent,
+        ).toBe(true);
+        expect(
+            plan_delete(['binned', 'live'], lookup, guarded, BIN).all_permanent,
+        ).toBe(false);
+        expect(plan_delete(['live'], lookup, guarded, BIN).all_permanent).toBe(
+            false,
+        );
+    });
+
+    it('marks permanence per item, so a mixed batch recycles the live one', () => {
+        const plan = plan_delete(['binned', 'live'], lookup, guarded, BIN);
+        expect(plan.permanent_ids.has('binned')).toBe(true);
+        expect(plan.permanent_ids.has('live')).toBe(false);
+    });
+
+    it('an empty or fully-protected selection deletes nothing', () => {
+        expect(plan_delete([], lookup, guarded, BIN).ids).toEqual([]);
+        expect(plan_delete([], lookup, guarded, BIN).all_permanent).toBe(false);
+        expect(plan_delete(['locked'], lookup, guarded, BIN).ids).toEqual([]);
     });
 });
 

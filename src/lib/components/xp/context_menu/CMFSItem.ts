@@ -3,6 +3,7 @@ import {
     clipboard,
     selectingItems,
     wallpaper,
+    hardDrive,
 } from '../../../store';
 import {
     recycle_bin_id,
@@ -16,6 +17,11 @@ import { get } from 'svelte/store';
 import * as fs from '../../../fs';
 import short from 'short-uuid';
 import { saveAs } from 'file-saver';
+import {
+    plan_delete,
+    delete_prompt_icon,
+    delete_prompt_message,
+} from '../../../delete_prompt';
 import { required } from '../../../types';
 import type { ContextMenuSpec, FSItemOriginator } from '../../../types';
 
@@ -235,55 +241,34 @@ export const make = ({
                           {
                               name: 'Delete',
                               action: () => {
-                                  const items = [...get(selectingItems)];
-                                  console.log(items);
+                                  const data = get(hardDrive) ?? {};
+                                  // One shared, unit-tested decision (see
+                                  // src/lib/delete_prompt.ts). This used to
+                                  // apply ONE recycle-vs-permanent verdict to
+                                  // the whole batch and skip no protected
+                                  // items, so a selection spanning the Recycle
+                                  // Bin and the desktop destroyed the live file
+                                  // outright.
+                                  const plan = plan_delete(
+                                      [...get(selectingItems)],
+                                      (id) => data[id],
+                                      (id) => protected_items.includes(id),
+                                      recycle_bin_id,
+                                  );
+                                  if (plan.ids.length === 0) return;
 
                                   const yes_action = () => {
-                                      if (
-                                          originator.item.parent ==
-                                          recycle_bin_id
-                                      ) {
-                                          for (const id of items) {
-                                              fs.del_fs(id);
-                                          }
-                                      } else {
-                                          for (const id of items) {
+                                      for (const id of plan.ids) {
+                                          if (!plan.permanent_ids.has(id)) {
                                               fs.clone_fs(
                                                   id,
                                                   recycle_bin_id,
                                                   null,
                                               );
-                                              fs.del_fs(id);
                                           }
+                                          fs.del_fs(id);
                                       }
                                   };
-                                  const filename =
-                                      originator.item.name.length > 70
-                                          ? originator.item.name.slice(0, 70) +
-                                            '...'
-                                          : originator.item.name;
-
-                                  let message: string;
-                                  let plural = '';
-                                  if (items.length == 1) {
-                                      plural = '';
-                                  } else if (items.length == 2) {
-                                      plural = ' and 1 other item';
-                                  } else if (items.length > 2) {
-                                      plural = ` and ${String(items.length - 1)} other items`;
-                                  }
-                                  if (
-                                      originator.item.parent == recycle_bin_id
-                                  ) {
-                                      message = `Do you want to permanently delete ${filename}${plural}? This action can't be undone?`;
-                                  } else {
-                                      message = `Do you want to move ${filename}${plural} to the Recycle Bin?`;
-                                  }
-
-                                  const icon =
-                                      originator.item.parent == recycle_bin_id
-                                          ? '/images/xp/icons/DeleteConfirmation.png'
-                                          : '/images/xp/icons/RecycleBinempty.png';
 
                                   void confirm_delete({
                                       node_ref:
@@ -291,8 +276,14 @@ export const make = ({
                                               ?.window?.node_ref ||
                                           document.body,
                                       title: 'Confirm Delete File',
-                                      icon,
-                                      message,
+                                      icon: delete_prompt_icon(
+                                          plan.all_permanent,
+                                      ),
+                                      message: delete_prompt_message(
+                                          plan.first_name,
+                                          plan.ids.length,
+                                          plan.all_permanent,
+                                      ),
                                       yes_action: yes_action,
                                       no_action: () => {
                                           /* keep the item */

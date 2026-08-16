@@ -1,12 +1,13 @@
 <svelte:options accessors={true} />
 
 <script lang="ts">
+    import { file_icon_url } from '../../file_icon';
     import { hardDrive } from '../../store';
     import { my_computer } from '../../../lib/system';
 
     import * as finder from '../../finder';
     import * as utils from '../../utils';
-    import { icons, hidden_items, previewable_exts } from '../../system';
+    import { hidden_items, previewable_exts } from '../../system';
     import { required } from '../../types';
     import type { VfsItem } from '../../types';
     const { click_outside, double_tap } = utils;
@@ -101,17 +102,6 @@
         open(parent_id);
     }
 
-    function file_icon(item: VfsItem | null | undefined) {
-        if (item == null) return null;
-        if (item.icon != null) {
-            return `url(${item.icon})`;
-        }
-        if (icons[item.ext] != null) {
-            return `url(/images/xp/icons/${icons[item.ext] ?? ''})`;
-        }
-        return null;
-    }
-
     function on_user_input(e: KeyboardEvent) {
         const target = e.target;
         if (!(target instanceof HTMLInputElement)) return;
@@ -156,7 +146,7 @@
                 {id == null
                     ? 'bg-[url(/images/xp/icons/MyComputer.png)]'
                     : 'bg-[url(/images/xp/icons/FolderClosed.png)]'} bg-contain"
-                style:background-image={file_icon(
+                style:background-image={file_icon_url(
                     id != null ? $hardDrive?.[id] : null,
                 )}
             ></div>
@@ -210,7 +200,7 @@
                 {#if previewable_exts.includes(item.ext)}
                     <Previewable
                         size={30}
-                        default_icon={file_icon(item)}
+                        default_icon={file_icon_url(item)}
                         fs_id={item.id}
                     ></Previewable>
                 {:else}
@@ -219,7 +209,7 @@
                         {item.type == 'folder'
                             ? 'bg-[url(/images/xp/icons/FolderClosed.png)]'
                             : 'bg-[url(/images/xp/icons/Default.png)]'} "
-                        style:background-image={file_icon(item)}
+                        style:background-image={file_icon_url(item)}
                     ></div>
                 {/if}
                 <p
