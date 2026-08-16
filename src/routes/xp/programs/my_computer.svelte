@@ -96,6 +96,17 @@
     ];
     let views_menu = false;
 
+    /**
+     * The My Computer ROOT renders a fixed two-section layout (drives, then
+     * folders) rather than the item grid, so Thumbnails/Tiles/Icons/List/Details
+     * change nothing there. Grey them rather than let the user click an inert
+     * control — every other location, the Recycle Bin included, is a normal
+     * folder and honours them.
+     */
+    $: views_available = current_history_id != null;
+    // never leave the dropdown open on a view that cannot use it
+    $: if (!views_available) views_menu = false;
+
     /** XP closes an open dropdown on Escape. */
     function on_keydown(event: KeyboardEvent) {
         if (event.key !== 'Escape' || !views_menu) return;
@@ -399,6 +410,7 @@
                 view_modes.map((m) => ({
                     name: m,
                     check: view_mode === m,
+                    disabled: !views_available,
                     action: () => {
                         view_mode = m;
                     },
@@ -749,6 +761,7 @@
                 <RButton
                     icon="/images/xp/icons/FolderView-Classic.png"
                     expandable={true}
+                    disabled={!views_available}
                     on_click={() => (views_menu = !views_menu)}
                     on_expand={() => (views_menu = !views_menu)}
                     tooltip_message="Views"
