@@ -196,8 +196,45 @@
         void load_page(homepage);
     }
 
+    /**
+     * An app-owned page (`/help.html`, …) is same-origin and authored by us, so
+     * the iframe may read it. A LOCAL file is served from a `blob:` URL, which
+     * inherits our origin — granting that same-origin access would hand a
+     * user-dropped .html our localStorage and the whole VFS, which is exactly
+     * what the sandbox is there to prevent. External https pages are
+     * cross-origin regardless, so the flag would buy nothing.
+     */
+    $: iframe_sandbox =
+        real_url != null && real_url.startsWith('/')
+            ? 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-same-origin'
+            : 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox';
+
+    /**
+     * Follow navigation that happened INSIDE the frame (clicking a link on the
+     * page) so the address bar, the Back/Forward dropdowns and Create Shortcut
+     * describe where the user actually is. Only possible for app-owned pages:
+     * for an external site the browser refuses to tell us the URL, and no
+     * amount of code changes that.
+     */
+    function sync_url_from_iframe() {
+        let href: string | null;
+        try {
+            href = iframe?.contentWindow?.location.href ?? null;
+        } catch {
+            return; // cross-origin — unknowable by design
+        }
+        if (href == null || href === 'about:blank') return;
+        const origin = globalThis.location.origin;
+        const seen = href.startsWith(origin) ? href.slice(origin.length) : href;
+        if (seen === nav_history[page_index]) return;
+        nav_history = [...nav_history.slice(0, page_index + 1), seen];
+        page_index = nav_history.length - 1;
+        address_text = seen;
+    }
+
     function iframe_loaded() {
         loading = false;
+        sync_url_from_iframe();
         // Update window title (works for same-origin pages only)
         try {
             const t = iframe?.contentDocument?.title;
@@ -792,7 +829,7 @@
                         src={real_url}
                         on:load={iframe_loaded}
                         frameborder="0"
-                        sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"
+                        sandbox={iframe_sandbox}
                         referrerpolicy="no-referrer"
                     >
                     </iframe>
