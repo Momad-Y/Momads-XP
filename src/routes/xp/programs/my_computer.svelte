@@ -152,6 +152,19 @@
             : null;
     // Properties falls back to the folder itself, like XP
     $: properties_target = single_selected ?? current_history_item;
+    /**
+     * Add to Favorites targets a SELECTED folder when there is one — that is
+     * what a user means after clicking a folder — and otherwise the folder the
+     * window is showing, which is XP's default. Files are not favouritable, so
+     * a selected file falls through to the current folder.
+     */
+    $: favorite_target =
+        single_selected != null &&
+        (single_selected.type === 'folder' ||
+            single_selected.type === 'drive' ||
+            single_selected.type === 'removable_storage')
+            ? single_selected
+            : current_history_item;
 
     function make_shortcuts() {
         for (const it of shortcut_targets) {
@@ -423,13 +436,14 @@
                     // Explorer favourites the folder you are looking at.
                     {
                         name: 'Add to Favorites...',
-                        // nothing to favourite at the My Computer root
-                        disabled: current_history_item == null,
+                        // a selected folder wins over the open one; only the
+                        // bare My Computer root has nothing to offer
+                        disabled: favorite_target == null,
                         action: () => {
-                            if (current_history_item == null) return;
+                            if (favorite_target == null) return;
                             queueProgram.set({
                                 path: './programs/add_to_favorites.svelte',
-                                fs_item: current_history_item,
+                                fs_item: favorite_target,
                             });
                         },
                     },

@@ -67,6 +67,12 @@ test('Organize Favorites can rename and delete', async ({ page }) => {
     await org.getByText('Experience', { exact: true }).click();
     await org.getByText('Rename', { exact: true }).click();
     const box = org.locator('input');
+    await expect(box).toBeVisible();
+    // Click INTO the editor before typing. `fill()` alone focuses without
+    // dispatching a click, so it hid a real bug: the row's click handler
+    // cleared `renaming`, closing the editor the moment a user clicked it.
+    await box.click();
+    await expect(box).toBeVisible();
     await box.fill('My Work');
     await box.press('Enter');
     await expect(org.getByText('My Work', { exact: true })).toBeVisible();
@@ -75,6 +81,30 @@ test('Organize Favorites can rename and delete', async ({ page }) => {
     await org.getByText('My Work', { exact: true }).click();
     await org.getByText('Delete', { exact: true }).click();
     await expect(org.getByText('My Work', { exact: true })).toHaveCount(0);
+});
+
+test('a SELECTED folder is what gets favourited, not just the open one', async ({
+    page,
+}) => {
+    await bootToDesktop(page);
+    await page.locator('#work-space p', { hasText: 'My Computer' }).dblclick();
+    const win = page.locator('#work-space .window').first();
+    await win.getByText('Local Disk (C:)').dblclick();
+    await win.locator('.dialog').getByText('OK').click();
+    await page.waitForTimeout(450);
+
+    // sitting in C:\ but with a child folder selected
+    await win.locator('.fs-item', { hasText: 'Experience' }).first().click();
+    await page.waitForTimeout(250);
+    await favMenu(win).click();
+    await win.getByText('Add to Favorites...', { exact: true }).click();
+
+    const dialog = page
+        .locator('#work-space .window')
+        .filter({ hasText: 'Windows will add this folder' })
+        .last();
+    // the selection wins over the folder the window is showing
+    await expect(dialog.locator('input').first()).toHaveValue('Experience');
 });
 
 test('a folder favourite is shared with IE and opens Explorer, not a web page', async ({
