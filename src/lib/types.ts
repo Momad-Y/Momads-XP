@@ -103,6 +103,8 @@ export interface ProgramLaunchRequest {
      */
     exe_item?: Partial<VfsItem>;
     webapp?: unknown;
+    /** Page markup for source_viewer (IE's View > Source). */
+    source?: { url: string; text: string };
     copying_obj?: CopyTree;
     target_folder_id?: string;
 }

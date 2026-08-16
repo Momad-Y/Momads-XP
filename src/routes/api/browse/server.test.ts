@@ -16,6 +16,7 @@ function make_event(
         origin?: string | null;
         referer?: string | null;
         ip?: string;
+        raw?: boolean;
     },
 ) {
     const headers = new Headers();
@@ -27,6 +28,7 @@ function make_event(
 
     const url = new URL(`${APP}/api/browse`);
     if (target != null) url.searchParams.set('url', target);
+    if (opts?.raw === true) url.searchParams.set('raw', '1');
 
     const event_shape = {
         request: new Request(url, { method: 'GET', headers }),
@@ -189,6 +191,26 @@ describe('/api/browse response handling', () => {
         const res = await GET(make_event('https://example.com/a.png'));
         expect(res.status).toBe(302);
         expect(res.headers.get('location')).toBe('https://example.com/a.png');
+    });
+
+    // raw=1 backs IE's View Source
+    it('raw mode returns the ORIGINAL markup, not the rewritten copy', async () => {
+        const original =
+            '<html><head><title>t</title></head><body>hi</body></html>';
+        vi.stubGlobal(
+            'fetch',
+            vi.fn(() => Promise.resolve(html_response(original))),
+        );
+        const res = await GET(
+            make_event('https://example.com/', { raw: true }),
+        );
+        const body = await res.text();
+        expect(body).toBe(original);
+        expect(body).not.toContain('__momadxp');
+        expect(body).not.toContain('<base');
+        // served as text so it is displayed, never executed
+        expect(res.headers.get('content-type')).toContain('text/plain');
+        expect(res.headers.get('x-content-type-options')).toBe('nosniff');
     });
 
     it('reports upstream failure as a gateway error', async () => {

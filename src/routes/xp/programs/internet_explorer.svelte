@@ -112,6 +112,45 @@
         });
     }
 
+    /**
+     * XP's View > Source opens the page's markup in Notepad. Where the source
+     * is fetched from depends on the page: an app-owned page is same-origin, a
+     * local file is already a blob, and an external page comes back through the
+     * proxy's `raw=1` mode — which returns the ORIGINAL bytes rather than the
+     * rewritten copy the frame renders.
+     */
+    function source_url_for(target: string): string | null {
+        if (/^[A-Z]:\\/.test(target)) return real_url ?? null; // local blob
+        if (target.startsWith('/')) return target; // app-owned page
+        if (/^https?:\/\//i.test(target)) {
+            return `/api/browse?url=${encodeURIComponent(target)}&raw=1`;
+        }
+        return null;
+    }
+
+    async function view_source() {
+        const target = address_text;
+        const src = source_url_for(target);
+        if (src == null) {
+            window?.show_toast({
+                message: 'The source of this page is not available.',
+            });
+            return;
+        }
+        try {
+            const res = await fetch(src);
+            const text = await res.text();
+            queueProgram.set({
+                path: './programs/source_viewer.svelte',
+                source: { url: target, text },
+            });
+        } catch {
+            window?.show_toast({
+                message: 'The source of this page could not be loaded.',
+            });
+        }
+    }
+
     function hostname_of(u: string) {
         try {
             return new URL(u).hostname;
@@ -436,7 +475,14 @@
                     { name: 'Stop', action: stop },
                     { name: 'Refresh', action: refresh },
                 ],
-                [{ name: 'Source', disabled: true, action: () => {} }],
+                [
+                    {
+                        name: 'Source',
+                        action: () => {
+                            void view_source();
+                        },
+                    },
+                ],
             ],
         },
         {

@@ -59,8 +59,14 @@
     }
 
     async function launch(program: ProgramLaunchRequest) {
-        const { fs_item, exe_item, copying_obj, target_folder_id, path } =
-            program;
+        const {
+            fs_item,
+            exe_item,
+            copying_obj,
+            target_folder_id,
+            path,
+            source,
+        } = program;
 
         if (focus_existing(path)) {
             queueProgram.set(null);
@@ -222,6 +228,22 @@
                 },
             });
 
+            //add to program tray
+            runningPrograms.update((values) => {
+                return [...values, program];
+            });
+        } else if (path == './programs/source_viewer.svelte') {
+            const Program = (await import('./programs/source_viewer.svelte'))
+                .default;
+            const program: ProgramInstance = mount(Program, {
+                target: node_ref,
+                props: {
+                    id: short.generate(),
+                    source,
+                    exec_path: path,
+                    get_self: () => program,
+                },
+            });
             //add to program tray
             runningPrograms.update((values) => {
                 return [...values, program];
