@@ -33,6 +33,11 @@ test('esc: Views toolbar dropdown', async ({ page }) => {
     await bootToDesktop(page);
     await page.locator('#work-space p', { hasText: 'My Computer' }).dblclick();
     const win = page.locator('#work-space .window').first();
+    // Enter a real folder first: the Views button is greyed at the My Computer
+    // root, where the fixed layout ignores view modes.
+    await win.getByText('Local Disk (C:)').dblclick();
+    await win.locator('.dialog').getByText('OK').click();
+    await page.waitForTimeout(450);
     await win.locator('[tooltip="Views"]').first().click();
     // the toolbar dropdown, not the View menu-bar entry of the same name
     const opt = win.locator('.z-30').getByText('Thumbnails', { exact: true });

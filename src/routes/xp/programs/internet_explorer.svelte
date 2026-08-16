@@ -407,9 +407,24 @@
 
         if (kind === 'navigate') {
             void load_page(reported); // the user clicked a link inside the page
-        } else if (kind === 'navigated' && reported !== address_text) {
-            // the page landed somewhere (redirect) — record it without
-            // re-fetching
+        } else if (kind === 'navigated') {
+            // A proxied page announces itself once it loads, which is how a
+            // redirect gets recorded. It must NOT be trusted blindly: a slow
+            // page finishing after the user has already gone somewhere else
+            // used to overwrite the address bar with the page they had left.
+            const intended = nav_history[page_index];
+            if (typeof intended !== 'string') return;
+            // we are no longer showing an external page at all
+            if (!/^https?:\/\//i.test(intended)) return;
+            // the frame is not currently pointed at the page we intend
+            if (
+                real_url == null ||
+                !real_url.includes(encodeURIComponent(intended))
+            ) {
+                return;
+            }
+            if (reported === address_text) return;
+
             nav_history = [...nav_history.slice(0, page_index + 1), reported];
             page_index = nav_history.length - 1;
             address_text = reported;
