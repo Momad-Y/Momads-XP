@@ -16,14 +16,16 @@ export interface Favorite {
      */
     url: string;
     /**
-     * Set when the favourite points at a folder in the VFS rather than a web
-     * page. XP keeps one Favorites list for both Explorer and IE, so the two
-     * kinds live side by side and each app opens whichever it can.
+     * Set when the favourite points at something in the VFS — a folder OR a
+     * file — rather than a web page. XP keeps one Favorites list for both
+     * Explorer and IE, so the two kinds live side by side and each app opens
+     * whichever it can.
      */
     fs_id?: string;
 }
 
-export function is_folder_favorite(fav: Favorite): boolean {
+/** A favourite that points into the file system rather than at a web page. */
+export function is_shell_favorite(fav: Favorite): boolean {
     return typeof fav.fs_id === 'string' && fav.fs_id !== '';
 }
 
@@ -72,10 +74,10 @@ favorites.subscribe((list) => {
 export function add_favorite(fav: Favorite): void {
     if (fav.name.trim() === '' || fav.url.trim() === '') return;
     favorites.update((list) =>
-        // a folder is identified by its id (two folders can share a display
+        // a shell item is identified by its id (two items can share a display
         // path after a rename); a page is identified by its address
         list.some((f) =>
-            is_folder_favorite(fav) ? f.fs_id === fav.fs_id : f.url === fav.url,
+            is_shell_favorite(fav) ? f.fs_id === fav.fs_id : f.url === fav.url,
         )
             ? list
             : [...list, fav],

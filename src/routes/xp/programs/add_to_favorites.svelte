@@ -24,7 +24,14 @@
 
     const target = fs_item as Partial<VfsItem> | undefined;
     const target_id = target?.id ?? '';
-    let fav_name = target?.name ?? 'Folder';
+    const is_file = target?.type === 'file';
+    // XP offers the basename for a file, so a rename does not carry ".txt"
+    let fav_name = 'Favorite';
+    if (target != null) {
+        fav_name =
+            (target.type === 'file' ? target.basename : target.name) ??
+            'Favorite';
+    }
     const path_label = finder.to_url(target_id) || (target?.name ?? '');
 
     export function destroy() {
@@ -74,7 +81,10 @@
         slot="content"
         class="absolute inset-0 flex flex-col bg-xp-yellow font-Tahoma p-4 text-[11px] text-slate-800"
     >
-        <p class="mb-3">Windows will add this folder to your Favorites list.</p>
+        <p class="mb-3">
+            Windows will add this {is_file ? 'file' : 'folder'} to your Favorites
+            list.
+        </p>
         <div class="flex flex-row items-center gap-2">
             <span class="shrink-0">Name:</span>
             <!-- svelte-ignore a11y_autofocus -->

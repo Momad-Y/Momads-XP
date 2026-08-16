@@ -7,9 +7,14 @@
         favorites,
         add_favorite,
         remove_favorite,
-        is_folder_favorite,
+        is_shell_favorite,
     } from '../../../lib/favorites';
-    import { runningPrograms, zIndex, queueProgram } from '../../../lib/store';
+    import {
+        runningPrograms,
+        zIndex,
+        queueProgram,
+        hardDrive,
+    } from '../../../lib/store';
     import Menu from '../../../lib/components/xp/Menu.svelte';
     import RButton from '../../../lib/components/xp/RButton.svelte';
     import ProgressBar from '../../../lib/components/xp/ProgressBar.svelte';
@@ -88,6 +93,21 @@
         );
         window?.show_toast({
             message: `Shortcut to ${name} created on the desktop.`,
+        });
+    }
+
+    /**
+     * Opens a file-system favourite in Explorer. A folder opens as itself; a
+     * file opens its parent folder, which is the closest thing a browser can
+     * usefully do with one.
+     */
+    function open_shell_favorite(fs_id: string | undefined) {
+        if (fs_id == null || fs_id === '') return;
+        const item = $hardDrive?.[fs_id];
+        const target = item?.type === 'file' ? item.parent : fs_id;
+        queueProgram.set({
+            path: './programs/my_computer.svelte',
+            fs_item: { id: target ?? fs_id },
         });
     }
 
@@ -435,16 +455,16 @@
                 ...$favorites.map((fav) => [
                     {
                         name: fav.name,
-                        icon: is_folder_favorite(fav)
+                        icon: is_shell_favorite(fav)
                             ? '/images/xp/icons/FolderClosed.png'
                             : '/images/xp/icons/URL.png',
                         action: () => {
-                            // a folder favourite belongs to Explorer, not IE
-                            if (is_folder_favorite(fav)) {
-                                queueProgram.set({
-                                    path: './programs/my_computer.svelte',
-                                    fs_item: { id: fav.fs_id },
-                                });
+                            // Shell favourites belong to Explorer, not IE. A
+                            // folder opens directly; a FILE opens the folder
+                            // that contains it, since a browser window has no
+                            // sensible way to present an arbitrary local file.
+                            if (is_shell_favorite(fav)) {
+                                open_shell_favorite(fav.fs_id);
                             } else {
                                 void load_page(fav.url);
                             }

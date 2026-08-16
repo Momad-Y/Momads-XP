@@ -10,7 +10,7 @@
         remove_favorite,
         rename_favorite,
         move_favorite,
-        is_folder_favorite,
+        is_shell_favorite,
     } from '../../../lib/favorites';
     import { required } from '../../../lib/types';
     import type {
@@ -111,7 +111,7 @@
                         }}
                     >
                         <img
-                            src={is_folder_favorite(fav)
+                            src={is_shell_favorite(fav)
                                 ? '/images/xp/icons/FolderClosed.png'
                                 : '/images/xp/icons/URL.png'}
                             alt=""
