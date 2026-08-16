@@ -119,11 +119,19 @@
                         />
                         {#if renaming && i === selected}
                             <!-- svelte-ignore a11y_autofocus -->
+                            <!--
+                              stopPropagation: the row's own click handler
+                              clears `renaming`, so without this, clicking into
+                              the box to type immediately closed the editor.
+                            -->
                             <input
                                 class="grow h-[18px] px-1 text-slate-900 border border-stone-400 outline-none"
                                 type="text"
                                 autofocus
                                 bind:value={draft}
+                                on:click|stopPropagation
+                                on:mousedown|stopPropagation
+                                on:dblclick|stopPropagation
                                 on:blur={commit_rename}
                                 on:keydown={(e) => {
                                     if (e.key === 'Enter') commit_rename();
