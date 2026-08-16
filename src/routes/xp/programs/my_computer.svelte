@@ -1,6 +1,7 @@
 <svelte:options accessors={true} />
 
 <script lang="ts">
+    import { file_icon_url } from '../../../lib/file_icon';
     import Window from '../../../lib/components/xp/Window.svelte';
     import { unmount, mount } from 'svelte';
     import {
@@ -11,11 +12,7 @@
         zIndex,
         contextMenu,
     } from '../../../lib/store';
-    import {
-        recycle_bin_id,
-        icons,
-        protected_items,
-    } from '../../../lib/system';
+    import { recycle_bin_id, protected_items } from '../../../lib/system';
     import * as fs from '../../../lib/fs';
     import {
         is_permanent_delete,
@@ -536,7 +533,6 @@
             if (id == null) {
                 id = finder.to_id_nocase(target.value);
             }
-            console.log('found id', id);
             if (id) {
                 open(id);
                 target.blur();
@@ -562,24 +558,8 @@
         exec_path,
     };
 
-    function file_icon(item: VfsItem | null | undefined) {
-        if (item == null) return null;
-        if (item.icon != null) {
-            return `url(${item.icon})`;
-        }
-        if (icons[item.ext] != null) {
-            return `url(/images/xp/icons/${icons[item.ext] ?? ''})`;
-        }
-        if (item.id == recycle_bin_id) {
-            return `url(/images/xp/icons/RecycleBinempty.png)`;
-        }
-        return null;
-    }
-
     export function open(fs_id: string | null | undefined) {
         if (fs_id == history[page_index]) return;
-        console.log('open', fs_id);
-        console.log(fs_id == null ? undefined : $hardDrive?.[fs_id]);
         history = [...history.slice(0, page_index + 1), fs_id];
         page_index = history.length - 1;
     }
@@ -817,7 +797,7 @@
                     {history[page_index] == null
                         ? 'bg-[url(/images/xp/icons/MyComputer.png)]'
                         : 'bg-[url(/images/xp/icons/FolderClosed.png)]'} bg-contain"
-                    style:background-image={file_icon(current_history_item)}
+                    style:background-image={file_icon_url(current_history_item)}
                 ></div>
             </div>
             <div

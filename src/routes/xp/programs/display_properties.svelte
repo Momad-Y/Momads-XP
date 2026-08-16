@@ -73,7 +73,6 @@
             w == null ? undefined : $hardDrive?.[w],
             'wallpaper item ' + String(w),
         );
-        console.log(fs_item);
         if (fs_item.storage_type == 'remote') {
             return fs_item.url;
         } else if (fs_item.storage_type == 'local') {

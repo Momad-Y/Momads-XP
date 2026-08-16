@@ -21,7 +21,6 @@
         hardDrive.subscribe(() => {
             clearInterval(io_worker);
             io_worker = setTimeout(() => {
-                console.log('update hardDrive');
                 void set('hard_drive', $hardDrive);
             }, 1000);
         }),

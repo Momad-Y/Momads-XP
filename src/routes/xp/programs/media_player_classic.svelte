@@ -82,7 +82,6 @@
         }
 
         subtitle_src = await find_subtitle(item);
-        console.log({ subtitle_src });
         player().src = url ?? '';
         void player().play();
         window?.update_title(item.name);
@@ -151,18 +150,15 @@
     }
 
     function seek(e: CustomEvent<{ value: number }>) {
-        console.log(e);
         currentTime = e.detail.value;
     }
 
     function next5s() {
         currentTime = Math.min(currentTime + 5, duration);
-        console.log('next5s', currentTime);
     }
 
     function back5s() {
         currentTime = Math.max(currentTime - 5, 0);
-        console.log('back5s', currentTime);
     }
 
     function next15s() {
@@ -174,9 +170,7 @@
     }
 
     function on_key_pressed(e: KeyboardEvent) {
-        console.log('keyevent receive in wmp');
         if (window?.z_index != $zIndex || isNaN(duration)) return;
-        console.log('not skip');
         e.preventDefault();
         if (e.key == 'ArrowRight') {
             next5s();

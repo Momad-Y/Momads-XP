@@ -51,9 +51,7 @@
                     name: 'Add or remove programs',
                     disabled: true,
                     icon: 'Programs.png',
-                    action: () => {
-                        console.log(id);
-                    },
+                    action: () => {},
                 },
 
                 ...(id

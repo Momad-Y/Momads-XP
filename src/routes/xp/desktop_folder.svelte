@@ -1,6 +1,7 @@
 <svelte:options accessors={true} />
 
 <script lang="ts">
+    import { file_icon_url } from '../../lib/file_icon';
     import {
         contextMenu,
         selectingItems,
@@ -13,7 +14,6 @@
     import * as utils from '../../lib/utils';
     import {
         doctypes,
-        icons,
         desktop_folder,
         previewable_exts,
     } from '../../lib/system';
@@ -301,7 +301,6 @@
         if (renaming) return;
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- defensive guard kept from the base (id is a const today)
         if (id == null) return;
-        console.log('keyevent in desktop_folder');
 
         if (!(e.ctrlKey || e.metaKey)) return;
         if (e.key == 'c') {
@@ -330,16 +329,6 @@
 
     function on_drop_over(e: DragEvent) {
         e.preventDefault();
-    }
-
-    function file_icon(item: VfsItem) {
-        if (item.icon != null) {
-            return `url(${item.icon})`;
-        }
-        if (icons[item.ext] != null) {
-            return `url(/images/xp/icons/${icons[item.ext] ?? ''})`;
-        }
-        return null;
     }
 </script>
 
@@ -416,7 +405,7 @@
                 {#if previewable_exts.includes(item.ext)}
                     <Previewable
                         size={40}
-                        default_icon={file_icon(item)}
+                        default_icon={file_icon_url(item)}
                         fs_id={item.id}
                     ></Previewable>
                 {:else}
@@ -428,7 +417,7 @@
                         {item.type == 'folder'
                             ? 'bg-[url(/images/xp/icons/FolderClosed.png)]'
                             : 'bg-[url(/images/xp/icons/Default.png)]'} "
-                        style:background-image={file_icon(item)}
+                        style:background-image={file_icon_url(item)}
                     ></div>
                 {/if}
                 <p

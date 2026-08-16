@@ -47,7 +47,6 @@ export const make = ({
                 {
                     name: 'Refresh',
                     action: () => {
-                        console.log('refresh');
                         const nodes = document.querySelectorAll('.fs-item');
                         for (const node of nodes) {
                             node.classList.add('animate-blink');

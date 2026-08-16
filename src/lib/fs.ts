@@ -18,27 +18,20 @@ function drive_snapshot(): HardDrive {
 export function copy(): void {
     clipboard_op.set('copy');
     clipboard.set(get(selectingItems));
-    console.log('copy');
 }
 
 export function cut(): void {
     clipboard_op.set('cut');
     clipboard.set(get(selectingItems));
-    console.log('cut');
 }
 
 export function paste(id: string, new_id: string | null = null): void {
-    console.log('paste to', id);
-    console.log('clipboard_op', get(clipboard_op));
-    console.log(drive_snapshot()[id]);
     const target = drive_snapshot()[id];
     if (target == null || target.type == 'file') {
-        console.log('target is not a dir');
         return;
     }
 
     if (get(clipboard).length == 0) {
-        console.log('clipboard is empty');
         return;
     }
 
@@ -56,7 +49,6 @@ export function paste(id: string, new_id: string | null = null): void {
 
 export function del_fs(id: string): void {
     if (protected_items.includes(id)) {
-        console.log(id, 'is protected');
         return;
     }
     const obj = required(drive_snapshot()[id], `fs item ${id}`);
@@ -64,8 +56,6 @@ export function del_fs(id: string): void {
     const child_ids = [...obj.children];
     const parent_id = obj.parent;
     if (parent_id != null && drive_snapshot()[parent_id] != null) {
-        console.log('delete from parent', parent_id);
-
         hardDrive.update((data) => {
             const parent = required(
                 required(data, 'hard drive')[parent_id],
@@ -165,7 +155,6 @@ export function clone_fs(
     new_id: string | null = null,
 ): void {
     if (dir_contains_dir(obj_current_id, parent_id)) {
-        console.log('cannot paste item onto itself');
         return;
     }
 
@@ -197,7 +186,6 @@ export function clone_fs(
     obj.name = basename + obj.ext;
 
     //backup children
-    console.log(obj);
     const children = [...obj.children];
     obj.children = [];
 
@@ -206,7 +194,6 @@ export function clone_fs(
         required(data, 'hard drive')[obj.id] = obj;
         return data;
     });
-    console.log('cloning', obj.id);
 
     hardDrive.update((data) => {
         const parent = required(
@@ -280,7 +267,6 @@ export async function new_fs_item(
         await idb.set(required(item.url, 'new fs item url'), file);
         item.size = Math.ceil(file.size / 1024);
     } else if (type == 'file') {
-        console.log('fetch empty file');
         file = await file_from_url(`/empty/empty${item.ext}`, item.name);
         await idb.set(required(item.url, 'new fs item url'), file);
         item.size = Math.ceil(file.size / 1024);
@@ -414,7 +400,6 @@ export async function save_file(
 ): Promise<void> {
     const item = drive_snapshot()[fs_id];
     if (item == null) {
-        console.log(fs_id, 'not exist');
         return;
     }
     const url = short.generate();
@@ -504,7 +489,6 @@ export async function get_file(id: string): Promise<File> {
         file = await file_from_url(required(fs_item.url, `url of ${id}`));
     } else if (fs_item.storage_type == 'local') {
         file = await idb.get<File>(required(fs_item.url, `url of ${id}`));
-        console.log(file);
     }
     const payload = required(file, `file payload of ${id}`);
     return new File([payload], fs_item.name, { type: payload.type });
@@ -550,6 +534,5 @@ export async function array_buffer_from_url(url: string): Promise<ArrayBuffer> {
 
 export async function buffer_from_url(url: string): Promise<Buffer> {
     const array_buffer = await array_buffer_from_url(url);
-    console.log(array_buffer);
     return Buffer.from(array_buffer);
 }

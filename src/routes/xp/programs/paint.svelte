@@ -129,7 +129,6 @@
         const selected_id = required(selected_items[0], 'picked file');
         fs_item = $hardDrive?.[selected_id];
         const file = await fs.get_file(selected_id);
-        console.log({ fs_item });
         return file;
     }
 
@@ -162,7 +161,6 @@
     }
 
     async function save_file_as() {
-        console.log(fs_item);
         let current_filetype = supported_types.find(
             (el) => el.ext == fs_item?.ext,
         );
@@ -180,7 +178,6 @@
                 filetypes: supported_types,
                 current_filetype,
             });
-        console.log(selected_filetype);
 
         const canvas = required(
             paint_document().querySelector<HTMLCanvasElement>('.main-canvas'),
@@ -250,9 +247,7 @@
         };
 
         if (fs_item != null) {
-            console.log({ fs_item });
             const file = await fs.get_file(fs_item.id);
-            console.log(file);
             jspaint.open_from_file?.(file);
         }
         // Wait for systemHooks object to exist (the iframe needs to load)
@@ -275,11 +270,9 @@
                 };
 
                 hooks.writeBlobToHandle = () => {
-                    console.log('writeBlobtoHandle');
                     if (fs_item != null) {
                         const ext = fs_item.ext || '.png';
                         const mimetype = utils.ext_to_mime(ext, 'image/png');
-                        console.log({ mimetype });
 
                         const canvas = required(
                             paint_document().querySelector<HTMLCanvasElement>(

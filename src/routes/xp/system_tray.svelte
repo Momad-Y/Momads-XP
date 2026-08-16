@@ -23,7 +23,6 @@
     }
 
     async function open_volume_adjust(e: MouseEvent) {
-        console.log(e);
         const Program = (await import('./programs/volume_adjust.svelte'))
             .default;
         const program: MountedComponent = mount(Program, {

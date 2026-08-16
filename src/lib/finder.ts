@@ -36,8 +36,6 @@ export function to_url(id: string | null | undefined): string | null {
             `fs item ${current_location.parent}`,
         );
         url = current_location.name + '\\' + url;
-
-        console.log(current_location);
     } while (
         current_location.parent != null &&
         current_location.parent.length != 0
@@ -76,13 +74,10 @@ export function to_id_nocase(
         `fs item ${drive.id}`,
     );
     for (let i = 1; i < path_components.length; i++) {
-        console.log(i);
-        console.log(path_components[i]);
         const component = path_components[i];
         const next = [
             ...current_location.children.map((id) => drive_snapshot()[id]),
         ].find((item) => item?.name.toLowerCase() == component?.toLowerCase());
-        console.log(next);
         if (next == null) return null;
         current_location = next;
         if (i == path_components.length - 1) return current_location.id;
@@ -99,7 +94,6 @@ export function to_id(
         .split('\\')
         .filter((item) => item.trim().length > 0)
         .map((item) => item.trim());
-    console.log(path_components);
     if (path_components.length == 0) return null;
 
     const drive = drives.find((item) => item.name == path_components[0]);
@@ -112,13 +106,10 @@ export function to_id(
         `fs item ${drive.id}`,
     );
     for (let i = 1; i < path_components.length; i++) {
-        console.log(i);
-        console.log(path_components[i]);
         const component = path_components[i];
         const next = [
             ...current_location.children.map((id) => drive_snapshot()[id]),
         ].find((item) => item?.name == component);
-        console.log(next);
         if (next == null) return null;
         current_location = next;
         if (i == path_components.length - 1) return current_location.id;

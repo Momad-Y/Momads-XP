@@ -13,7 +13,6 @@
                 : required(store_get(hardDrive), 'hard drive')[w], // read without subscribing — avoids re-render on hardDrive changes
             'wallpaper item ' + String(w),
         );
-        console.log(fs_item);
         let url: string | null = null;
 
         if (fs_item.storage_type == 'remote') {

@@ -1,13 +1,14 @@
 <svelte:options accessors={true} />
 
 <script lang="ts">
+    import { folder_size } from '../../../lib/fs_size';
+    import { file_icon_url } from '../../../lib/file_icon';
     import Window from '../../../lib/components/xp/Window.svelte';
     import Button from '../../../lib/components/xp/Button.svelte';
     import Tab from '../../../lib/components/xp/Tab.svelte';
     import CheckBox from '../../../lib/components/xp/CheckBox.svelte';
     import { onMount, unmount } from 'svelte';
     import { runningPrograms, hardDrive } from '../../../lib/store';
-    import { icons } from '../../../lib/system';
     import * as utils from '../../../lib/utils';
     import _ from 'lodash';
     import * as finder from '../../../lib/finder';
@@ -62,7 +63,10 @@
                             [
                                 'Size',
                                 utils.formatBytes(
-                                    size_cal(initial_item.id) * 1024,
+                                    folder_size(
+                                        $hardDrive ?? {},
+                                        initial_item.id,
+                                    ) * 1024,
                                 ),
                             ] satisfies [string, string],
                         ]),
@@ -84,7 +88,11 @@
                                 'Size on disk',
                                 utils.formatBytes(
                                     Math.ceil(
-                                        (size_cal(initial_item.id) * 1024) /
+                                        (folder_size(
+                                            $hardDrive ?? {},
+                                            initial_item.id,
+                                        ) *
+                                            1024) /
                                             4096,
                                     ) * 4096,
                                 ),
@@ -109,9 +117,7 @@
                   ],
               ];
 
-    onMount(() => {
-        console.log(fs_item);
-    });
+    onMount(() => {});
 
     export function destroy() {
         runningPrograms.update((programs) =>
@@ -133,34 +139,6 @@
         minimize_btn: false,
         exec_path,
     };
-
-    function size_cal(item_id: string): number {
-        console.log(item_id);
-        let total_size = _.sum(
-            drive_item(item_id)
-                .children.map((el) => drive_item(el))
-                .filter((el) => el.type == 'file')
-                .map((el) => el.size),
-        );
-
-        const folders = drive_item(item_id).children.filter(
-            (el) => drive_item(el).type == 'folder',
-        );
-        for (const folder of folders) {
-            total_size += size_cal(folder);
-        }
-        return total_size;
-    }
-
-    function file_icon(item: VfsItem) {
-        if (item.icon != null) {
-            return `url(${item.icon})`;
-        }
-        if (icons[item.ext] != null) {
-            return `url(/images/xp/icons/${icons[item.ext] ?? ''})`;
-        }
-        return null;
-    }
 </script>
 
 <Window {options} bind:this={window} on_click_close={destroy}>
@@ -184,7 +162,7 @@
                     {#if fs_item?.type == 'file'}
                         <div
                             class="w-[50px] h-[50px] shrink-0 bg-[url(/images/xp/icons/Default.png)] bg-contain bg-no-repeat"
-                            style:background-image={file_icon(fs_item)}
+                            style:background-image={file_icon_url(fs_item)}
                         ></div>
                     {:else}
                         <div

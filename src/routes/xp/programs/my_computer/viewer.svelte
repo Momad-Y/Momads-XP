@@ -1,6 +1,7 @@
 <svelte:options accessors={true} />
 
 <script lang="ts">
+    import { file_icon_url } from '../../../../lib/file_icon';
     import {
         contextMenu,
         selectingItems,
@@ -14,7 +15,6 @@
     import * as utils from '../../../../lib/utils';
     import {
         doctypes,
-        icons,
         my_computer,
         hidden_items,
         recycle_bin_id,
@@ -122,7 +122,6 @@
     });
     worker.onmessage = ({ data }: MessageEvent<SortMessage>) => {
         if (data.type == 'sorted' && data.id == id) {
-            console.log('update sorted_items', id);
             sorted_items = data.sorted_items;
         }
     };
@@ -138,7 +137,6 @@
             };
 
             const hash = hash_sum(hash_object);
-            console.log({ hash });
             if (hash != last_sort_tx_hash) {
                 // eslint-disable-next-line no-useless-assignment -- read on the next run of this reactive block
                 last_sort_tx_hash = hash;
@@ -297,7 +295,6 @@
 
         const handlers = doctypes[fs_item.ext.toLowerCase()];
         if (fs_item.type == 'file') {
-            console.log(fs_item);
             if (fs_item.executable) {
                 queueProgram.set({
                     path: fs_item.url,
@@ -408,7 +405,6 @@
         if (my_computer_instance.window?.z_index != $zIndex) return;
         if (renaming) return;
         if (id == null) return;
-        console.log('keyevent in my computer');
 
         if (!(e.ctrlKey || e.metaKey)) return;
         if (e.key == 'c') {
@@ -439,16 +435,6 @@
 
     function on_drop_over(e: DragEvent) {
         e.preventDefault();
-    }
-
-    function file_icon(item: VfsItem) {
-        if (item.icon != null) {
-            return `url(${item.icon})`;
-        }
-        if (icons[item.ext] != null) {
-            return `url(/images/xp/icons/${icons[item.ext] ?? ''})`;
-        }
-        return null;
     }
 
     async function show_guide() {
@@ -580,7 +566,7 @@
                     {#if previewable_exts.includes(item.ext)}
                         <div class="{icon_box} shrink-0">
                             <Previewable
-                                default_icon={file_icon(item)}
+                                default_icon={file_icon_url(item)}
                                 fs_id={item.id}
                             ></Previewable>
                         </div>
@@ -590,7 +576,7 @@
                         {item.type == 'folder'
                                 ? 'bg-[url(/images/xp/icons/FolderClosed.png)]'
                                 : 'bg-[url(/images/xp/icons/Default.png)]'} "
-                            style:background-image={file_icon(item)}
+                            style:background-image={file_icon_url(item)}
                         ></div>
                     {/if}
                     <p
