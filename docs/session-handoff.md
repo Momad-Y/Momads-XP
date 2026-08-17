@@ -5,31 +5,30 @@ re-deriving anything. Read this first, then `docs/phase-2-guide.md`.
 
 ---
 
-## 1. WHERE WE STOPPED — an open question awaiting the user's answer
+## 1. DONE — the View menu has no dead entries left (PR #93)
 
-Explorer's **View menu** has 11 entries. The 5 view modes work; **the other 6 are
-inert** (verified in a browser, not assumed):
+All 11 entries work. The 6 that were greyed were implemented together:
 
-```
-Toolbars=GREY  Status Bar=GREY  Explorer Bar=GREY
-Thumbnails=live  Tiles=live  Icons=live  List=live  Details=live
-Choose Details...=GREY  Go To=GREY  Refresh=GREY
-```
+| Entry | Where it lives now |
+| --- | --- |
+| Toolbars ▸ | `show_standard_buttons` / `show_address_bar` / `show_links` in `my_computer.svelte`; the Links bar renders the web half of `$favorites` |
+| Status Bar | `src/lib/status_bar.ts` + the bottom row; counts through `viewer.visible_ids`, never raw `selectingItems` |
+| Explorer Bar ▸ | `left_panel` widened to include `favorites` \| `history`; new `favorites_panel.svelte` / `history_panel.svelte` |
+| Choose Details… | `src/lib/details_columns.ts` + `my_computer/choose_details.svelte`, rendered INSIDE the window so two Explorers can differ |
+| Go To ▸ | `go_to_submenu`, built off the same `history_entries` the Back/Forward dropdowns use |
+| Refresh (+F5) | `viewer.refresh()` — bumps a nonce that rides in the sort hash, because the sort worker memoises on it |
 
-I listed them for the user and asked which to implement. **The user has not
-answered yet — do not start implementing without their pick.**
+Two things worth remembering from that work:
 
-| Entry | XP behaviour | Cost here |
-| --- | --- | --- |
-| Toolbars | submenu toggling toolbar rows | Medium — rows exist, need visibility flags + submenu (`Menu.svelte` supports submenus now) |
-| Status Bar | bottom bar: "N objects", size, zone | Medium — Explorer has **no** status bar at all; `contact_me.svelte` has a working toggle as precedent |
-| Explorer Bar | submenu: Search / Favorites / History / Folders | **Cheap** — `left_panel: 'tasks'\|'search'\|'folders'` + `toggle_panel()` already exist |
-| Choose Details… | dialog picking Details columns | **Biggest** — Details columns are fixed; needs column state + dialog |
-| Go To | submenu: Back / Forward / Up One Level | **Cheap** — `back()`, `page_index + 1`, `up()` already exist |
-| Refresh | re-read the folder | **Cheap** — viewer is reactive off `$hardDrive`, so it must visibly re-sort or it will feel like a no-op |
+- `data-menu` on menu-bar entries and `data-history-idx` on History rows exist
+  because "Favorites"/"Search"/"Folders" now appear in BOTH the menu bar or
+  toolbar and a submenu — text-only locators went ambiguous and broke four
+  specs. Hidden submenus are still in the DOM, so `getByText` matches them.
+- The My Computer root list is now reactive; it used to be a `const` frozen at
+  mount.
 
-Recommendation given: the three cheap ones first (Explorer Bar, Go To, Refresh),
-then Status Bar + Toolbars, and decide Choose Details… separately.
+**Next open question:** nothing pending on the View menu. See §2 — the deploy is
+the outstanding item.
 
 ---
 
@@ -54,7 +53,7 @@ The user chose to wait until **~10 Aug 2026**. That date has now passed, so:
 3. Verify prod: `help.html` → 200, index bundle hash changed from
    `start.2JH2ogIg.js`, security headers present.
 
-`dev` is **16 commits ahead of `main`** and all of it is unreleased. The user
+`dev` is **18 commits ahead of `main`** and all of it is unreleased. The user
 chose to hold a single cutover PR (`dev` → `main`) until just before deploying.
 
 Netlify build settings were set to `allowed_branches:["main"]` + `skip_prs:true`
@@ -65,7 +64,7 @@ locally.
 
 ## 3. WHAT SHIPPED THIS SESSION (all merged to `dev`, none deployed)
 
-PRs #77–#92. Highlights:
+PRs #77–#93. Highlights:
 
 - **System Properties** — profile-driven content, all 4 tabs, dark-text logo.
 - **Explorer File menu** — fleshed out to real XP (Open, Send To, New ▸, Create
@@ -80,6 +79,8 @@ PRs #77–#92. Highlights:
   Favorites dialog; folder/file favourites open in Explorer, web ones in IE.
 - **View → Source** in IE (`/api/browse?raw=1` + Notepad-style `source_viewer`).
 - **View modes greyed at the My Computer root**, where they do nothing.
+- **The whole View menu works** — Toolbars, Status Bar, Explorer Bar, Choose
+  Details…, Go To and Refresh; see §1.
 - **De-duplication + a CRITICAL fix** — see §4.
 
 ---
@@ -163,7 +164,7 @@ invocations per user action — watch it once deploys resume.
 npm run check        # 0 errors / 128 warnings  (baseline 131 — do not grow)
 npm run lint
 npm run format:check
-npx vitest run       # 164 tests
+npx vitest run       # 194 tests
 npm run build
-npx playwright test  # 66/66
+npx playwright test  # 72/72
 ```
