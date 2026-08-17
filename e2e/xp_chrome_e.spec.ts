@@ -8,17 +8,16 @@ test('Explorer Favorites menu is seeded from profile and opens IE', async ({
     await page.locator('#work-space p', { hasText: 'My Computer' }).dblclick();
     const win = page.locator('#work-space .window').first();
 
-    await win
-        .locator('.toolbar-menu')
-        .getByText('Favorites', { exact: true })
-        .click();
-    // seeded from profile.social
-    await expect(win.getByText('GitHub', { exact: true })).toBeVisible();
-    await expect(win.getByText('LinkedIn', { exact: true })).toBeVisible();
-    await expect(win.getByText('Instagram', { exact: true })).toBeVisible();
+    await win.locator('[data-menu="Favorites"]').click();
+    // seeded from profile.social. Scoped to the menu: the (hidden) Links
+    // toolbar lists the same favourites.
+    const menu = win.locator('.toolbar-menu');
+    await expect(menu.getByText('GitHub', { exact: true })).toBeVisible();
+    await expect(menu.getByText('LinkedIn', { exact: true })).toBeVisible();
+    await expect(menu.getByText('Instagram', { exact: true })).toBeVisible();
 
     // clicking one launches Internet Explorer
-    await win.getByText('GitHub', { exact: true }).click();
+    await menu.getByText('GitHub', { exact: true }).click();
     await expect(page.locator('#work-space iframe')).toHaveCount(1, {
         timeout: 10000,
     });

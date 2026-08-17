@@ -35,7 +35,10 @@ test('Explorer Back dropdown lists history and jumps to a page', async ({
 
     // jump straight back to My Computer root
     await menu.getByText('My Computer').click();
-    await expect(win.getByText('Local Disk (C:)')).toBeVisible();
+    // the drive in the viewer — View > Go To now lists the same label too
+    await expect(
+        win.locator('.fs-item', { hasText: 'Local Disk (C:)' }),
+    ).toBeVisible();
     // the portfolio entry from Experience is no longer shown
     await expect(win.getByText('Printerpix — AI Engineer.txt')).toBeHidden();
 });

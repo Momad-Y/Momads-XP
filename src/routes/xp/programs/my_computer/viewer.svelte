@@ -25,6 +25,12 @@
     import { createEventDispatcher, tick, mount } from 'svelte';
     import { get, set } from 'idb-keyval';
     import { parse_dir } from '../../../../lib/dir_parser';
+    import {
+        column_value,
+        default_details_columns,
+        visible_columns,
+    } from '../../../../lib/details_columns';
+    import type { DetailsColumnKey } from '../../../../lib/details_columns';
     import { required } from '../../../../lib/types';
     import { show_no_association_dialog } from '../../../../lib/no_association';
     import type {
@@ -60,18 +66,13 @@
         Details: 'w-[16px] h-[16px]',
     }[view_mode];
 
-    function type_label(item: VfsItem): string {
-        if (item.type === 'folder') return 'File Folder';
-        if (item.type === 'drive') return 'Local Disk';
-        if (item.type === 'removable_storage') return 'Removable Disk';
-        return item.ext !== ''
-            ? `${item.ext.slice(1).toUpperCase()} File`
-            : 'File';
-    }
-    function size_label(item: VfsItem): string {
-        if (item.type !== 'file') return '';
-        return `${String(item.size ?? 0)} KB`;
-    }
+    /**
+     * Which Details columns to render (View > Choose Details...). Name is
+     * always shown — it is the item label itself — so only the REST are laid
+     * out as columns beside it.
+     */
+    export let details: readonly DetailsColumnKey[] = default_details_columns;
+    $: extra_columns = visible_columns(details).filter((c) => c.key !== 'name');
 
     /** A point with the optional modifier keys of a (possibly synthetic) click. */
     interface MenuTrigger {
@@ -126,12 +127,27 @@
         }
     };
 
+    /**
+     * Bumped by `refresh()` so the sort is re-run even though nothing about
+     * the folder changed. It rides in the hash because the worker memoises on
+     * that hash — without it, a refresh would be answered from the cache and
+     * the user would see no evidence anything happened.
+     */
+    let refresh_nonce = 0;
+
+    /** View > Refresh (and F5): re-read the folder and re-sort it. */
+    export function refresh() {
+        sorted_items = null;
+        refresh_nonce++;
+    }
+
     let last_sort_tx_hash: string | null | undefined;
     $: {
         if (current_folder) {
             const hash_object = {
                 id,
                 items,
+                refresh_nonce,
                 sort_option: current_folder.sort_option,
                 sort_order: current_folder.sort_order,
             };
@@ -151,7 +167,10 @@
     $: is_focus = $zIndex == my_computer_instance.window?.z_index;
     // Filter (don't throw) on missing ids: an offline stale cached drive may
     // predate newer seeded entries in the list (Phase 2 red-team M1).
-    const computer = my_computer.flatMap((el) => {
+    // Reactive, not a one-shot const: the root list used to be frozen at mount,
+    // so a drive renamed elsewhere never updated and View > Refresh had nothing
+    // to re-derive here.
+    $: computer = my_computer.flatMap((el) => {
         const item = $hardDrive?.[el];
         return item == null ? [] : [item];
     });
@@ -521,8 +540,14 @@
                 >
                     <span class="w-[16px] shrink-0"></span>
                     <span class="grow px-1 mx-0.5">Name</span>
-                    <span class="w-[90px] shrink-0">Type</span>
-                    <span class="w-[70px] shrink-0 text-right pr-2">Size</span>
+                    {#each extra_columns as col (col.key)}
+                        <span
+                            class="shrink-0 truncate {col.align === 'right'
+                                ? 'text-right pr-2'
+                                : ''}"
+                            style:width="{col.width ?? 90}px">{col.label}</span
+                        >
+                    {/each}
                 </div>
             {/if}
             {#each sorted_items as item (item.id)}
@@ -591,14 +616,16 @@
                         {item.name}
                     </p>
                     {#if view_mode === 'Details'}
-                        <span
-                            class="w-[90px] shrink-0 text-[11px] text-slate-600 truncate"
-                            >{type_label(item)}</span
-                        >
-                        <span
-                            class="w-[70px] shrink-0 text-[11px] text-slate-600 text-right pr-2"
-                            >{size_label(item)}</span
-                        >
+                        {#each extra_columns as col (col.key)}
+                            <span
+                                class="shrink-0 text-[11px] text-slate-600 truncate {col.align ===
+                                'right'
+                                    ? 'text-right pr-2'
+                                    : ''}"
+                                style:width="{col.width ?? 90}px"
+                                >{column_value(item, col.key)}</span
+                            >
+                        {/each}
                     {/if}
                     {#if $selectingItems.includes(item.id) && renaming}
                         <textarea

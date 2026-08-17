@@ -15,7 +15,7 @@ async function openExperience(page: Page) {
 }
 
 const favMenu = (win: ReturnType<Page['locator']>) =>
-    win.locator('.toolbar-menu').getByText('Favorites', { exact: true });
+    win.locator('[data-menu="Favorites"]');
 
 test('Explorer can favourite the folder it is showing', async ({ page }) => {
     const win = await openExperience(page);
@@ -175,10 +175,7 @@ test('a folder favourite is shared with IE and opens Explorer, not a web page', 
         .dblclick();
     await page.waitForTimeout(800);
     const ie = page.locator('#work-space .window').last();
-    await ie
-        .locator('.toolbar-menu')
-        .getByText('Favorites', { exact: true })
-        .click();
+    await ie.locator('[data-menu="Favorites"]').click();
     await expect(
         ie.locator('p', { hasText: /^Experience$/ }).first(),
     ).toBeVisible();

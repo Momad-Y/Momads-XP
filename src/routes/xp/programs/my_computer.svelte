@@ -25,12 +25,24 @@
     import Viewer from './my_computer/viewer.svelte';
     import * as finder from '../../../lib/finder';
     import * as utils from '../../../lib/utils';
-    import { favorites, favorite_icon } from '../../../lib/favorites';
+    import {
+        favorites,
+        favorite_icon,
+        is_shell_favorite,
+    } from '../../../lib/favorites';
+    import type { Favorite } from '../../../lib/favorites';
+    import { status_info } from '../../../lib/status_bar';
+    import { default_details_columns } from '../../../lib/details_columns';
+    import type { DetailsColumnKey } from '../../../lib/details_columns';
     import Sidebar from './my_computer/sidebar.svelte';
     import SearchPanel from './my_computer/search_panel.svelte';
     import FoldersTree from './my_computer/folders_tree.svelte';
+    import FavoritesPanel from './my_computer/favorites_panel.svelte';
+    import HistoryPanel from './my_computer/history_panel.svelte';
+    import ChooseDetails from './my_computer/choose_details.svelte';
     import { required } from '../../../lib/types';
     import type {
+        HistoryEntry,
         MenuBarEntry,
         ProgramInstance,
         MountedComponent,
@@ -107,12 +119,40 @@
     // never leave the dropdown open on a view that cannot use it
     $: if (!views_available) views_menu = false;
 
-    /** XP closes an open dropdown on Escape. */
+    // ── View menu chrome (§ Toolbars / Status Bar / Choose Details) ────────
+    // Each toolbar row is toggled independently, exactly as XP's View >
+    // Toolbars submenu does. State is per WINDOW — two Explorers can disagree
+    // about their chrome, which is why none of this lives in a store.
+    let show_standard_buttons = true;
+    let show_address_bar = true;
+    let show_links = false;
+    let show_status_bar = true;
+    /** Which Details columns this window shows (View > Choose Details...). */
+    let details_visible: DetailsColumnKey[] = [...default_details_columns];
+    let show_choose_details = false;
+
+    /** XP's Links toolbar is the web half of the Favorites list. */
+    $: link_favorites = $favorites.filter((fav) => !is_shell_favorite(fav));
+
+    function focused(): boolean {
+        return window?.z_index === $zIndex;
+    }
+
+    /** XP closes an open dropdown on Escape, and refreshes the folder on F5. */
     function on_keydown(event: KeyboardEvent) {
-        if (event.key !== 'Escape' || !views_menu) return;
+        if (!focused()) return; // focused window only
+        if (event.key === 'F5') {
+            event.preventDefault();
+            refresh();
+            return;
+        }
+        if (event.key !== 'Escape') return;
         if ($contextMenu != null) return;
-        if (window?.z_index !== $zIndex) return; // focused window only
-        views_menu = false;
+        if (show_choose_details) {
+            show_choose_details = false;
+            return;
+        }
+        if (views_menu) views_menu = false;
     }
 
     // ── File menu ────────────────────────────────────────────
@@ -324,6 +364,46 @@
                   },
               ];
 
+    /** XP's View > Explorer Bar submenu, in XP's order. */
+    interface ExplorerBarEntry {
+        name: string;
+        mode: Exclude<LeftPanel, 'tasks'>;
+    }
+    const explorer_bars: ExplorerBarEntry[] = [
+        { name: 'Search', mode: 'search' },
+        { name: 'Favorites', mode: 'favorites' },
+        { name: 'History', mode: 'history' },
+        { name: 'Folders', mode: 'folders' },
+    ];
+
+    /**
+     * View > Go To ▸ — the toolbar's three navigation buttons plus the trail
+     * itself, with the current stop ticked (XP lists visited folders here).
+     */
+    $: go_to_submenu = [
+        { name: 'Back', disabled: page_index === 0, action: back },
+        {
+            name: 'Forward',
+            disabled: page_index === history.length - 1,
+            action: next,
+        },
+        {
+            name: 'Up One Level',
+            disabled: current_history_id == null,
+            action: up,
+        },
+        ...history_entries.map((entry) => ({
+            name: entry.label,
+            check: entry.idx === page_index,
+            // via pick_history, NOT an inline `page_index = …`: an assignment
+            // inside a reactive statement makes it a producer of that variable
+            // and the compiler then sees a cycle (url → page_index → url).
+            action: () => {
+                pick_history(entry.idx);
+            },
+        })),
+    ];
+
     $: menu = [
         {
             name: 'File',
@@ -396,15 +476,47 @@
                 [
                     {
                         name: 'Toolbars',
-                        disabled: true,
+                        items: [
+                            {
+                                name: 'Standard Buttons',
+                                check: show_standard_buttons,
+                                action: () => {
+                                    show_standard_buttons =
+                                        !show_standard_buttons;
+                                },
+                            },
+                            {
+                                name: 'Address Bar',
+                                check: show_address_bar,
+                                action: () => {
+                                    show_address_bar = !show_address_bar;
+                                },
+                            },
+                            {
+                                name: 'Links',
+                                check: show_links,
+                                action: () => {
+                                    show_links = !show_links;
+                                },
+                            },
+                        ],
                     },
                     {
                         name: 'Status Bar',
-                        disabled: true,
+                        check: show_status_bar,
+                        action: () => {
+                            show_status_bar = !show_status_bar;
+                        },
                     },
                     {
                         name: 'Explorer Bar',
-                        disabled: true,
+                        items: explorer_bars.map((bar) => ({
+                            name: bar.name,
+                            check: left_panel === bar.mode,
+                            action: () => {
+                                toggle_panel(bar.mode);
+                            },
+                        })),
                     },
                 ],
                 view_modes.map((m) => ({
@@ -417,16 +529,21 @@
                 })),
                 [
                     {
+                        // only the item list has columns; the fixed root layout
+                        // has none, so it greys with the view modes
                         name: 'Choose Details...',
-                        disabled: true,
+                        disabled: !views_available,
+                        action: () => {
+                            show_choose_details = true;
+                        },
                     },
                     {
                         name: 'Go To',
-                        disabled: true,
+                        items: go_to_submenu,
                     },
                     {
                         name: 'Refresh',
-                        disabled: true,
+                        action: refresh,
                     },
                 ],
             ],
@@ -442,36 +559,22 @@
                         // a selected folder wins over the open one; only the
                         // bare My Computer root has nothing to offer
                         disabled: favorite_target == null,
-                        action: () => {
-                            if (favorite_target == null) return;
-                            queueProgram.set({
-                                path: './programs/add_to_favorites.svelte',
-                                fs_item: favorite_target,
-                            });
-                        },
+                        action: add_to_favorites,
                     },
                     {
                         name: 'Organize Favorites',
-                        action: () => {
-                            queueProgram.set({
-                                path: './programs/organize_favorites.svelte',
-                            });
-                        },
+                        action: organize_favorites,
                     },
                 ],
                 $favorites.map((fav) => ({
                     name: fav.name,
                     icon: favorite_icon(fav, $hardDrive),
+                    // A shell favourite goes through the viewer's opener, which
+                    // navigates folders and launches files in their associated
+                    // program — the same as double-clicking. Web favourites
+                    // still hand off to IE.
                     action: () => {
-                        // A shell favourite goes through the viewer's opener,
-                        // which navigates folders and launches files in their
-                        // associated program — the same as double-clicking.
-                        // Web favourites still hand off to IE.
-                        if (fav.fs_id != null && fav.fs_id !== '') {
-                            viewer?.open_item(fav.fs_id);
-                        } else {
-                            open_favorite(fav.url);
-                        }
+                        open_favorite_entry(fav);
                     },
                 })),
             ],
@@ -584,10 +687,29 @@
         page_index = Math.min(history.length - 1, page_index + 1);
     }
 
-    // Left explorer bar: common tasks (default), search, or folders tree
-    let left_panel: 'tasks' | 'search' | 'folders' = 'tasks';
-    function toggle_panel(mode: 'search' | 'folders') {
+    // Left explorer bar (View > Explorer Bar): common tasks by default, else
+    // one of XP's four bars.
+    type LeftPanel = 'tasks' | 'search' | 'folders' | 'favorites' | 'history';
+    let left_panel: LeftPanel = 'tasks';
+    function toggle_panel(mode: Exclude<LeftPanel, 'tasks'>) {
         left_panel = left_panel === mode ? 'tasks' : mode;
+    }
+
+    /** View > Refresh, and F5. */
+    function refresh() {
+        viewer?.refresh();
+    }
+
+    function close_explorer_bar() {
+        left_panel = 'tasks';
+    }
+
+    function apply_details(next: DetailsColumnKey[]) {
+        details_visible = next;
+    }
+
+    function close_choose_details() {
+        show_choose_details = false;
     }
 
     // Back/Forward history dropdowns
@@ -597,23 +719,53 @@
         const item = $hardDrive?.[id];
         return item?.display_name ?? item?.name ?? 'My Computer';
     }
-    interface HistoryOption {
-        label: string;
-        idx: number;
+    function history_icon(id: string | null | undefined): string {
+        if (id == null) return '/images/xp/icons/MyComputer.png';
+        const item = $hardDrive?.[id];
+        if (item?.icon != null && item.icon !== '') return item.icon;
+        return '/images/xp/icons/FolderClosed.png';
     }
-    $: back_options = history
-        .slice(0, page_index)
-        .map((id, i): HistoryOption => ({ label: history_label(id), idx: i }))
-        .reverse();
-    $: forward_options = history
-        .slice(page_index + 1)
-        .map((id, i): HistoryOption => ({
-            label: history_label(id),
-            idx: page_index + 1 + i,
-        }));
+    /** The whole trail — the Go To menu and the History bar both walk it. */
+    $: history_entries = history.map((hid, i): HistoryEntry => ({
+        label: history_label(hid),
+        idx: i,
+        icon: history_icon(hid),
+    }));
+    $: back_options = history_entries.slice(0, page_index).reverse();
+    $: forward_options = history_entries.slice(page_index + 1);
     function pick_history(idx: number) {
         history_menu = null;
         page_index = idx;
+    }
+
+    // ── Status bar ────────────────────────────────────────────────────────
+    // Counts what THIS window is showing. `viewer_visible_ids` is the same
+    // filter the File menu uses, so a selection made in another window or on
+    // the desktop can never be counted here.
+    $: shown_items = viewer_visible_ids
+        .map((vid) => $hardDrive?.[vid])
+        .filter((it): it is VfsItem => it != null);
+    $: status = status_info(shown_items, selected_items);
+
+    /** Opens a favourite the way both Favorites surfaces do. */
+    function open_favorite_entry(fav: Favorite) {
+        if (fav.fs_id != null && fav.fs_id !== '') {
+            viewer?.open_item(fav.fs_id);
+        } else {
+            open_favorite(fav.url);
+        }
+    }
+
+    function add_to_favorites() {
+        if (favorite_target == null) return;
+        queueProgram.set({
+            path: './programs/add_to_favorites.svelte',
+            fs_item: favorite_target,
+        });
+    }
+
+    function organize_favorites() {
+        queueProgram.set({ path: './programs/organize_favorites.svelte' });
     }
 
     export function up() {
@@ -661,6 +813,7 @@
         </div>
         <div
             class="shrink-0 flex flex-row items-center border-b border-stone-300"
+            class:hidden={!show_standard_buttons}
         >
             <div class="relative">
                 <RButton
@@ -793,6 +946,7 @@
         </div>
         <div
             class="shrink-0 flex flex-row items-center border-b border-stone-300 text-[11px] items-center"
+            class:hidden={!show_address_bar}
         >
             <span class="px-2 text-slate-800">Address</span>
             <div class="grow h-[25px] relative">
@@ -818,6 +972,35 @@
             ></div>
         </div>
 
+        <!-- XP's Links toolbar: the web half of the shared Favorites list -->
+        <div
+            class="shrink-0 flex flex-row items-center gap-1 px-2 py-1 border-b border-stone-300 text-[11px] overflow-x-auto"
+            class:hidden={!show_links}
+        >
+            <span class="shrink-0 text-slate-800">Links</span>
+            {#if link_favorites.length === 0}
+                <span class="text-slate-500 italic">no links yet</span>
+            {/if}
+            {#each link_favorites as fav, i (i)}
+                <button
+                    type="button"
+                    class="shrink-0 flex flex-row items-center px-1 hover:bg-blue-100"
+                    on:click={() => {
+                        open_favorite(fav.url);
+                    }}
+                >
+                    <span
+                        class="w-4 h-4 mr-1 bg-contain bg-no-repeat bg-center"
+                        style:background-image="url({favorite_icon(
+                            fav,
+                            $hardDrive,
+                        )})"
+                    ></span>
+                    {fav.name}
+                </button>
+            {/each}
+        </div>
+
         <div class="grow flex flex-row overflow-hidden">
             {#if left_panel === 'search'}
                 <SearchPanel my_computer_instance={mc_interface} />
@@ -825,6 +1008,20 @@
                 <FoldersTree
                     my_computer_instance={mc_interface}
                     current_id={history[page_index]}
+                />
+            {:else if left_panel === 'favorites'}
+                <FavoritesPanel
+                    on_open={open_favorite_entry}
+                    on_add={add_to_favorites}
+                    on_organize={organize_favorites}
+                    on_close={close_explorer_bar}
+                />
+            {:else if left_panel === 'history'}
+                <HistoryPanel
+                    entries={history_entries}
+                    current_idx={page_index}
+                    on_pick={pick_history}
+                    on_close={close_explorer_bar}
                 />
             {:else}
                 <Sidebar
@@ -838,6 +1035,7 @@
                     bind:visible_ids={viewer_visible_ids}
                     id={history[page_index]}
                     {view_mode}
+                    details={details_visible}
                     on:open={(e: CustomEvent<{ id: string | null }>) => {
                         open(e.detail.id);
                     }}
@@ -845,5 +1043,29 @@
                 ></Viewer>
             </div>
         </div>
+
+        <!-- XP's status bar: object count, size, and the security zone -->
+        <div
+            class="shrink-0 flex flex-row items-center border-t border-stone-300 bg-xp-yellow text-[11px] text-slate-800"
+            class:hidden={!show_status_bar}
+        >
+            <span class="grow px-2 py-0.5 truncate">{status.objects}</span>
+            <span
+                class="w-[110px] shrink-0 px-2 py-0.5 border-l border-stone-300 truncate"
+                >{status.size}</span
+            >
+            <span
+                class="w-[110px] shrink-0 px-2 py-0.5 border-l border-stone-300 truncate"
+                >My Computer</span
+            >
+        </div>
+
+        {#if show_choose_details}
+            <ChooseDetails
+                visible={details_visible}
+                on_apply={apply_details}
+                on_close={close_choose_details}
+            />
+        {/if}
     </div>
 </Window>
