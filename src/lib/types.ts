@@ -202,6 +202,20 @@ export interface ViewerController {
     rename: () => void;
     /** Opens an item the way a double-click does (resolves .lnk, launches). */
     open_item: (item_id: string) => void;
+    /** View > Refresh / F5: re-reads and re-sorts the current folder. */
+    refresh: () => void;
+}
+
+/**
+ * One stop on an Explorer window's navigation trail — shared by the
+ * Back/Forward dropdowns, the Go To menu and the History Explorer Bar, which
+ * all walk the same `history` array.
+ */
+export interface HistoryEntry {
+    label: string;
+    /** Index into the window's `history` array. */
+    idx: number;
+    icon: string;
 }
 
 /** Originator for folder-scoped menus (Desktop, FSVoid): the folder's VFS id. */

@@ -69,7 +69,13 @@
         <div
             class="text-[11px] text-slate-900 hover:bg-blue-600 hover:text-slate-50 relative group"
         >
-            <div class="px-2 py-1" on:click={() => (active = true)}>
+            <!-- data-menu: the label text alone is ambiguous once a submenu
+                 carries the same word (View > Explorer Bar > Favorites) -->
+            <div
+                class="px-2 py-1"
+                data-menu={menu_group.name}
+                on:click={() => (active = true)}
+            >
                 {menu_group.name}
             </div>
             {#if menu_group.items != null}
@@ -179,6 +185,14 @@
                                                                 height="17px"
                                                                 alt=""
                                                             />
+                                                        {:else if sub_item.check}
+                                                            <!-- XP ticks toggles inside submenus too (View > Toolbars) -->
+                                                            <span
+                                                                class="text-[11px] {sub_item.disabled
+                                                                    ? 'text-slate-400'
+                                                                    : 'text-slate-900 group-sub1-hover:text-slate-50'}"
+                                                                >✓</span
+                                                            >
                                                         {/if}
                                                     </div>
                                                     <div
