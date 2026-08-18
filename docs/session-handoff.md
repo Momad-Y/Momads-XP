@@ -16,16 +16,23 @@ All 11 entries work. The 6 that were greyed were implemented together:
 | Explorer Bar ▸ | `left_panel` widened to include `favorites` \| `history`; new `favorites_panel.svelte` / `history_panel.svelte` |
 | Choose Details… | `src/lib/details_columns.ts` + `my_computer/choose_details.svelte`, rendered INSIDE the window so two Explorers can differ |
 | Go To ▸ | `go_to_submenu`, built off the same `history_entries` the Back/Forward dropdowns use |
-| Refresh (+F5) | `viewer.refresh()` — bumps a nonce that rides in the sort hash, because the sort worker memoises on it |
+| Refresh (+F5) | `viewer.refresh()` — bumps a nonce that rides in the sort hash. NOT for the worker's `cache` (that object is read but never written — dead code): the viewer only posts to the worker when `hash !== last_sort_tx_hash`, so without the nonce a Refresh nulls `sorted_items`, never re-posts, and the folder hangs on "working on it..." forever |
 
-Two things worth remembering from that work:
+Worth remembering from that work:
 
 - `data-menu` on menu-bar entries and `data-history-idx` on History rows exist
   because "Favorites"/"Search"/"Folders" now appear in BOTH the menu bar or
   toolbar and a submenu — text-only locators went ambiguous and broke four
   specs. Hidden submenus are still in the DOM, so `getByText` matches them.
 - The My Computer root list is now reactive; it used to be a `const` frozen at
-  mount.
+  mount. `folders_tree.svelte` was already reactive, so this removed an
+  inconsistency rather than creating one.
+- **Refresh must abandon an in-flight rename.** Tearing the item list down
+  blurs the rename textarea and the blur handler COMMITS — so a reflex F5
+  mid-edit silently saved a half-typed name. Fixed by calling
+  `cancel_renaming()` from `refresh()`; covered by a test in
+  `e2e/file_menu_safety.spec.ts`. This is the third time a fix landed on one
+  call site and left a sibling path broken.
 
 **Next open question:** nothing pending on the View menu. See §2 — the deploy is
 the outstanding item.

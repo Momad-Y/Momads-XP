@@ -130,3 +130,29 @@ test('property sheets are single-instance and Escape closes them', async ({
     await page.keyboard.press('Escape');
     await expect(sheets).toHaveCount(0);
 });
+
+test('F5 abandons an inline rename instead of committing it', async ({
+    page,
+}) => {
+    // Refresh tears the item list down, which blurs the rename textarea. The
+    // blur handler commits — so before this guard, a reflex F5 mid-edit saved
+    // a half-typed name silently. Same trap Escape was fixed for.
+    const win = await openExplorerAt(page, 'Experience');
+    await win.locator('.toolbar-menu').getByText('File').click();
+    await win.locator('p', { hasText: /^New$/ }).first().hover();
+    await win.getByText('Text Document').click();
+    const created = win.getByText('New Text Document.txt');
+    await expect(created).toBeVisible({ timeout: 15000 });
+
+    await created.click({ button: 'right' });
+    await page.locator('.context-menu').getByText('Rename').click();
+    const box = win.locator('textarea');
+    await expect(box).toBeVisible();
+    await box.click();
+    await box.fill('F5_COMMITTED');
+    await page.keyboard.press('F5');
+    await page.waitForTimeout(600);
+
+    await expect(win.getByText('F5_COMMITTED')).toHaveCount(0);
+    await expect(win.getByText('New Text Document.txt')).toBeVisible();
+});

@@ -137,6 +137,12 @@
 
     /** View > Refresh (and F5): re-read the folder and re-sort it. */
     export function refresh() {
+        // A rename in flight must be ABANDONED, not committed. Refreshing
+        // tears the item list down, which blurs the rename textarea, and the
+        // blur handler would commit whatever had been typed — the exact trap
+        // Escape was fixed for (red-team M1). F5 is a reflex key, so this was
+        // reachable by accident mid-edit.
+        if (renaming) cancel_renaming();
         sorted_items = null;
         refresh_nonce++;
     }
