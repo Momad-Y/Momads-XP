@@ -187,6 +187,7 @@ test('View > Go To navigates, and Refresh keeps the folder listed', async ({
     // and re-sorts. The flash is too brief to poll for, so a MutationObserver
     // installed BEFORE the click records it — the title is just a channel back
     // to the test, since page.evaluate cannot hand out a live JS reference.
+    await openMenu(win, 'View');
     await page.evaluate(() => {
         const observer = new MutationObserver(() => {
             if (document.body.textContent?.includes('working on it...')) {
@@ -199,7 +200,9 @@ test('View > Go To navigates, and Refresh keeps the folder listed', async ({
             characterData: true,
         });
     });
-    await openMenu(win, 'View');
+    // installed AFTER the menu is open, so the only DOM change it can be
+    // reacting to is the Refresh click itself
+    expect(await page.title()).not.toBe('REFRESH_OBSERVED');
     await menuRow(win, 'Refresh').click();
     await expect.poll(() => page.title()).toBe('REFRESH_OBSERVED');
     await expect(win.getByText('Mohamed_Abdelnasser_Resume.pdf')).toBeVisible();

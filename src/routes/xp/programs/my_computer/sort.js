@@ -16,8 +16,6 @@ onmessage = async ({ data }) => {
         return;
     }
 
-    console.log('sorting', hash);
-
     for (let item of items) {
         if (item.type == 'folder') {
             item.size = 0;

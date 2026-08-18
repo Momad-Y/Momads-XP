@@ -143,7 +143,8 @@
         if (!focused()) return; // focused window only
         if (event.key === 'F5') {
             event.preventDefault();
-            refresh();
+            // a modal owns the keyboard: don't refresh the list underneath it
+            if (!show_choose_details) refresh();
             return;
         }
         if (event.key !== 'Escape') return;
