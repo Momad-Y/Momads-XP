@@ -32,6 +32,7 @@
     } from '../../../lib/favorites';
     import type { Favorite } from '../../../lib/favorites';
     import { status_info } from '../../../lib/status_bar';
+    import { scoped_ids } from '../../../lib/selection';
     import { default_details_columns } from '../../../lib/details_columns';
     import type { DetailsColumnKey } from '../../../lib/details_columns';
     import Sidebar from './my_computer/sidebar.svelte';
@@ -143,8 +144,16 @@
         if (!focused()) return; // focused window only
         if (event.key === 'F5') {
             event.preventDefault();
-            // a modal owns the keyboard: don't refresh the list underneath it
-            if (!show_choose_details) refresh();
+            // A modal owns the keyboard: don't refresh the list underneath it.
+            // Checks the DOM, not one boolean — the delete confirmation and
+            // the File Transfer guide mount straight into this window and set
+            // no flag, so guarding only `show_choose_details` left two
+            // siblings uncovered.
+            if (
+                !show_choose_details &&
+                window?.node_ref?.querySelector('.dialog') == null
+            )
+                refresh();
             return;
         }
         if (event.key !== 'Escape') return;
@@ -153,7 +162,12 @@
             show_choose_details = false;
             return;
         }
-        if (views_menu) views_menu = false;
+        if (views_menu) {
+            views_menu = false;
+            return;
+        }
+        // the bars advertise dismissal with a ✕, so Escape should do it too
+        if (left_panel !== 'tasks') close_explorer_bar();
     }
 
     // ── File menu ────────────────────────────────────────────
@@ -166,8 +180,7 @@
     // actually showing. Without this, an Explorer sitting on C:\ would happily
     // Delete/Rename/Shortcut an item selected on the desktop — which was a
     // real, reproducible data-loss path (red-team CRITICAL).
-    $: selected_items = $selectingItems
-        .filter((sid) => viewer_visible_ids.includes(sid))
+    $: selected_items = scoped_ids($selectingItems, viewer_visible_ids)
         .map((sid) => $hardDrive?.[sid])
         .filter((it): it is VfsItem => it != null);
     $: single_selected = selected_items.length === 1 ? selected_items[0] : null;
@@ -393,7 +406,9 @@
             disabled: current_history_id == null,
             action: up,
         },
-        ...history_entries.map((entry) => ({
+        // Capped: the flyout has no scroll and the window clips it, so an
+        // uncapped trail pushed the oldest stops out of reach after ~8 hops.
+        ...history_entries.slice(-8).map((entry) => ({
             name: entry.label,
             check: entry.idx === page_index,
             // via pick_history, NOT an inline `page_index = …`: an assignment
@@ -750,11 +765,20 @@
 
     /** Opens a favourite the way both Favorites surfaces do. */
     function open_favorite_entry(fav: Favorite) {
-        if (fav.fs_id != null && fav.fs_id !== '') {
-            viewer?.open_item(fav.fs_id);
-        } else {
+        if (fav.fs_id == null || fav.fs_id === '') {
             open_favorite(fav.url);
+            return;
         }
+        // A favourite outlives its target: deleting to the Recycle Bin mints a
+        // NEW id for the clone and drops the original, and nothing prunes the
+        // Favorites list. `viewer.open_item` resolves through `required()`, so
+        // a stale id THREW out of the click handler. IE degrades to My
+        // Computer here, so Explorer does the same.
+        if ($hardDrive?.[fav.fs_id] == null) {
+            open(null);
+            return;
+        }
+        viewer?.open_item(fav.fs_id);
     }
 
     function add_to_favorites() {
@@ -1004,14 +1028,19 @@
 
         <div class="grow flex flex-row overflow-hidden">
             {#if left_panel === 'search'}
-                <SearchPanel my_computer_instance={mc_interface} />
+                <SearchPanel
+                    my_computer_instance={mc_interface}
+                    on_close={close_explorer_bar}
+                />
             {:else if left_panel === 'folders'}
                 <FoldersTree
                     my_computer_instance={mc_interface}
                     current_id={history[page_index]}
+                    on_close={close_explorer_bar}
                 />
             {:else if left_panel === 'favorites'}
                 <FavoritesPanel
+                    can_add={favorite_target != null}
                     on_open={open_favorite_entry}
                     on_add={add_to_favorites}
                     on_organize={organize_favorites}

@@ -151,6 +151,9 @@ test('F5 abandons an inline rename instead of committing it', async ({
     await box.click();
     await box.fill('F5_COMMITTED');
     await page.keyboard.press('F5');
+    // ABANDONED, not merely uncommitted: the textarea must be gone. Without
+    // this a mutation that left the box open but non-committing passed.
+    await expect(win.locator('textarea')).toHaveCount(0);
     await page.waitForTimeout(600);
 
     await expect(win.getByText('F5_COMMITTED')).toHaveCount(0);

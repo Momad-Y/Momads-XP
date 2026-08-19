@@ -2,6 +2,7 @@
 
 <script lang="ts">
     import { folder_size } from '../../../lib/fs_size';
+    import { type_label } from '../../../lib/details_columns';
     import Window from '../../../lib/components/xp/Window.svelte';
     import Button from '../../../lib/components/xp/Button.svelte';
     import Tab from '../../../lib/components/xp/Tab.svelte';
@@ -41,7 +42,9 @@
         'disk properties fs item',
     );
     const details: DiskDetails = {
-        type: disk.type == 'drive' ? 'Local Disk' : 'Removable Storage',
+        // shared with the Details column and the file Properties sheet, which
+        // both said "Removable Disk" where this said "Removable Storage"
+        type: type_label(disk),
         format: 'FAT32',
         used_space: folder_size($hardDrive ?? {}, disk.id),
         // The untyped base compared `used_space > details.capacity` before

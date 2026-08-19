@@ -33,6 +33,12 @@ describe('format_size', () => {
         expect(format_size(12.4)).toBe('12 KB');
     });
 
+    it('rolls over at the unit boundary after rounding, not before', () => {
+        // 1023.6 rounded is 1024 KB, which must read as 1.00 MB
+        expect(format_size(1023.6)).toBe('1.00 MB');
+        expect(format_size(1024 * 1024 - 1)).toBe('1.00 GB');
+    });
+
     it('says "0 bytes" for empty, negative or non-finite sizes', () => {
         expect(format_size(0)).toBe('0 bytes');
         expect(format_size(-5)).toBe('0 bytes');
@@ -53,6 +59,15 @@ describe('total_size', () => {
 
     it('treats a missing size as zero', () => {
         expect(total_size([item({ id: 'a' })])).toBe(0);
+    });
+
+    it('one non-finite size does not poison the whole folder total', () => {
+        expect(
+            total_size([
+                item({ id: 'a', size: 10 }),
+                item({ id: 'b', size: Number.NaN }),
+            ]),
+        ).toBe(10);
     });
 
     it('is zero for an empty folder', () => {
@@ -89,10 +104,18 @@ describe('status_info', () => {
         );
     });
 
-    it('reports an empty folder as 0 objects', () => {
-        expect(status_info([], [])).toEqual({
-            objects: '0 objects',
-            size: '0 bytes',
+    it('reports an empty folder as 0 objects with a blank size', () => {
+        expect(status_info([], [])).toEqual({ objects: '0 objects', size: '' });
+    });
+
+    it('leaves the size BLANK for a container-only selection', () => {
+        // "0 bytes" for a 26 GB drive is a false statement, not a missing one
+        const drive = item({ id: 'c', type: 'drive', capacity: 26_214_400 });
+        expect(status_info([drive], [drive])).toEqual({
+            objects: '1 object selected',
+            size: '',
         });
+        const folder = item({ id: 'd', type: 'folder' });
+        expect(status_info([folder], []).size).toBe('');
     });
 });

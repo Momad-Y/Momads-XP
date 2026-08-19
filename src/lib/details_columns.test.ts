@@ -46,6 +46,10 @@ describe('type_label', () => {
     it('falls back to "File" when there is no extension', () => {
         expect(type_label(item({ id: 'e' }))).toBe('File');
     });
+
+    it('treats a bare dot as extensionless — renaming to "notes." is reachable', () => {
+        expect(type_label(item({ id: 'f', ext: '.' }))).toBe('File');
+    });
 });
 
 describe('size_label', () => {
@@ -55,6 +59,13 @@ describe('size_label', () => {
 
     it('treats a missing size as zero', () => {
         expect(size_label(item({ id: 'b' }))).toBe('0 KB');
+    });
+
+    it('abbreviates large files the same way the status bar does', () => {
+        // two formatters shipped side by side and disagreed: the column said
+        // "5000000 KB" while the status bar said "4.77 GB"
+        expect(size_label(item({ id: 'c', size: 5_000_000 }))).toBe('4.77 GB');
+        expect(size_label(item({ id: 'd', size: 2048 }))).toBe('2.00 MB');
     });
 
     it('shows nothing for folders', () => {
@@ -79,6 +90,19 @@ describe('date_label', () => {
         expect(date_label(undefined)).toBe('');
         expect(date_label(Number.NaN)).toBe('');
         expect(date_label(-1)).toBe('');
+    });
+
+    it('is blank for a finite stamp outside Date range, not "NaN/NaN/NaN"', () => {
+        expect(date_label(9e15)).toBe(''); // max Date is 8.64e15
+    });
+
+    it('formats a fixed epoch, so a switch to UTC getters would fail', () => {
+        // The local-parts round-trip below is a tautology under TZ=UTC, which
+        // is what CI runs — this pins an absolute instant instead. vitest.config
+        // forces TZ=Asia/Tokyo (UTC+9, no DST) for exactly this assertion.
+        expect(date_label(Date.UTC(2026, 7, 16, 6, 4))).toBe(
+            '8/16/2026 3:04 PM',
+        );
     });
 });
 

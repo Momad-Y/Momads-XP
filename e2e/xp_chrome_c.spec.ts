@@ -36,13 +36,13 @@ test('Search button finds files by name', async ({ page }) => {
     await win.getByPlaceholder('All or part of a name').click();
     await win.getByPlaceholder('All or part of a name').fill('Resume');
     // the panel's own Search button, not the toolbar one
-    await win.getByRole('button', { name: 'Search' }).click();
+    await win.getByRole('button', { name: 'Search', exact: true }).click();
 
     await expect(win.getByText('Mohamed_Abdelnasser_Resume.pdf')).toBeVisible();
 
     // a nonsense query yields the empty state
     await win.getByPlaceholder('All or part of a name').click();
     await win.getByPlaceholder('All or part of a name').fill('zzzznope');
-    await win.getByRole('button', { name: 'Search' }).click();
+    await win.getByRole('button', { name: 'Search', exact: true }).click();
     await expect(win.getByText('No items match your search.')).toBeVisible();
 });

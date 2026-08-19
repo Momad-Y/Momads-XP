@@ -8,6 +8,7 @@
  * a list with no name column is unusable.
  */
 import type { VfsItem } from './types';
+import { format_size } from './status_bar';
 
 export type DetailsColumnKey =
     'name' | 'size' | 'type' | 'date_modified' | 'date_created';
@@ -45,13 +46,25 @@ export function type_label(item: VfsItem): string {
     if (item.type === 'folder') return 'File Folder';
     if (item.type === 'drive') return 'Local Disk';
     if (item.type === 'removable_storage') return 'Removable Disk';
-    return item.ext !== '' ? `${item.ext.slice(1).toUpperCase()} File` : 'File';
+    // `ext` of '.' is reachable — renaming a file to "notes." makes extname
+    // return '.', which used to render as " File" with a leading space.
+    const ext = item.ext.replace(/^\./, '');
+    return ext !== '' ? `${ext.toUpperCase()} File` : 'File';
 }
 
-/** The Size cell. Folders show nothing, exactly like XP. */
+/**
+ * The Size cell. Folders show nothing, exactly like XP.
+ *
+ * Shares `format_size` with the status bar: two formatters shipped side by
+ * side in the same commit and disagreed, so one window showed the same file as
+ * "5000000 KB" in the column and "4.77 GB" in the bar two rows below.
+ */
 export function size_label(item: VfsItem): string {
     if (item.type !== 'file') return '';
-    return `${String(item.size ?? 0)} KB`;
+    const size = item.size ?? 0;
+    // XP's Size COLUMN writes an empty file as "0 KB", not "0 bytes" — only
+    // the status bar spells zero that way.
+    return size <= 0 ? '0 KB' : format_size(size);
 }
 
 /**
@@ -61,6 +74,9 @@ export function size_label(item: VfsItem): string {
 export function date_label(ms: number | undefined): string {
     if (ms == null || !Number.isFinite(ms) || ms <= 0) return '';
     const d = new Date(ms);
+    // finite but out of Date's range (max 8.64e15) → an Invalid Date, whose
+    // getters are all NaN and which rendered "NaN/NaN/NaN NaN:NaN PM"
+    if (Number.isNaN(d.getTime())) return '';
     const hours = d.getHours();
     const hour12 = hours % 12 === 0 ? 12 : hours % 12;
     const minutes = String(d.getMinutes()).padStart(2, '0');

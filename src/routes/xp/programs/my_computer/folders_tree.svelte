@@ -2,9 +2,11 @@
     import { hardDrive } from '../../../../lib/store';
     import { my_computer } from '../../../../lib/system';
     import type { MyComputerInstance, VfsItem } from '../../../../lib/types';
+    import ExplorerBarHeader from './explorer_bar_header.svelte';
 
     export let my_computer_instance: MyComputerInstance;
     export let current_id: string | null | undefined = null;
+    export let on_close: () => void = () => {};
 
     const expanded: Record<string, boolean> = {};
 
@@ -35,6 +37,7 @@
 <div
     class="w-[200px] shrink-0 overflow-auto bg-white border-r border-stone-300 text-[11px] font-MSSS py-1"
 >
+    <ExplorerBarHeader title="Folders" {on_close} />
     <div
         class="px-2 py-1 font-bold text-slate-700 border-b border-stone-200 flex flex-row items-center gap-1"
     >

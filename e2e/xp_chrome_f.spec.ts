@@ -69,10 +69,19 @@ test('View > Toolbars shows and hides each toolbar row', async ({ page }) => {
     await pickSub(win, 'Toolbars', 'Standard Buttons');
     await expect(back).toBeHidden();
 
-    // and back on again — the tick reflects the live state
+    // and back on again — assert the TICK, not just the row: hardcoding
+    // `check: false` used to leave every checkmark dead and still pass
     await openMenu(win, 'View');
     await pickSub(win, 'Toolbars', 'Address Bar');
     await expect(address).toBeVisible();
+    await openMenu(win, 'View');
+    await win
+        .locator('.toolbar-menu')
+        .getByText('Toolbars', { exact: true })
+        .hover();
+    await expect(subRow(win, 'Address Bar')).toContainText('✓');
+    await expect(subRow(win, 'Standard Buttons')).not.toContainText('✓');
+    await page.keyboard.press('Escape');
 
     // Links starts hidden, like XP, and appears when ticked. The bar's own
     // label is a <span>; the menu entry of the same name is a <p>.
@@ -81,6 +90,9 @@ test('View > Toolbars shows and hides each toolbar row', async ({ page }) => {
     await openMenu(win, 'View');
     await pickSub(win, 'Toolbars', 'Links');
     await expect(links_bar).toBeVisible();
+    // a real WEB favourite, not just the row's caption: inverting the filter
+    // to shell favourites used to pass
+    await expect(win.getByRole('button', { name: /GitHub/ })).toBeVisible();
 });
 
 test('View > Status Bar counts what the folder holds, and toggles off', async ({
@@ -89,6 +101,7 @@ test('View > Status Bar counts what the folder holds, and toggles off', async ({
     const win = await openDriveC(page);
     const status = win.getByText(/^\d+ objects?$/);
     await expect(status).toBeVisible();
+    await expect(status).not.toHaveText('0 objects');
 
     // selecting an item switches the count to the selection, like XP
     await win.getByText('Mohamed_Abdelnasser_Resume.pdf').click();
@@ -130,6 +143,19 @@ test('View > Explorer Bar opens the Favorites and History bars', async ({
     // the bar closes from its own X
     await win.locator('[aria-label="Close History bar"]').click();
     await expect(win.locator('[aria-label="Close History bar"]')).toBeHidden();
+
+    // Search and Folders are reachable from this menu too — xp_chrome_c only
+    // ever reaches those panels through the TOOLBAR buttons
+    await openMenu(win, 'View');
+    await pickSub(win, 'Explorer Bar', 'Search');
+    await expect(win.getByPlaceholder('All or part of a name')).toBeVisible();
+    await openMenu(win, 'View');
+    await pickSub(win, 'Explorer Bar', 'Folders');
+    await expect(win.locator('div[role="treeitem"]').first()).toBeVisible();
+    // re-picking the same entry closes it, as the toolbar buttons do
+    await openMenu(win, 'View');
+    await pickSub(win, 'Explorer Bar', 'Folders');
+    await expect(win.locator('div[role="treeitem"]')).toHaveCount(0);
 });
 
 test('View > Choose Details... adds and removes Details columns', async ({
@@ -171,6 +197,9 @@ test('View > Choose Details... Cancel discards, and Name cannot be removed', asy
     await menuRow(win, 'Choose Details\\.\\.\\.').click();
     await win.locator('[data-column="date_created"]').click();
     await win.locator('[data-column="name"]').click(); // ignored — Name is fixed
+    // Name stays ticked in the dialog itself; asserting the rendered header
+    // proved nothing, since that header is a hardcoded literal
+    await expect(win.locator('[data-column="name"]')).toContainText('✓');
     await win.getByText('Cancel', { exact: true }).click();
 
     await expect(win.getByText('Date Created', { exact: true })).toBeHidden();
@@ -215,5 +244,20 @@ test('View > Go To navigates, and Refresh keeps the folder listed', async ({
     // …and Back returns to C:
     await openMenu(win, 'View');
     await pickSub(win, 'Go To', 'Back');
+    await expect(win.getByText('Mohamed_Abdelnasser_Resume.pdf')).toBeVisible();
+
+    // the visited-folder list at the bottom of Go To is live too — deleting
+    // the whole history_entries spread used to pass
+    await openMenu(win, 'View');
+    await win
+        .locator('.toolbar-menu')
+        .getByText('Go To', { exact: true })
+        .hover();
+    // the trail legitimately holds My Computer twice by now (root -> C: ->
+    // root), so .first() picks stop 0 deliberately rather than by accident
+    await subRow(win, 'My Computer').first().click();
+    await expect(win.getByText('Files Stored on This Computer')).toBeVisible();
+    await openMenu(win, 'View');
+    await pickSub(win, 'Go To', 'Forward');
     await expect(win.getByText('Mohamed_Abdelnasser_Resume.pdf')).toBeVisible();
 });

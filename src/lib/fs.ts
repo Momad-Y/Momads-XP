@@ -8,6 +8,7 @@ import * as idb from 'idb-keyval';
 import * as finder from './finder';
 import { Buffer } from 'buffer';
 import { required } from './types';
+import { scoped_ids } from './selection';
 import type { HardDrive, VfsItem, VfsItemDraft } from './types';
 
 /** Snapshot the hard drive store, failing fast (as the untyped code did) if unseeded. */
@@ -15,14 +16,19 @@ function drive_snapshot(): HardDrive {
     return required(get(hardDrive), 'hard drive');
 }
 
-export function copy(): void {
+/**
+ * `scope` is the ids the acting surface is showing; the selection is narrowed
+ * to it (see src/lib/selection.ts). Without it a cut started in one Explorer
+ * carried another window's — or the desktop's — items, and paste MOVES them.
+ */
+export function copy(scope?: readonly string[]): void {
     clipboard_op.set('copy');
-    clipboard.set(get(selectingItems));
+    clipboard.set(scoped_ids(get(selectingItems), scope, []));
 }
 
-export function cut(): void {
+export function cut(scope?: readonly string[]): void {
     clipboard_op.set('cut');
-    clipboard.set(get(selectingItems));
+    clipboard.set(scoped_ids(get(selectingItems), scope, []));
 }
 
 export function paste(id: string, new_id: string | null = null): void {

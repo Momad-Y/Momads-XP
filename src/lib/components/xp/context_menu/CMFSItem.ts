@@ -23,6 +23,7 @@ import {
     delete_prompt_message,
 } from '../../../delete_prompt';
 import { required } from '../../../types';
+import { scoped_ids } from '../../../selection';
 import type { ContextMenuSpec, FSItemOriginator } from '../../../types';
 
 export const make = ({
@@ -31,6 +32,17 @@ export const make = ({
     type: string;
     originator: FSItemOriginator;
 }): ContextMenuSpec => {
+    /**
+     * What this menu is allowed to touch. `selectingItems` is ONE global store
+     * shared by the desktop and every Explorer window, so acting on it raw
+     * deleted/moved items belonging to another surface — whose highlight is
+     * focus-gated and therefore invisible. Falls back to the right-clicked
+     * item alone when the opener did not tell us what it is showing.
+     */
+    const in_scope = (): string[] =>
+        scoped_ids(get(selectingItems), originator.visible_ids, [
+            originator.item.id,
+        ]);
     //originator: a wrapped fs item, i.e, file, folder, drive
     // {item: item, open: fn(), my_computer_instance: obj})
 
@@ -183,9 +195,9 @@ export const make = ({
                     : [
                           {
                               name: 'Cut',
-                              disabled: get(selectingItems).length == 0,
+                              disabled: in_scope().length == 0,
                               action: () => {
-                                  fs.cut();
+                                  fs.cut(in_scope());
                               },
                           },
                       ]),
@@ -195,9 +207,9 @@ export const make = ({
                     : [
                           {
                               name: 'Copy',
-                              disabled: get(selectingItems).length == 0,
+                              disabled: in_scope().length == 0,
                               action: () => {
-                                  fs.copy();
+                                  fs.copy(in_scope());
                               },
                           },
                       ]),
@@ -250,7 +262,7 @@ export const make = ({
                                   // Bin and the desktop destroyed the live file
                                   // outright.
                                   const plan = plan_delete(
-                                      [...get(selectingItems)],
+                                      in_scope(),
                                       (id) => data[id],
                                       (id) => protected_items.includes(id),
                                       recycle_bin_id,

@@ -144,7 +144,7 @@
 </script>
 
 <div
-    class="w-[220px] shrink-0 overflow-auto p-2"
+    class="w-[200px] shrink-0 overflow-auto p-2"
     style:background="linear-gradient(rgb(137 155 253) 0%, rgb(84 104 212) 100%)"
 >
     <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
