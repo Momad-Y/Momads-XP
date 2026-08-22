@@ -24,25 +24,43 @@ confirmed by looking at the screenshots, as §11 requires.
 | SSRF / proxy hardening | #101 | §A1–A9 |
 | Regressions + correctness + tests | #102 | §C, §D, §E |
 | Visual parity | #103 | §F1–F8 |
+| Pinning, open redirect, chrome | #104 | §A2, §A10, §F10 |
 
-**Deliberately NOT fixed, with reasons:**
+**#104 closed the three that #100–#103 had left**, plus one finding that
+turned out not to be a defect:
 
-- **§A10** (open redirect / SSRF status oracle on the non-HTML branch) — a
-  multiplier on A1–A3, which are closed. Left as-is.
-- **§F9/F10** — IE and Explorer draw dropdowns with different borders and
-  gutters, and Internet Options uses bare headings where System Properties
-  uses bordered cards. Both LOW and cosmetic; they want one pass over the
-  shared chrome, not per-dialog patches.
-- **DNS rebinding.** #101 resolves and verifies every hostname but does not
-  PIN the connection, so a very short TTL can still flip the answer between
-  our lookup and `fetch`'s. Closing it needs a custom undici dispatcher whose
-  `connect.lookup` returns the verified address — replacing the runtime's HTTP
-  agent on a metered function is a bigger blast radius than the hole. Recorded
-  in `url_guard.ts` too.
+- **§A2 DNS rebinding — CLOSED.** The earlier note said this needed a custom
+  undici dispatcher and was too big a blast radius. That was wrong on the
+  mechanism: `node:https` takes a `lookup` option, so the socket is forced onto
+  the address the guard verified with no new dependency
+  (`src/lib/server/browse/pinned_fetch.ts`). TLS still sees the real hostname,
+  so SNI and certificate validation are untouched. A mixed DNS answer — some
+  public, some internal — is now refused outright rather than resolved to the
+  public one, which would just hand an attacker a retry.
+- **§A10 open redirect — CLOSED.** The non-HTML branch serves a small
+  interstitial instead of a 302, so `/api/browse` can no longer launder a link
+  on our domain and the 302/200/502 probe signal is gone.
+- **§F10 dialog chrome — CLOSED**, though the finding was described backwards:
+  System Properties used bare headings, Internet Options used cards on two tabs
+  and headings on the third, Folder Options used cards throughout. One shared
+  `GroupBox` with XP's etched frame now serves all three.
+- **§F9 IE-vs-Explorer menus — NOT A DEFECT.** Both render from the same
+  `Menu.svelte` with the same props and no style override, so they cannot
+  differ. The lens compared two screenshots taken at different window scales.
+
+**Still deliberately not done:**
+
 - **One test is not mutation-verified and says so.** The greyed-means-inert
   test in `file_menu_safety.spec.ts` clicks Delete and Rename, but no clean
   mutant makes it uniquely fail: the SCOPING makes the action a no-op, not the
   greying, and the CRITICAL test beside it already covers that.
+
+**A bug the pinning work caught, worth remembering:** Node calls a custom
+`lookup` with `{ all: true }` and then REQUIRES an array; returning a bare
+string fails with "Invalid IP address: undefined" on the first connection. The
+unit test asserted only the simple callback shape, so it passed against a build
+that could not fetch anything at all. Testing against a real host is what
+found it.
 
 ---
 
