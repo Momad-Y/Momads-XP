@@ -43,13 +43,18 @@ export function strip_csp_meta(html: string): string {
  * It is deliberately tiny and dependency-free; the page it runs in is
  * untrusted, so the parent validates everything it receives.
  */
-export function reporter_script(current_url: string): string {
+export function reporter_script(
+    current_url: string,
+    requested_url: string = current_url,
+): string {
     const json_url = JSON.stringify(current_url);
+    const json_req = JSON.stringify(requested_url);
     return `<script>(function(){
 try{
 var CUR=${json_url};
-function post(type,url){try{parent.postMessage({__momadxp:1,type:type,url:url},'*');}catch(e){}}
-post('navigated',CUR);
+var REQ=${json_req};
+function post(type,url,requested){try{parent.postMessage({__momadxp:1,type:type,url:url,requested:requested},'*');}catch(e){}}
+post('navigated',CUR,REQ);
 document.addEventListener('click',function(e){
   var a=e.target&&e.target.closest?e.target.closest('a'):null;
   if(!a)return;
@@ -106,9 +111,23 @@ export function strip_base(html: string): string {
  * Full document rewrite. Injected as early as possible so the reporter is
  * listening before the page's own scripts can navigate.
  */
-export function rewrite_document(html: string, current_url: string): string {
+/**
+ * `current_url` is where the fetch ENDED UP (after redirects) and `requested_url`
+ * is what the parent asked for. The reporter announces both, because the parent
+ * cannot otherwise tell a redirect of the page it wanted from a stale message
+ * sent by a page the user has already navigated away from — and it has to know,
+ * since a redirect must REPLACE the current history entry rather than add one.
+ */
+export function rewrite_document(
+    html: string,
+    current_url: string,
+    requested_url: string = current_url,
+): string {
     let out = strip_csp_meta(strip_base(html));
-    const injection = base_tag(current_url) + reporter_script(current_url);
+    // <base> stays the FINAL url: relative subresources resolve against where
+    // the document actually came from.
+    const injection =
+        base_tag(current_url) + reporter_script(current_url, requested_url);
 
     if (/<head[^>]*>/i.test(out)) {
         out = out.replace(/<head[^>]*>/i, (m) => m + injection);
