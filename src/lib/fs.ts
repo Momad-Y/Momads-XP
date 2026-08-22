@@ -34,7 +34,14 @@ function drive_snapshot(): HardDrive {
  * Ctrl+C with nothing selected as a no-op, not as "empty the clipboard".
  */
 function clip(op: 'copy' | 'cut', scope: readonly string[] | null): void {
-    const ids = scoped_ids(get(selectingItems), scope, []);
+    let ids = scoped_ids(get(selectingItems), scope, []);
+    // The right-click menu hides Cut for protected items, but the KEYBOARD
+    // path had no such filter and `del_fs` silently no-ops on them — so
+    // Ctrl+X then Ctrl+V cloned the whole portfolio tree and left the original
+    // in place, once per repeat.
+    if (op === 'cut') {
+        ids = ids.filter((id) => !protected_items.includes(id));
+    }
     if (ids.length === 0) return;
     clipboard_op.set(op);
     clipboard.set(ids);
@@ -48,26 +55,45 @@ export function cut(scope: readonly string[] | null): void {
     clip('cut', scope);
 }
 
+/**
+ * Paste into `id`.
+ *
+ * There is deliberately NO scope parameter here, unlike `copy`/`cut`. Paste
+ * does not read the selection — it reads the clipboard and writes into one
+ * named folder — so narrowing a selection buys nothing. The defect that let
+ * ONE Ctrl+V paste into two places was a FOCUS defect, and it is fixed where
+ * it lives: the desktop's keydown gate (desktop_folder.svelte), which was the
+ * only keyboard surface in the app with no z-order awareness.
+ */
 export function paste(id: string, new_id: string | null = null): void {
     const target = drive_snapshot()[id];
     if (target == null || target.type == 'file') {
         return;
     }
 
-    if (get(clipboard).length == 0) {
+    const batch = get(clipboard);
+    if (batch.length == 0) {
         return;
     }
+    const was_cut = get(clipboard_op) == 'cut';
 
-    for (const fs_id of get(clipboard)) {
+    for (const fs_id of batch) {
+        // re-check per item: an earlier iteration, or another window, may have
+        // removed it since the clipboard was filled
+        if (drive_snapshot()[fs_id] == null) continue;
         clone_fs(fs_id, id, new_id);
-
-        if (get(clipboard_op) == 'cut') {
+        if (was_cut) {
             del_fs(fs_id);
         }
     }
 
-    clipboard_op.set('copy');
-    // clipboard.set([]);
+    // A cut CONSUMES the clipboard. Leaving the ids behind kept Paste enabled
+    // on every void menu, and clicking it threw `required()` on a deleted id
+    // out of the menu handler. A copy stays on the clipboard, as in Windows.
+    if (was_cut) {
+        clipboard.set([]);
+        clipboard_op.set('copy');
+    }
 }
 
 export function del_fs(id: string): void {
@@ -98,9 +124,36 @@ export function del_fs(id: string): void {
         return data;
     });
 
+    free_blob(obj);
+
     for (const child_id of child_ids) {
         del_fs(child_id);
     }
+}
+
+/**
+ * Release an uploaded file's bytes once nothing references them.
+ *
+ * Nothing ever called `idb.del` — `del` was not imported anywhere in `src/` —
+ * so every upload leaked its bytes forever. Deleting three 150 MB videos and
+ * emptying the Recycle Bin left ~450 MB unreachable, and once the origin hit
+ * quota every later `set('hard_drive', …)` rejected and the visitor's files
+ * vanished on reload.
+ *
+ * The reference check is what makes this safe: recycling CLONES an item and
+ * the clone keeps the same `url` key, so the bytes must survive until the last
+ * item pointing at them is gone.
+ */
+function free_blob(removed: VfsItem): void {
+    const url = removed.url;
+    if (removed.storage_type !== 'local' || url == null || url === '') return;
+    const still_referenced = Object.values(drive_snapshot()).some(
+        (item) => item.url === url,
+    );
+    if (still_referenced) return;
+    // A failed release only costs quota — there is nothing the visitor could
+    // do about it and nothing to retry, so it is not surfaced.
+    void idb.del(url).catch(() => undefined);
 }
 
 function dir_contains_dir(a: string | null, b: string | null): boolean {

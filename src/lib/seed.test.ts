@@ -93,14 +93,47 @@ describe('merge_on_reseed', () => {
         expect(merge_on_reseed(cached, seed)['lost']).toBeUndefined();
     });
 
-    it('does NOT carry stale fake/remote items (retires old placeholders)', () => {
+    it('retires a stale program placeholder (fake AND executable)', () => {
         const cached = drive(
             item({ id: 'desktop', type: 'folder', children: ['old_exe'] }),
-            item({ id: 'old_exe', parent: 'desktop', storage_type: 'fake' }),
+            item({
+                id: 'old_exe',
+                parent: 'desktop',
+                storage_type: 'fake',
+                executable: true,
+            }),
         );
         const merged = merge_on_reseed(cached, seed);
         expect(merged['old_exe']).toBeUndefined();
         expect(merged['desktop']?.children).toEqual(['seeded_exe']);
+    });
+
+    // The carry rule is PROVENANCE, not `storage_type`. create_shortcut mints
+    // .lnk items as `fake`, so selecting on 'local' silently destroyed every
+    // shortcut a visitor made on the next deploy while their uploads survived.
+    it('carries a user-created shortcut, which is fake but NOT executable', () => {
+        const cached = drive(
+            item({ id: 'desktop', type: 'folder', children: ['lnk'] }),
+            item({
+                id: 'lnk',
+                name: 'Shortcut to Projects.lnk',
+                ext: '.lnk',
+                parent: 'desktop',
+                storage_type: 'fake',
+                shortcut_target: 'seeded_exe',
+            }),
+        );
+        const merged = merge_on_reseed(cached, seed);
+        expect(merged['lnk']?.name).toBe('Shortcut to Projects.lnk');
+        expect(merged['desktop']?.children).toContain('lnk');
+    });
+
+    it('carries a pasted copy of a seed item', () => {
+        const cached = drive(
+            item({ id: 'desktop', type: 'folder', children: ['pasted'] }),
+            item({ id: 'pasted', parent: 'desktop', storage_type: 'remote' }),
+        );
+        expect(merge_on_reseed(cached, seed)['pasted']).toBeDefined();
     });
 
     it('seed always wins for ids it contains', () => {
@@ -117,7 +150,7 @@ describe('merge_on_reseed', () => {
         expect(merged['desktop']?.children).toEqual(['seeded_exe']);
     });
 
-    it('a carried folder only keeps carried children', () => {
+    it('a carried folder keeps its carried children and drops dangling ids', () => {
         const cached = drive(
             item({ id: 'desktop', type: 'folder', children: ['dir'] }),
             item({
@@ -125,10 +158,14 @@ describe('merge_on_reseed', () => {
                 type: 'folder',
                 parent: 'desktop',
                 storage_type: 'local',
-                children: ['copy'],
+                children: ['copy', 'ghost'],
             }),
             item({ id: 'copy', parent: 'dir', storage_type: 'remote' }),
         );
-        expect(merge_on_reseed(cached, seed)['dir']?.children).toEqual([]);
+        // `copy` is the visitor's, so it is carried; `ghost` does not exist in
+        // the cached drive at all and must not survive into the merged one
+        expect(merge_on_reseed(cached, seed)['dir']?.children).toEqual([
+            'copy',
+        ]);
     });
 });
