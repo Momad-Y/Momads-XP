@@ -108,3 +108,11 @@ test('a redirect does not pile up entries in the Back dropdown', async ({
     await expect(menu.getByText(REQUESTED)).toHaveCount(0);
     await expect(menu.locator('div')).toHaveCount(1);
 });
+
+/*
+ * NOT tested here: wiby's "surprise me" meta-refresh hop. `page.route` cannot
+ * reach it — the fetch happens SERVER-side in /api/browse, so a spec written
+ * this way silently hits the live internet and lands on a different random
+ * page every run. It is covered deterministically in
+ * src/routes/api/browse/server.test.ts, where `fetch` itself is stubbed.
+ */

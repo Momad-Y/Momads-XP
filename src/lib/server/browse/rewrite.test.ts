@@ -4,6 +4,7 @@ import {
     strip_csp_meta,
     strip_base,
     base_tag,
+    meta_refresh_target,
     reporter_script,
     rewrite_document,
 } from './rewrite';
@@ -160,5 +161,65 @@ describe('rewrite_document', () => {
         expect(out).not.toContain('/old');
         expect(out).not.toContain('content-security-policy" content="x"');
         expect(out).toContain('https://example.com/page');
+    });
+});
+
+describe('meta_refresh_target', () => {
+    const base = 'https://wiby.me/surprise/';
+
+    it('follows the instant refresh wiby uses for "surprise me"', () => {
+        // the real body, which is a 200 — fetch(redirect:'follow') sees no
+        // redirect at all, so the address bar stayed on /surprise/
+        const html =
+            '<html><head><meta http-equiv="refresh" content="0; URL=https://rosemaryjacobs.com/"/></head><body>You asked for it!</body></html>';
+        expect(meta_refresh_target(html, base)).toBe(
+            'https://rosemaryjacobs.com/',
+        );
+    });
+
+    it('accepts the attribute and quoting variants authors actually write', () => {
+        expect(
+            meta_refresh_target(
+                `<meta content='0;url=/next' http-equiv='refresh'>`,
+                base,
+            ),
+        ).toBe('https://wiby.me/next');
+        expect(
+            meta_refresh_target(
+                '<META HTTP-EQUIV="REFRESH" CONTENT="0 ; Url = page.html">',
+                base,
+            ),
+        ).toBe('https://wiby.me/surprise/page.html');
+    });
+
+    it('leaves a DELAYED refresh alone — that page is meant to be read', () => {
+        const html =
+            '<meta http-equiv="refresh" content="5; url=https://e.com/">';
+        expect(meta_refresh_target(html, base)).toBeNull();
+    });
+
+    it('ignores a refresh with no url (a plain reload)', () => {
+        expect(
+            meta_refresh_target(
+                '<meta http-equiv="refresh" content="0">',
+                base,
+            ),
+        ).toBeNull();
+    });
+
+    it('returns null when there is no refresh at all', () => {
+        expect(meta_refresh_target('<html><body>hi</body></html>', base)).toBe(
+            null,
+        );
+        expect(meta_refresh_target('<meta charset="utf-8">', base)).toBeNull();
+    });
+
+    it('returns null for an unparseable target rather than throwing', () => {
+        expect(
+            meta_refresh_target(
+                '<meta http-equiv="refresh" content="0; url=http://">',
+                base,
+            ),
+        ).toBeNull();
     });
 });

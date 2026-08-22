@@ -19,13 +19,13 @@
     import Menu from '../../../lib/components/xp/Menu.svelte';
     import RButton from '../../../lib/components/xp/RButton.svelte';
     import ProgressBar from '../../../lib/components/xp/ProgressBar.svelte';
-    import buildUrl from 'build-url';
     import isURL from 'is-valid-http-url';
     import * as fs from '../../../lib/fs';
     import { desktop_folder } from '../../../lib/system';
     import * as utils from '../../../lib/utils';
     import * as finder from '../../../lib/finder';
     import { push_entry, replace_entry } from '../../../lib/nav_history';
+    import { HOMEPAGE, search_url } from '../../../lib/search';
     import { required } from '../../../lib/types';
     import type {
         MenuBarEntry,
@@ -46,7 +46,7 @@
     // narrows `export let` props to their default in top-level flow (Svelte
     // injects the real prop value before this code runs)
     const initial_url = url as string | null | undefined;
-    const homepage = initial_url ? initial_url : 'https://wiby.me/';
+    const homepage = initial_url ? initial_url : HOMEPAGE;
 
     let nav_history = [homepage];
     let page_index = 0;
@@ -182,10 +182,10 @@
         } else if (!u.startsWith('https://') && !u.startsWith('http://')) {
             u = 'https://' + u;
             if (!isURL(u)) {
-                u = buildUrl('https://bing.com', {
-                    path: 'search',
-                    queryParams: { q: (nav_url ?? address_input.value).trim() },
-                });
+                // not a URL at all — search for what was typed
+                const searched = search_url(nav_url ?? address_input.value);
+                if (searched == null) return;
+                u = searched;
             }
         }
 
@@ -352,11 +352,9 @@
     }
 
     function do_search() {
-        if (!search_query.trim()) return;
-        void load_page(
-            'https://bing.com/search?q=' +
-                encodeURIComponent(search_query.trim()),
-        );
+        const url = search_url(search_query);
+        if (url == null) return;
+        void load_page(url);
         sidebar_mode = null;
         search_query = '';
     }

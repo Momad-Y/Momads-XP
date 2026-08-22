@@ -15,6 +15,7 @@
 import { error } from '@sveltejs/kit';
 import { check_browse_url } from '../../../lib/server/browse/url_guard';
 import {
+    meta_refresh_target,
     rewrite_document,
     should_strip_header,
 } from '../../../lib/server/browse/rewrite';
@@ -33,6 +34,40 @@ const limiter = create_rate_limiter({
 const FETCH_TIMEOUT_MS = 10_000;
 /** Retro pages are small; this caps both memory and egress. */
 const MAX_BYTES = 3_000_000;
+/**
+ * How many INSTANT meta refreshes to follow before giving up. Bounds a refresh
+ * loop; two hops is already more than any real interstitial chain.
+ */
+const MAX_META_REFRESH_HOPS = 3;
+
+/**
+ * One timed, cookie-less upstream fetch. Returns null instead of throwing so a
+ * meta-refresh hop can simply stop following rather than fail the whole page.
+ */
+async function fetch_upstream(url: string): Promise<Response | null> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+        controller.abort();
+    }, FETCH_TIMEOUT_MS);
+    try {
+        return await fetch(url, {
+            redirect: 'follow',
+            signal: controller.signal,
+            headers: {
+                // Identify honestly and ask for a document. No cookies, no
+                // auth: `fetch` sends none by default and we add none.
+                'User-Agent':
+                    'Mozilla/5.0 (compatible; MomadsXP/1.0; +https://momad-xp.netlify.app)',
+                Accept: 'text/html,application/xhtml+xml,*/*;q=0.8',
+                'Accept-Language': 'en',
+            },
+        });
+    } catch {
+        return null;
+    } finally {
+        clearTimeout(timer);
+    }
+}
 
 export const GET: RequestHandler = async (event) => {
     // Only our own app may drive the proxy — this is not an open relay.
@@ -77,30 +112,8 @@ export const GET: RequestHandler = async (event) => {
     }
     const target = verdict.url;
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => {
-        controller.abort();
-    }, FETCH_TIMEOUT_MS);
-
-    let upstream: Response;
-    try {
-        upstream = await fetch(target, {
-            redirect: 'follow',
-            signal: controller.signal,
-            headers: {
-                // Identify honestly and ask for a document. No cookies, no
-                // auth: `fetch` sends none by default and we add none.
-                'User-Agent':
-                    'Mozilla/5.0 (compatible; MomadsXP/1.0; +https://momad-xp.netlify.app)',
-                Accept: 'text/html,application/xhtml+xml,*/*;q=0.8',
-                'Accept-Language': 'en',
-            },
-        });
-    } catch {
-        clearTimeout(timer);
-        error(502, 'fetch_failed');
-    }
-    clearTimeout(timer);
+    const upstream = await fetch_upstream(target);
+    if (upstream == null) error(502, 'fetch_failed');
 
     // `raw=1` backs IE's View Source: it must show the page as the server sent
     // it, NOT the rewritten copy with our base tag and reporter injected.
@@ -135,9 +148,48 @@ export const GET: RequestHandler = async (event) => {
             },
         });
     }
-    // `upstream.url` reflects redirects, so the reporter announces where the
-    // user actually landed rather than where they aimed.
-    const body = rewrite_document(html, upstream.url || target, target);
+    /**
+     * Follow an INSTANT meta refresh, which `redirect: 'follow'` cannot see —
+     * it is a 200 whose body redirects. wiby's "surprise me" is exactly that,
+     * so without this the frame moved itself to the random page while the
+     * address bar stayed on https://wiby.me/surprise/.
+     *
+     * Each hop is re-validated through `check_browse_url`: the target comes
+     * from a page we do not control, so it gets the same SSRF treatment as
+     * anything the user types. The budget bounds a refresh loop.
+     */
+    let landed = upstream.url || target;
+    let page = html;
+    for (let hop = 0; hop < MAX_META_REFRESH_HOPS; hop++) {
+        const next = meta_refresh_target(page, landed);
+        if (next == null) break;
+        const next_verdict = check_browse_url(next);
+        if (!next_verdict.ok || next_verdict.url == null) break;
+
+        const hop_res = await fetch_upstream(next_verdict.url);
+        if (hop_res == null) break;
+        if (!(hop_res.headers.get('content-type') ?? '').includes('text/html'))
+            break;
+        // Following is BEST EFFORT: the page in hand already loaded, so a
+        // hop that fails to read must leave the user on it rather than turn a
+        // working page into a 500.
+        let hop_buffer: ArrayBuffer;
+        try {
+            hop_buffer = await hop_res.arrayBuffer();
+        } catch {
+            break;
+        }
+        if (hop_buffer.byteLength > MAX_BYTES) break;
+
+        page = new TextDecoder('utf-8').decode(hop_buffer);
+        landed = hop_res.url || next_verdict.url;
+    }
+
+    // `landed` reflects redirects — HTTP ones and the meta variety — so the
+    // reporter announces where the user actually ended up, while `target` is
+    // what they aimed at. The parent needs both to tell a redirect of the
+    // current entry from a stale message (see src/lib/nav_history.ts).
+    const body = rewrite_document(page, landed, target);
 
     const headers = new Headers();
     upstream.headers.forEach((value, key) => {
