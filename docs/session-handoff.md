@@ -60,7 +60,7 @@ The user chose to wait until **~10 Aug 2026**. That date has now passed, so:
 3. Verify prod: `help.html` → 200, index bundle hash changed from
    `start.2JH2ogIg.js`, security headers present.
 
-`dev` is **25 commits ahead of `main`** and all of it is unreleased. The user
+`dev` is **27 commits ahead of `main`** and all of it is unreleased. The user
 chose to hold a single cutover PR (`dev` → `main`) until just before deploying.
 
 Netlify build settings were set to `allowed_branches:["main"]` + `skip_prs:true`
@@ -71,7 +71,7 @@ locally.
 
 ## 3. WHAT SHIPPED THIS SESSION (all merged to `dev`, none deployed)
 
-PRs #77–#97. Highlights:
+PRs #77–#98. Highlights:
 
 - **System Properties** — profile-driven content, all 4 tabs, dark-text logo.
 - **Explorer File menu** — fleshed out to real XP (Open, Send To, New ▸, Create
@@ -173,7 +173,7 @@ npm run lint
 npm run format:check
 npx vitest run       # 252 tests
 npm run build
-npx playwright test  # 90 (~1 boot flake per run under parallel load)
+npx playwright test  # 91 (CI 2.9 min; ~1 local flake per 2-3 runs, see §8)
 ```
 
 ---
@@ -214,12 +214,31 @@ are the ones most likely to be "helpfully" reverted later:
    `sync_url_from_iframe` still APPENDS on purpose: same-origin pages carry no
    reporter, so that is the only way an in-page link click is recorded.
 
-**Known suite instability, not a product bug.** The e2e suite now flakes about
-one spec per full run — always `bootToDesktop` timing out at 30s, never the same
-spec twice, always green in isolation. Boot is ≥3s by design plus asset
-preloading and 8 workers contend. It will eventually redden CI on an unrelated
-change; the options are a CI retry, fewer workers, or a shorter boot under test.
-The user has not chosen one, so nothing was changed.
+**Known suite instability — measured, and NOT worker count (#98).** The e2e
+suite flakes roughly one spec per two or three LOCAL runs, always green in
+isolation. CI, on a dedicated runner, has never flaked.
+
+The obvious hypothesis — too many workers on a 16-core box — was tested and is
+WRONG. Full suite, per run:
+
+```
+8 workers + full boot   1 failure          2.9-4.4 min
+8 workers + skip        4 failures         3.6 min
+4 workers + skip        2 in 4 runs        2.6-4.0 min
+2 workers + skip        1 in 3 runs        4.5-5.2 min   <- CI's exact config
+```
+
+Two workers still flaked, and `page.goto` ITSELF times out, so the failures
+track overall machine load against the single `vite preview` process. Don't
+"fix" it by tuning workers again — `workers: 4` locally is a SPEED choice
+(fastest measured) and the config comment says so.
+
+**What DID pay off:** `bootToDesktop` skips the 3-10s startup through the app's
+own affordance (the boot screen skips on any click/keypress once the VFS seed
+lands — `data-boot-skippable` mirrors that state). CI e2e went **5.4 min ->
+2.9 min** with one more test. `smoke.spec` keeps `{ skip: false }` for the full
+startup, and a test covers the skip path itself, because the whole suite now
+depends on it.
 
 **A finding that was REJECTED — do not "fix" it again.** The `rename_cancelled`
 latch was reported as sticking across renames (premise: no blur fires for an
