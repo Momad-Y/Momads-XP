@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { check_browse_url } from './url_guard';
 
 describe('check_browse_url', () => {
@@ -68,5 +68,73 @@ describe('check_browse_url', () => {
         expect(
             check_browse_url('https://e.com/' + 'a'.repeat(3000)).reason,
         ).toBe('too_long');
+    });
+});
+
+/**
+ * Resolving is the half a string check cannot do: `ssrf.attacker.tld` looks
+ * perfectly ordinary and can point anywhere. These cover the resolver's own
+ * branches, including the one that matters most — a name with a MIX of public
+ * and private answers must be refused outright, or an attacker just retries
+ * until the public one is picked.
+ */
+describe('resolve_public_address', () => {
+    const lookup = vi.fn();
+    beforeEach(() => {
+        lookup.mockReset();
+        vi.doMock('node:dns/promises', () => ({
+            default: { lookup },
+            lookup,
+        }));
+    });
+
+    it('returns an IP literal unchanged, with nothing to resolve', async () => {
+        const { resolve_public_address } = await import('./url_guard');
+        expect(await resolve_public_address('93.184.216.34')).toEqual({
+            address: '93.184.216.34',
+            family: 4,
+        });
+        expect(await resolve_public_address('[2001:4860:4860::8888]')).toEqual({
+            address: '2001:4860:4860::8888',
+            family: 6,
+        });
+    });
+
+    it('refuses a private literal without touching DNS', async () => {
+        const { resolve_public_address } = await import('./url_guard');
+        expect(await resolve_public_address('[::ffff:127.0.0.1]')).toBeNull();
+        expect(lookup).not.toHaveBeenCalled();
+    });
+
+    it('returns the resolved address for a public name', async () => {
+        lookup.mockResolvedValue([{ address: '93.184.216.34', family: 4 }]);
+        const { resolve_public_address } = await import('./url_guard');
+        expect(await resolve_public_address('example.com')).toEqual({
+            address: '93.184.216.34',
+            family: 4,
+        });
+    });
+
+    it('refuses a name that resolves internally', async () => {
+        lookup.mockResolvedValue([{ address: '169.254.169.254', family: 4 }]);
+        const { resolve_public_address } = await import('./url_guard');
+        expect(await resolve_public_address('ssrf.attacker.tld')).toBeNull();
+    });
+
+    it('refuses a MIXED answer rather than picking the public one', async () => {
+        lookup.mockResolvedValue([
+            { address: '93.184.216.34', family: 4 },
+            { address: '127.0.0.1', family: 4 },
+        ]);
+        const { resolve_public_address } = await import('./url_guard');
+        expect(await resolve_public_address('mixed.attacker.tld')).toBeNull();
+    });
+
+    it('fails closed on an empty answer or a lookup error', async () => {
+        lookup.mockResolvedValue([]);
+        const mod = await import('./url_guard');
+        expect(await mod.resolve_public_address('nothing.tld')).toBeNull();
+        lookup.mockRejectedValue(new Error('ENOTFOUND'));
+        expect(await mod.resolve_public_address('broken.tld')).toBeNull();
     });
 });

@@ -2,7 +2,29 @@ import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { bootToDesktop } from './helpers';
 
+/**
+ * Stop these specs reaching the live internet.
+ *
+ * IE's homepage is wiby.me, which loads through the REAL /api/browse — so
+ * every test here made an outbound request, and since the proxy now resolves
+ * DNS itself and opens a pinned TLS connection, that got slower and more
+ * failure-prone. One of them started flaking on CI. The page under test is
+ * IE's chrome, not wiby, so the upstream is stubbed.
+ */
+async function stub_upstream(page: Page) {
+    await page.route('**/api/browse**', async (route) => {
+        const asked =
+            new URL(route.request().url()).searchParams.get('url') ?? '';
+        await route.fulfill({
+            status: 200,
+            contentType: 'text/html',
+            body: `<html><head><title>Stub</title></head><body>STUB ${asked}</body></html>`,
+        });
+    });
+}
+
 async function openIE(page: Page) {
+    await stub_upstream(page);
     await bootToDesktop(page);
     await page
         .locator('#work-space p', { hasText: 'Internet Explorer' })

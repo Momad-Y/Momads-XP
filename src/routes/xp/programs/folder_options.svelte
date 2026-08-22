@@ -3,6 +3,7 @@
 <script lang="ts">
     import Window from '../../../lib/components/xp/Window.svelte';
     import Button from '../../../lib/components/xp/Button.svelte';
+    import GroupBox from '../../../lib/components/xp/GroupBox.svelte';
     import Tab from '../../../lib/components/xp/Tab.svelte';
     import { unmount } from 'svelte';
     import { runningPrograms, zIndex, contextMenu } from '../../../lib/store';
@@ -68,12 +69,11 @@
             {#if selected === 'General'}
                 <div class="flex flex-col p-4 gap-3 leading-snug">
                     {#each fo.general.sections as section, i (i)}
-                        <div class="flex flex-col gap-1">
-                            <p class="font-bold">{section.title}</p>
+                        <GroupBox title={section.title}>
                             {#each section.lines as line, j (j)}
-                                <p class="ml-3">{line}</p>
+                                <p>{line}</p>
                             {/each}
-                        </div>
+                        </GroupBox>
                     {/each}
                     <p class="text-slate-500 italic">{fo.general.note}</p>
                     <div class="mt-auto flex flex-row justify-end pt-2">
@@ -83,10 +83,7 @@
                 </div>
             {:else if selected === 'View'}
                 <div class="flex flex-col p-4 gap-3 leading-snug">
-                    <p class="font-bold">{fo.view.title}</p>
-                    <div
-                        class="border border-[#919b9c] bg-white p-2 flex flex-col gap-1"
-                    >
+                    <GroupBox title={fo.view.title}>
                         {#each fo.view.settings as setting, i (i)}
                             <div class="flex flex-row items-start gap-2">
                                 <span
@@ -96,15 +93,12 @@
                                 <span>{setting}</span>
                             </div>
                         {/each}
-                    </div>
+                    </GroupBox>
                     <p class="text-slate-500 italic">{fo.view.note}</p>
                 </div>
             {:else if selected === 'File Types'}
                 <div class="flex flex-col p-4 gap-3 leading-snug">
-                    <p class="font-bold">{fo.fileTypes.title}</p>
-                    <div
-                        class="border border-[#919b9c] bg-white p-2 flex flex-col gap-1"
-                    >
+                    <GroupBox title={fo.fileTypes.title}>
                         {#each fo.fileTypes.types as type, i (i)}
                             <div class="flex flex-row items-start gap-2">
                                 <span class="w-10 shrink-0 font-bold"
@@ -113,7 +107,7 @@
                                 <span>{type.desc}</span>
                             </div>
                         {/each}
-                    </div>
+                    </GroupBox>
                     <p class="text-slate-500 italic">{fo.fileTypes.note}</p>
                     <div class="mt-auto flex flex-row justify-end gap-2 pt-2">
                         <Button title="Change..." disabled={true}></Button>

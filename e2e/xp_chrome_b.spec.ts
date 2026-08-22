@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { bootToDesktop } from './helpers';
+import { stubBrowse } from './stub_browse';
 
 /** The Back RButton's expand-arrow: the 10px wrapper inside its .p-2 root. */
 function backArrow(win: ReturnType<Page['locator']>, page: Page) {
@@ -12,6 +13,7 @@ function backArrow(win: ReturnType<Page['locator']>, page: Page) {
 test('Explorer Back dropdown lists history and jumps to a page', async ({
     page,
 }) => {
+    await stubBrowse(page);
     await bootToDesktop(page);
     await page.locator('#work-space p', { hasText: 'My Computer' }).dblclick();
     const win = page.locator('#work-space .window').first();
@@ -44,6 +46,7 @@ test('Explorer Back dropdown lists history and jumps to a page', async ({
 });
 
 test('IE Back dropdown lists visited pages', async ({ page }) => {
+    await stubBrowse(page);
     await bootToDesktop(page);
     await page
         .locator('#work-space p', { hasText: 'Internet Explorer' })

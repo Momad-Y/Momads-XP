@@ -3,6 +3,7 @@
 <script lang="ts">
     import Window from '../../../lib/components/xp/Window.svelte';
     import Button from '../../../lib/components/xp/Button.svelte';
+    import GroupBox from '../../../lib/components/xp/GroupBox.svelte';
     import Tab from '../../../lib/components/xp/Tab.svelte';
     import { unmount } from 'svelte';
     import { runningPrograms, zIndex, contextMenu } from '../../../lib/store';
@@ -68,12 +69,11 @@
             {#if selected === 'General'}
                 <div class="flex flex-col p-4 gap-3 leading-snug">
                     {#each io.general.sections as section, i (i)}
-                        <div class="flex flex-col gap-1">
-                            <p class="font-bold">{section.title}</p>
+                        <GroupBox title={section.title}>
                             {#each section.lines as line, j (j)}
-                                <p class="ml-3">{line}</p>
+                                <p>{line}</p>
                             {/each}
-                        </div>
+                        </GroupBox>
                     {/each}
                     <p class="text-slate-500 italic">{io.general.note}</p>
                     <div class="mt-auto flex flex-row justify-end gap-2 pt-2">
@@ -84,10 +84,7 @@
                 </div>
             {:else if selected === 'Security'}
                 <div class="flex flex-col p-4 gap-3 leading-snug">
-                    <p class="font-bold">{io.security.title}</p>
-                    <div
-                        class="border border-[#919b9c] bg-white p-2 flex flex-col gap-1"
-                    >
+                    <GroupBox title={io.security.title}>
                         {#each io.security.zones as zone, i (i)}
                             <div class="flex flex-row items-start gap-2">
                                 <img
@@ -98,7 +95,7 @@
                                 <span>{zone}</span>
                             </div>
                         {/each}
-                    </div>
+                    </GroupBox>
                     <p class="text-slate-500 italic">{io.security.note}</p>
                     <div class="mt-auto flex flex-row justify-end pt-2">
                         <Button title="Custom Level..." disabled={true}
@@ -107,10 +104,7 @@
                 </div>
             {:else if selected === 'Advanced'}
                 <div class="flex flex-col p-4 gap-3 leading-snug">
-                    <p class="font-bold">{io.advanced.title}</p>
-                    <div
-                        class="border border-[#919b9c] bg-white p-2 flex flex-col gap-1"
-                    >
+                    <GroupBox title={io.advanced.title}>
                         {#each io.advanced.settings as setting, i (i)}
                             <div class="flex flex-row items-start gap-2">
                                 <span
@@ -120,7 +114,7 @@
                                 <span>{setting}</span>
                             </div>
                         {/each}
-                    </div>
+                    </GroupBox>
                     <p class="text-slate-500 italic">{io.advanced.note}</p>
                     <div class="mt-auto flex flex-row justify-end pt-2">
                         <Button title="Restore Defaults" disabled={true}

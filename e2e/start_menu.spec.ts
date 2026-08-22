@@ -1,7 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { bootToDesktop } from './helpers';
+import { stubBrowse } from './stub_browse';
 
 test('start menu matches the §3.4 structure', async ({ page }) => {
+    await stubBrowse(page);
     await bootToDesktop(page);
     await page.locator('#start-menu-btn').click();
     const menu = page.locator('#start-menu');
@@ -40,6 +42,7 @@ test('start menu matches the §3.4 structure', async ({ page }) => {
 test('All Programs flyout lists the programs and the Games flyout', async ({
     page,
 }) => {
+    await stubBrowse(page);
     await bootToDesktop(page);
     await page.locator('#start-menu-btn').click();
     await page.locator('#start-menu').getByText('All Programs').hover();

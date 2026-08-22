@@ -1,8 +1,10 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { bootToDesktop } from './helpers';
+import { stubBrowse } from './stub_browse';
 
 async function openMyComputer(page: Page) {
+    await stubBrowse(page);
     await bootToDesktop(page);
     await page.locator('#work-space p', { hasText: 'My Computer' }).dblclick();
     await expect(page.locator('#work-space .window').first()).toBeVisible();
@@ -128,6 +130,7 @@ test('Explorer File menu greys selection-only actions, like XP', async ({
 });
 
 test('Explorer Tools > Folder Options opens', async ({ page }) => {
+    await stubBrowse(page);
     await bootToDesktop(page);
     await page.locator('#work-space p', { hasText: 'My Computer' }).dblclick();
     const win = page.locator('#work-space .window').first();
@@ -147,6 +150,7 @@ test('Explorer Tools > Folder Options opens', async ({ page }) => {
 });
 
 test('IE Tools > Internet Options opens', async ({ page }) => {
+    await stubBrowse(page);
     await bootToDesktop(page);
     await page
         .locator('#work-space p', { hasText: 'Internet Explorer' })
@@ -165,6 +169,7 @@ test('IE Tools > Internet Options opens', async ({ page }) => {
 });
 
 test('IE Mail button opens Contact Me', async ({ page }) => {
+    await stubBrowse(page);
     await bootToDesktop(page);
     await page
         .locator('#work-space p', { hasText: 'Internet Explorer' })
