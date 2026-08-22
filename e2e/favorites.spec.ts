@@ -1,8 +1,10 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { bootToDesktop } from './helpers';
+import { stubBrowse } from './stub_browse';
 
 async function openExperience(page: Page) {
+    await stubBrowse(page);
     await bootToDesktop(page);
     await page.locator('#work-space p', { hasText: 'My Computer' }).dblclick();
     const win = page.locator('#work-space .window').first();
@@ -86,6 +88,7 @@ test('Organize Favorites can rename and delete', async ({ page }) => {
 test('a SELECTED folder is what gets favourited, not just the open one', async ({
     page,
 }) => {
+    await stubBrowse(page);
     await bootToDesktop(page);
     await page.locator('#work-space p', { hasText: 'My Computer' }).dblclick();
     const win = page.locator('#work-space .window').first();

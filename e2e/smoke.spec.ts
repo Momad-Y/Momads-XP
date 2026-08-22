@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { bootToDesktop } from './helpers';
+import { stubBrowse } from './stub_browse';
 
 /**
  * The FULL startup, with no skip. Every other spec now skips the boot wait
@@ -17,6 +18,7 @@ test('boots straight to loading screen then desktop', async ({ page }) => {
 });
 
 test('start menu opens', async ({ page }) => {
+    await stubBrowse(page);
     await bootToDesktop(page);
     await page.locator('#start-menu-btn').click();
     await expect(page.locator('#start-menu')).toBeVisible();
@@ -26,6 +28,7 @@ test('start menu opens', async ({ page }) => {
 });
 
 test('My Computer window opens, drags, and closes', async ({ page }) => {
+    await stubBrowse(page);
     await bootToDesktop(page);
     await page.locator('#work-space p', { hasText: 'My Computer' }).dblclick();
 
