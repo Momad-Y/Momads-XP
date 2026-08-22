@@ -334,7 +334,14 @@
     }
 </script>
 
-<div class="absolute inset-0 bg-black overflow-hidden text-slate-100">
+<!-- `data-boot-skippable` mirrors `core_ready`: the point from which a click
+     or keypress actually skips the wait. It is the honest readiness signal for
+     anything driving the boot — without it a caller can only guess and retry. -->
+<div
+    id="boot-screen"
+    data-boot-skippable={core_ready ? 'true' : 'false'}
+    class="absolute inset-0 bg-black overflow-hidden text-slate-100"
+>
     <div
         class="absolute top-[50%] -translate-y-[50%] left-[50%] -translate-x-[50%] animate-fadein flex flex-col items-center"
     >
