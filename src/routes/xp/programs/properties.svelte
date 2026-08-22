@@ -27,15 +27,33 @@
     export let fs_item: VfsItem | undefined = undefined;
     export let exec_path: string;
 
-    /** Fail-fast lookup mirroring the untyped base's direct dereferences. */
-    function drive_item(item_id: string): VfsItem {
-        return required($hardDrive?.[item_id], 'fs item ' + item_id);
-    }
-
     // widened back from the `undefined` initializer: eslint's TS service
     // narrows `export let` props to their default in top-level flow (Svelte
     // injects the real prop value before this code runs)
     const initial_item = fs_item as VfsItem | undefined;
+
+    /**
+     * Count children by kind, SKIPPING ids that no longer resolve.
+     *
+     * `drive_item` is a throwing lookup and this runs over a SNAPSHOT's
+     * children during mount, so deleting a file from another window while this
+     * menu was open threw out of `launch()` before `queueProgram.set(null)`:
+     * no Properties window, no error, and a wait cursor stuck over the whole
+     * desktop until the next successful launch. folder_size, create_shortcut
+     * and the viewer all filter dangling ids for exactly this reason.
+     */
+    function contains_label(children: string[]): string {
+        const drive = $hardDrive ?? {};
+        let files = 0;
+        let folders = 0;
+        for (const child_id of children) {
+            const child = drive[child_id];
+            if (child == null) continue;
+            if (child.type === 'file') files++;
+            else folders++;
+        }
+        return `${String(files)} Files, ${String(folders)} Folders`;
+    }
 
     const details: [string, string | null][] =
         initial_item == null
@@ -102,7 +120,7 @@
                       : [
                             [
                                 'Contains',
-                                `${String(initial_item.children.filter((el) => drive_item(el).type == 'file').length)} Files, ${String(initial_item.children.filter((el) => drive_item(el).type == 'folder').length)} Folders`,
+                                contains_label(initial_item.children),
                             ] satisfies [string, string],
                         ]),
                   // date_label, not timestamp_to_readable: the latter is

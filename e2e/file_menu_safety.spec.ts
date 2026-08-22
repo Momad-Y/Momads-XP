@@ -66,8 +66,11 @@ test('File > Open launches the file instead of navigating into it', async ({
     await expect(detail.getByText('AI Engineer', { exact: true })).toBeVisible({
         timeout: 15000,
     });
-    // … and Explorer did NOT navigate inside the file
-    await expect(win.locator('input[value*=".txt"]')).toHaveCount(0);
+    // … and Explorer did NOT navigate inside the file.
+    // NOT `input[value*=".txt"]` — that is an ATTRIBUTE selector, and Svelte
+    // assigns the value PROPERTY without ever calling setAttribute, so the
+    // count was 0 no matter what the address bar said.
+    await expect(win.locator('input').first()).not.toHaveValue(/\.txt$/);
 });
 
 test('Escape cancels an inline rename instead of committing it', async ({
@@ -158,4 +161,44 @@ test('F5 abandons an inline rename instead of committing it', async ({
 
     await expect(win.getByText('F5_COMMITTED')).toHaveCount(0);
     await expect(win.getByText('New Text Document.txt')).toBeVisible();
+});
+
+/**
+ * The greyed-out tests assert a CLASS. Hardcode `text-slate-400` on those rows
+ * while leaving their actions live and every one of them still passes — while
+ * File > Delete goes on destroying the desktop icon. This one clicks.
+ */
+test('a greyed File > Delete really is inert, not just grey', async ({
+    page,
+}) => {
+    await bootToDesktop(page);
+    // select something on the DESKTOP, then open an Explorer window: the
+    // selection store is global, so this is the state the scoping exists for
+    await page.locator('#work-space p', { hasText: 'About Me' }).click();
+    await page.locator('#work-space p', { hasText: 'My Computer' }).dblclick();
+    const win = page.locator('#work-space .window').first();
+    await expect(win).toBeVisible();
+
+    await win.locator('.toolbar-menu').getByText('File').click();
+    const del = win
+        .locator('p', { hasText: /^Delete$/ })
+        .first()
+        .locator('..');
+    await expect(del).toHaveClass(/text-slate-400/);
+
+    // click it anyway — greyed must mean it does nothing
+    await del.click({ force: true });
+    await expect(win.locator('.dialog')).toHaveCount(0);
+    await expect(
+        page.locator('#work-space p', { hasText: 'About Me' }),
+    ).toBeVisible();
+
+    // …and the same for Rename, which would open an editor on another surface
+    await win.locator('.toolbar-menu').getByText('File').click();
+    const rename = win
+        .locator('p', { hasText: /^Rename$/ })
+        .first()
+        .locator('..');
+    await rename.click({ force: true });
+    await expect(page.locator('#work-space textarea')).toHaveCount(0);
 });

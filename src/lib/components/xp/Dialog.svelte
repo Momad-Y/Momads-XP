@@ -30,10 +30,35 @@
      * can open over the File Transfer guide), and every one of them mounts its
      * own listener.
      */
+    /**
+     * Where a dialog sits in the STACK, not in the document.
+     *
+     * Each dialog mounts into its own window's node, and windows stack purely
+     * by CSS `z-index` — `Window.svelte` raises one by bumping that number and
+     * never reorders the DOM. So "last in document order" meant "belongs to
+     * the most recently CREATED window", which is not the same thing at all:
+     * Escape cancelled a confirmation buried behind the one on screen.
+     *
+     * A dialog mounted outside any window (CMFSItem puts the desktop's delete
+     * confirmation into document.body, no_association into #desktop) carries
+     * its own z-index of 100000 and therefore paints above every window.
+     */
+    function stacking_rank(el: Element): number {
+        const owner = el.closest('.window');
+        if (owner == null) return Number.MAX_SAFE_INTEGER;
+        const z = Number.parseInt(getComputedStyle(owner).zIndex, 10);
+        return Number.isNaN(z) ? 0 : z;
+    }
+
     function on_keydown(event: KeyboardEvent) {
         if (event.key !== 'Escape' || node_ref == null) return;
-        const open_dialogs = document.querySelectorAll('.dialog');
-        if (open_dialogs[open_dialogs.length - 1] !== node_ref) return;
+        const open_dialogs = [...document.querySelectorAll('.dialog')];
+        const mine = stacking_rank(node_ref);
+        // strictly greater: a tie means two dialogs in the same window, where
+        // document order IS the stacking order, so the last one still wins
+        if (open_dialogs.some((d) => stacking_rank(d) > mine)) return;
+        const tied = open_dialogs.filter((d) => stacking_rank(d) === mine);
+        if (tied[tied.length - 1] !== node_ref) return;
         event.preventDefault();
         event.stopPropagation();
         const cancel = buttons.find((b) => b.name === 'Cancel');
