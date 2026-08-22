@@ -8,7 +8,6 @@
  * a list with no name column is unusable.
  */
 import type { VfsItem } from './types';
-import { format_size } from './status_bar';
 
 export type DetailsColumnKey =
     'name' | 'size' | 'type' | 'date_modified' | 'date_created';
@@ -46,25 +45,32 @@ export function type_label(item: VfsItem): string {
     if (item.type === 'folder') return 'File Folder';
     if (item.type === 'drive') return 'Local Disk';
     if (item.type === 'removable_storage') return 'Removable Disk';
-    // `ext` of '.' is reachable — renaming a file to "notes." makes extname
-    // return '.', which used to render as " File" with a leading space.
-    const ext = item.ext.replace(/^\./, '');
+    // XP names a .lnk by what it IS, not by its extension.
+    if (item.ext.toLowerCase() === '.lnk') return 'Shortcut';
+    // Strip every leading dot and surrounding space: `sanitize_filename` only
+    // removes slashes, so renaming a file to "notes." or "notes. " leaves an
+    // `ext` of '.' or '. ', which rendered as " File" / "  File".
+    const ext = item.ext.replace(/^\.+/, '').trim();
     return ext !== '' ? `${ext.toUpperCase()} File` : 'File';
 }
 
 /**
  * The Size cell. Folders show nothing, exactly like XP.
  *
- * Shares `format_size` with the status bar: two formatters shipped side by
- * side in the same commit and disagreed, so one window showed the same file as
- * "5000000 KB" in the column and "4.77 GB" in the bar two rows below.
+ * ALWAYS KB with thousands separators — "13,323 KB", never "13.01 MB". The
+ * column and the status bar are not two drifted copies of one rule; they are
+ * XP's two DIFFERENT rules, and only the status bar picks a unit to suit the
+ * number. Routing this through `format_size` re-spelled five shipped Desktop
+ * items into Vista-style adaptive units.
  */
 export function size_label(item: VfsItem): string {
     if (item.type !== 'file') return '';
     const size = item.size ?? 0;
-    // XP's Size COLUMN writes an empty file as "0 KB", not "0 bytes" — only
-    // the status bar spells zero that way.
-    return size <= 0 ? '0 KB' : format_size(size);
+    // negative and non-finite both collapse to 0, matching `total_size`'s
+    // defence — the two used to guard opposite halves, so the status bar could
+    // contradict a cell two rows above it.
+    const kb = Number.isFinite(size) && size > 0 ? Math.ceil(size) : 0;
+    return `${kb.toLocaleString('en-US')} KB`;
 }
 
 /**

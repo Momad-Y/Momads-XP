@@ -27,7 +27,11 @@ export function format_size(kb: number): string {
     if (whole_kb < 1024) return `${String(whole_kb)} KB`;
     const mb = whole_kb / 1024;
     if (Math.round(mb * 100) / 100 < 1024) return `${mb.toFixed(2)} MB`;
-    return `${(mb / 1024).toFixed(2)} GB`;
+    const gb = mb / 1024;
+    // GB was terminal, so a 1 TB drive printed "1024.00 GB" — the same
+    // rollover bug this function was rewritten to fix, surviving one tier up.
+    if (Math.round(gb * 100) / 100 < 1024) return `${gb.toFixed(2)} GB`;
+    return `${(gb / 1024).toFixed(2)} TB`;
 }
 
 /**
@@ -39,7 +43,10 @@ export function total_size(items: readonly VfsItem[]): number {
     return items.reduce((sum, it) => {
         if (it.type !== 'file') return sum;
         const size = it.size ?? 0;
-        return sum + (Number.isFinite(size) ? size : 0);
+        // negative AND non-finite, the same pair `size_label` rejects: this
+        // guarded only non-finite while the column guarded only negative, so
+        // a bad size made the bar contradict a cell in the same window.
+        return sum + (Number.isFinite(size) && size > 0 ? size : 0);
     }, 0);
 }
 

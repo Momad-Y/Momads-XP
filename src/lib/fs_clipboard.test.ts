@@ -59,13 +59,36 @@ describe('cut/copy are scoped to the acting surface', () => {
         expect(get(clipboard)).toEqual(['here', 'elsewhere']);
     });
 
-    it('fails CLOSED without a scope rather than grabbing everything', () => {
-        fs.cut();
+    it('fails CLOSED on a null scope rather than grabbing everything', () => {
+        fs.cut(null);
         expect(get(clipboard)).toEqual([]);
     });
 
     it('an empty scope clips nothing', () => {
         fs.copy([]);
         expect(get(clipboard)).toEqual([]);
+    });
+
+    // Three surfaces bind window keydown, so ONE Ctrl+C can reach two
+    // handlers. Each writes its own scope, so the one that legitimately
+    // narrows to nothing must not destroy what the other just copied.
+    it('an empty narrowing LEAVES an existing clipboard alone', () => {
+        fs.copy(['here']);
+        expect(get(clipboard)).toEqual(['here']);
+
+        // the other surface fires for the same keypress and sees none of it
+        fs.copy(['somewhere_else']);
+        expect(get(clipboard)).toEqual(['here']);
+        expect(get(clipboard_op)).toBe('copy');
+    });
+
+    it('an empty narrowing does not flip the pending operation either', () => {
+        fs.cut(['here']);
+        expect(get(clipboard_op)).toBe('cut');
+
+        fs.copy(['somewhere_else']);
+        // a stray copy must not turn a pending CUT into a copy
+        expect(get(clipboard_op)).toBe('cut');
+        expect(get(clipboard)).toEqual(['here']);
     });
 });

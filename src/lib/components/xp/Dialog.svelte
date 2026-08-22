@@ -18,9 +18,34 @@
     export function destroy() {
         void unmount(required(get_self(), 'dialog instance'));
     }
+
+    let node_ref: HTMLDivElement | undefined = undefined;
+
+    /**
+     * XP: Escape IS Cancel on a dialog. Without this the key fell straight
+     * through to whatever window listener was underneath, so Escape left the
+     * dialog open and mutated the window BEHIND it.
+     *
+     * Only the topmost dialog responds — dialogs stack (a delete confirmation
+     * can open over the File Transfer guide), and every one of them mounts its
+     * own listener.
+     */
+    function on_keydown(event: KeyboardEvent) {
+        if (event.key !== 'Escape' || node_ref == null) return;
+        const open_dialogs = document.querySelectorAll('.dialog');
+        if (open_dialogs[open_dialogs.length - 1] !== node_ref) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const cancel = buttons.find((b) => b.name === 'Cancel');
+        if (cancel?.action != null) cancel.action();
+        else destroy();
+    }
 </script>
 
+<svelte:window on:keydown={on_keydown} />
+
 <div
+    bind:this={node_ref}
     class="dialog absolute inset-0 bg-slate-50/10 rounded-t-lg"
     style:z-index="100000"
     on:click|self={(e) => {

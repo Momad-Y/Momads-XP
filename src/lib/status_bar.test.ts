@@ -23,10 +23,13 @@ describe('format_size', () => {
         expect(format_size(1023)).toBe('1023 KB');
     });
 
-    it('switches to MB and GB', () => {
+    it('switches to MB, GB and TB', () => {
         expect(format_size(1024)).toBe('1.00 MB');
         expect(format_size(4034)).toBe('3.94 MB');
         expect(format_size(1024 * 1024)).toBe('1.00 GB');
+        // GB used to be terminal, so a 1 TB drive printed "1024.00 GB" — the
+        // same rollover this function was rewritten to fix, one tier up
+        expect(format_size(1024 * 1024 * 1024)).toBe('1.00 TB');
     });
 
     it('rounds fractional KB', () => {
@@ -73,6 +76,23 @@ describe('total_size', () => {
     it('is zero for an empty folder', () => {
         expect(total_size([])).toBe(0);
     });
+
+    it('ignores negative sizes as well as non-finite ones', () => {
+        // the column guarded negative and this guarded non-finite, so a bad
+        // size made the bar contradict a cell two rows above it
+        expect(
+            total_size([
+                item({ id: 'a', size: -5 }),
+                item({ id: 'b', size: 3 }),
+            ]),
+        ).toBe(3);
+        expect(
+            total_size([
+                item({ id: 'c', size: Number.NaN }),
+                item({ id: 'd', size: 10 }),
+            ]),
+        ).toBe(10);
+    });
 });
 
 describe('status_info', () => {
@@ -102,6 +122,16 @@ describe('status_info', () => {
         expect(status_info(shown, shown.slice(0, 2)).objects).toBe(
             '2 objects selected',
         );
+    });
+
+    // the mutant `total_size(counted) > 0 ? ... : ''` passed every other case:
+    // XP distinguishes "has a size, and it is zero" from "has no size at all"
+    it('spells a selected 0-byte FILE as 0 bytes, not blank', () => {
+        const empty = item({ id: 'z', size: 0 });
+        expect(status_info([empty], [empty])).toEqual({
+            objects: '1 object selected',
+            size: '0 bytes',
+        });
     });
 
     it('reports an empty folder as 0 objects with a blank size', () => {

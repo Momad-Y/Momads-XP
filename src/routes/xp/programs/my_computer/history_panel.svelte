@@ -24,31 +24,34 @@
     <div class="m-2 mt-0 rounded bg-white p-1 grow overflow-auto">
         {#if entries.length <= 1}
             <!-- one entry is the page you are already on: a clickable no-op.
-                 IE's sidebar guards this the same way. -->
+                 IE's sidebar guards this the same way. `{:else}`, not a bare
+                 `{#if}` — the empty state used to render ABOVE the very row it
+                 exists to replace. -->
             <p class="p-2 text-slate-600">No history yet.</p>
-        {/if}
-        {#each entries as entry (entry.idx)}
-            <div
-                data-history-idx={entry.idx}
-                class="flex flex-row items-center px-1 py-1 cursor-pointer hover:bg-blue-100 {entry.idx ===
-                current_idx
-                    ? 'bg-blue-100 text-blue-700 font-bold'
-                    : ''}"
-                role="button"
-                tabindex="0"
-                on:keydown={utils.activate(() => {
-                    on_pick(entry.idx);
-                })}
-                on:click={() => {
-                    on_pick(entry.idx);
-                }}
-            >
+        {:else}
+            {#each entries as entry (entry.idx)}
                 <div
-                    class="w-4 h-4 mr-1 bg-contain bg-no-repeat bg-center shrink-0"
-                    style:background-image="url({entry.icon})"
-                ></div>
-                <span class="truncate">{entry.label}</span>
-            </div>
-        {/each}
+                    data-history-idx={entry.idx}
+                    class="flex flex-row items-center px-1 py-1 cursor-pointer hover:bg-blue-100 {entry.idx ===
+                    current_idx
+                        ? 'bg-blue-100 text-blue-700 font-bold'
+                        : ''}"
+                    role="button"
+                    tabindex="0"
+                    on:keydown={utils.activate(() => {
+                        on_pick(entry.idx);
+                    })}
+                    on:click={() => {
+                        on_pick(entry.idx);
+                    }}
+                >
+                    <div
+                        class="w-4 h-4 mr-1 bg-contain bg-no-repeat bg-center shrink-0"
+                        style:background-image="url({entry.icon})"
+                    ></div>
+                    <span class="truncate">{entry.label}</span>
+                </div>
+            {/each}
+        {/if}
     </div>
 </div>

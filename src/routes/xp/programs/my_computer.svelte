@@ -33,6 +33,7 @@
     import type { Favorite } from '../../../lib/favorites';
     import { status_info } from '../../../lib/status_bar';
     import { scoped_ids } from '../../../lib/selection';
+    import { visible_trail } from '../../../lib/history_window';
     import { default_details_columns } from '../../../lib/details_columns';
     import type { DetailsColumnKey } from '../../../lib/details_columns';
     import Sidebar from './my_computer/sidebar.svelte';
@@ -145,15 +146,13 @@
         if (event.key === 'F5') {
             event.preventDefault();
             // A modal owns the keyboard: don't refresh the list underneath it.
-            // Checks the DOM, not one boolean — the delete confirmation and
-            // the File Transfer guide mount straight into this window and set
-            // no flag, so guarding only `show_choose_details` left two
-            // siblings uncovered.
-            if (
-                !show_choose_details &&
-                window?.node_ref?.querySelector('.dialog') == null
-            )
-                refresh();
+            // Searches the WHOLE document, not this window's subtree: the
+            // no-association dialog mounts into #desktop, so a subtree query
+            // missed it while catching the delete confirmation — two dialogs a
+            // user cannot tell apart behaving differently. And it fails CLOSED
+            // now: `node_ref` is undefined before mount, and `undefined == null`
+            // let the old guard refresh anyway.
+            if (document.querySelector('.dialog') == null) refresh();
             return;
         }
         if (event.key !== 'Escape') return;
@@ -162,12 +161,14 @@
             show_choose_details = false;
             return;
         }
-        if (views_menu) {
-            views_menu = false;
-            return;
-        }
-        // the bars advertise dismissal with a ✕, so Escape should do it too
-        if (left_panel !== 'tasks') close_explorer_bar();
+        if (views_menu) views_menu = false;
+        // Escape does NOT close the Explorer Bar. That was invented rather
+        // than ported — XP dismisses a bar from its ✕ or by re-toggling
+        // Ctrl+E/I/H — and it cost three defects, because four independent
+        // `svelte:window` listeners each decided in isolation: Escape reached
+        // through an open dialog to close the bar behind it, collapsed the
+        // menu bar and the bar together, and discarded a typed Search query
+        // and its results (both are component-local and die with the panel).
     }
 
     // ── File menu ────────────────────────────────────────────
@@ -391,6 +392,12 @@
     ];
 
     /**
+     * The trail, capped so the flyout cannot be clipped out of the window and
+     * always containing the current stop — see src/lib/history_window.ts.
+     */
+    $: go_to_trail = visible_trail(history_entries, page_index);
+
+    /**
      * View > Go To ▸ — the toolbar's three navigation buttons plus the trail
      * itself, with the current stop ticked (XP lists visited folders here).
      */
@@ -408,7 +415,7 @@
         },
         // Capped: the flyout has no scroll and the window clips it, so an
         // uncapped trail pushed the oldest stops out of reach after ~8 hops.
-        ...history_entries.slice(-8).map((entry) => ({
+        ...go_to_trail.map((entry) => ({
             name: entry.label,
             check: entry.idx === page_index,
             // via pick_history, NOT an inline `page_index = …`: an assignment
@@ -1079,8 +1086,11 @@
             class="shrink-0 flex flex-row items-center border-t border-stone-300 bg-xp-yellow text-[11px] text-slate-800"
             class:hidden={!show_status_bar}
         >
-            <span class="grow px-2 py-0.5 truncate">{status.objects}</span>
+            <span data-status="objects" class="grow px-2 py-0.5 truncate"
+                >{status.objects}</span
+            >
             <span
+                data-status="size"
                 class="w-[110px] shrink-0 px-2 py-0.5 border-l border-stone-300 truncate"
                 >{status.size}</span
             >

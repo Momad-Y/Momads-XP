@@ -271,6 +271,18 @@ export const make = ({
 
                                   const yes_action = () => {
                                       for (const id of plan.ids) {
+                                          // Re-check per item at CONFIRM time,
+                                          // like my_computer.delete_selected
+                                          // does. The plan is frozen when the
+                                          // menu opens and executed when OK is
+                                          // clicked, so another window can
+                                          // delete the item in between —
+                                          // clone_fs/del_fs then `required()`
+                                          // it and THROW, which pre-empted
+                                          // dialog.destroy() and left the
+                                          // confirmation stuck on screen.
+                                          if (get(hardDrive)?.[id] == null)
+                                              continue;
                                           if (!plan.permanent_ids.has(id)) {
                                               fs.clone_fs(
                                                   id,
@@ -369,8 +381,13 @@ async function confirm_delete({
         {
             name: 'OK',
             action: () => {
-                yes_action();
-                dialog.destroy();
+                // destroy() in `finally`: any throw inside yes_action used to
+                // skip it and wedge the confirmation permanently open.
+                try {
+                    yes_action();
+                } finally {
+                    dialog.destroy();
+                }
             },
             focus: true,
         },

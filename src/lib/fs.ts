@@ -21,14 +21,31 @@ function drive_snapshot(): HardDrive {
  * to it (see src/lib/selection.ts). Without it a cut started in one Explorer
  * carried another window's — or the desktop's — items, and paste MOVES them.
  */
-export function copy(scope?: readonly string[]): void {
-    clipboard_op.set('copy');
-    clipboard.set(scoped_ids(get(selectingItems), scope, []));
+/**
+ * `scope` is REQUIRED — a caller that genuinely cannot know what it is showing
+ * passes `null` explicitly, matching `scoped_ids`. It was optional, so a
+ * forgotten argument compiled cleanly and produced a working-looking copy that
+ * clipped nothing.
+ *
+ * An empty narrowing LEAVES THE CLIPBOARD ALONE rather than blanking it. Three
+ * surfaces bind window keydown, so two Ctrl+C handlers can fire on one
+ * keypress; each now writes its own scope, and whichever legitimately narrows
+ * to nothing used to wipe what the other had just copied. Windows treats
+ * Ctrl+C with nothing selected as a no-op, not as "empty the clipboard".
+ */
+function clip(op: 'copy' | 'cut', scope: readonly string[] | null): void {
+    const ids = scoped_ids(get(selectingItems), scope, []);
+    if (ids.length === 0) return;
+    clipboard_op.set(op);
+    clipboard.set(ids);
 }
 
-export function cut(scope?: readonly string[]): void {
-    clipboard_op.set('cut');
-    clipboard.set(scoped_ids(get(selectingItems), scope, []));
+export function copy(scope: readonly string[] | null): void {
+    clip('copy', scope);
+}
+
+export function cut(scope: readonly string[] | null): void {
+    clip('cut', scope);
 }
 
 export function paste(id: string, new_id: string | null = null): void {

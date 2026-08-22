@@ -22,7 +22,7 @@
     } from '../../../../lib/system';
     import * as fs from '../../../../lib/fs';
     const { long_press, double_tap } = utils;
-    import { createEventDispatcher, tick, mount } from 'svelte';
+    import { createEventDispatcher, onDestroy, tick, mount } from 'svelte';
     import { get, set } from 'idb-keyval';
     import { parse_dir } from '../../../../lib/dir_parser';
     import {
@@ -31,6 +31,7 @@
         visible_columns,
     } from '../../../../lib/details_columns';
     import type { DetailsColumnKey } from '../../../../lib/details_columns';
+    import { scoped_ids } from '../../../../lib/selection';
     import { required } from '../../../../lib/types';
     import { show_no_association_dialog } from '../../../../lib/no_association';
     import type {
@@ -162,12 +163,24 @@
         sorted_items = null;
         refresh_nonce++;
         if (id == null) {
+            // setTimeout, NOT tick(): tick() resolves inside the same microtask
+            // drain that flushed the write, so no frame could ever be painted
+            // between the two states and Refresh at the root stayed invisible.
+            // A real minimum duration is the only thing that makes the control
+            // observably do something.
             root_loading = true;
-            void tick().then(() => {
+            if (root_loading_timer != null) clearTimeout(root_loading_timer);
+            root_loading_timer = setTimeout(() => {
                 root_loading = false;
-            });
+                root_loading_timer = null;
+            }, 150);
         }
     }
+
+    let root_loading_timer: ReturnType<typeof setTimeout> | null = null;
+    onDestroy(() => {
+        if (root_loading_timer != null) clearTimeout(root_loading_timer);
+    });
 
     let last_sort_tx_hash: string | null | undefined;
     $: {
@@ -383,17 +396,29 @@
     // exported so the Explorer File menu can trigger it too (accessors={true});
     // requires a selection — callers must gate on $selectingItems
     export function rename() {
+        // Clear the latch BEFORE arming a new edit. It is only ever cleared
+        // inside end_renaming, and cancelling removes the focused textarea —
+        // which fires no blur in Chromium/WebKit — so one Escape (or one F5,
+        // since refresh() cancels too) left it set and silently discarded the
+        // NEXT rename's commit.
+        rename_cancelled = false;
         renaming = true;
         void tick().then(() => {
-            const item_id = required($selectingItems[0], 'renaming selection');
+            // the SCOPED selection, not $selectingItems[0]: the raw store can
+            // lead with an id belonging to the desktop or another window, and
+            // this then measured the wrong basename — or threw, inside an
+            // unawaited promise, if that id had since been deleted.
+            const item_id = scoped_ids($selectingItems, visible_ids)[0];
+            if (item_id == null) {
+                renaming = false;
+                return;
+            }
             const el = document.querySelector<HTMLTextAreaElement>(
                 `div[fs-id="${item_id}"] textarea`,
             );
-            const end_range = required(
-                $hardDrive?.[item_id],
-                'fs item ' + item_id,
-            ).basename.length;
-            if (el != null) el.setSelectionRange(0, end_range);
+            const end_range = $hardDrive?.[item_id]?.basename.length;
+            if (el != null && end_range != null)
+                el.setSelectionRange(0, end_range);
         });
     }
 
@@ -688,7 +713,10 @@
     </div>
 
     {#if id == null && root_loading}
-        <p class="text-center text-sm font-Trebuchet my-2 text-slate-500">
+        <p
+            data-root-loading
+            class="text-center text-sm font-Trebuchet my-2 text-slate-500"
+        >
             working on it...
         </p>
     {/if}

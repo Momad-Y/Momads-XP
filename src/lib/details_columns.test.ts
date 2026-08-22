@@ -50,6 +50,18 @@ describe('type_label', () => {
     it('treats a bare dot as extensionless — renaming to "notes." is reachable', () => {
         expect(type_label(item({ id: 'f', ext: '.' }))).toBe('File');
     });
+
+    it('survives the trailing space sanitize_filename lets through', () => {
+        // sanitize_filename strips only / and \\, so "notes. " renames fine
+        // and extname returns '. ' — which rendered as "  File"
+        expect(type_label(item({ id: 'g', ext: '. ' }))).toBe('File');
+        expect(type_label(item({ id: 'h', ext: '.pdf ' }))).toBe('PDF File');
+        expect(type_label(item({ id: 'i', ext: '..' }))).toBe('File');
+    });
+
+    it('names a shortcut by what it is, as XP does', () => {
+        expect(type_label(item({ id: 'j', ext: '.lnk' }))).toBe('Shortcut');
+    });
 });
 
 describe('size_label', () => {
@@ -61,11 +73,27 @@ describe('size_label', () => {
         expect(size_label(item({ id: 'b' }))).toBe('0 KB');
     });
 
-    it('abbreviates large files the same way the status bar does', () => {
-        // two formatters shipped side by side and disagreed: the column said
-        // "5000000 KB" while the status bar said "4.77 GB"
-        expect(size_label(item({ id: 'c', size: 5_000_000 }))).toBe('4.77 GB');
-        expect(size_label(item({ id: 'd', size: 2048 }))).toBe('2.00 MB');
+    // XP's Size COLUMN is always KB with separators; only the status bar picks
+    // a unit. Routing this through format_size re-spelled five shipped Desktop
+    // items ("13,323 KB" -> "13.01 MB"), which is Vista-and-later behaviour.
+    it('stays in KB with thousands separators, however large', () => {
+        expect(size_label(item({ id: 'c', size: 5_000_000 }))).toBe(
+            '5,000,000 KB',
+        );
+        expect(size_label(item({ id: 'd', size: 2048 }))).toBe('2,048 KB');
+        expect(size_label(item({ id: 'e', size: 13_323 }))).toBe('13,323 KB');
+    });
+
+    it('collapses negative and non-finite sizes to zero, like the status bar', () => {
+        expect(size_label(item({ id: 'f', size: -5 }))).toBe('0 KB');
+        expect(size_label(item({ id: 'g', size: Number.NaN }))).toBe('0 KB');
+        expect(
+            size_label(item({ id: 'h', size: Number.POSITIVE_INFINITY })),
+        ).toBe('0 KB');
+    });
+
+    it('rounds a fractional KB up, never down to nothing', () => {
+        expect(size_label(item({ id: 'i', size: 0.2 }))).toBe('1 KB');
     });
 
     it('shows nothing for folders', () => {

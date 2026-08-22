@@ -182,7 +182,8 @@ export type MountedComponent = Record<string, unknown>;
 /** One button of a Dialog.svelte prompt. */
 export interface DialogButton {
     name: string;
-    action: (event: MouseEvent) => void;
+    /** The event is optional: Escape invokes Cancel with no click behind it. */
+    action: (event?: MouseEvent) => void;
     focus?: boolean;
 }
 

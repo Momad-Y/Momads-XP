@@ -18,6 +18,7 @@
         previewable_exts,
     } from '../../lib/system';
     import * as fs from '../../lib/fs';
+    import { scoped_ids } from '../../lib/selection';
     const { click_outside, long_press, double_tap } = utils;
     import { tick } from 'svelte';
     import RecycleBin from '../../lib/components/xp/RecycleBin.svelte';
@@ -248,15 +249,29 @@
     }
 
     function rename() {
+        // Clear the latch BEFORE arming a new edit — see the note on
+        // cancel_renaming: it is cleared only inside end_renaming, which never
+        // runs when a cancel removes the focused textarea, so one Escape
+        // silently discarded the NEXT rename's commit.
+        rename_cancelled = false;
         renaming = true;
         void tick().then(() => {
-            const id = required($selectingItems[0], 'renaming selection');
+            // the SCOPED selection: the raw store can lead with an id from an
+            // Explorer window, which measured the wrong basename or threw.
+            const id = scoped_ids(
+                $selectingItems,
+                items.map((el) => el.id),
+            )[0];
+            if (id == null) {
+                renaming = false;
+                return;
+            }
             const el = document.querySelector<HTMLTextAreaElement>(
                 `div[fs-id="${id}"] textarea`,
             );
-            const end_range = required($hardDrive?.[id], 'fs item ' + id)
-                .basename.length;
-            if (el != null) el.setSelectionRange(0, end_range);
+            const end_range = $hardDrive?.[id]?.basename.length;
+            if (el != null && end_range != null)
+                el.setSelectionRange(0, end_range);
         });
     }
 
