@@ -1,3 +1,5 @@
+import { is_private_address } from './ip_rules';
+
 /**
  * Guards for /api/browse. A proxy that fetches whatever URL it is handed is an
  * SSRF hole and an open relay, so every request is checked here before any
@@ -8,41 +10,46 @@
 const ALLOWED_PROTOCOLS = ['http:', 'https:'];
 
 /**
- * Hosts that must never be fetched server-side: loopback, link-local (cloud
- * metadata lives at 169.254.169.254), and the RFC1918 private ranges. Without
- * this, `?url=http://169.254.169.254/…` would hand a caller our host's
- * credentials.
+ * Names that must never be fetched, compared with any trailing dot removed —
+ * `localhost.` and `metadata.google.internal.` are the same hosts as their
+ * undotted forms and both used to sail through a literal set lookup.
  */
 const BLOCKED_HOSTNAMES = new Set([
     'localhost',
-    '127.0.0.1',
-    '0.0.0.0',
-    '::1',
-    '[::1]',
     'metadata.google.internal',
+    'metadata.goog',
+    'instance-data',
 ]);
 
-function is_blocked_ip(hostname: string): boolean {
-    // IPv4 literal?
-    const v4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(hostname);
-    if (v4 == null) return false;
-    const octets = v4.slice(1).map((part) => Number(part));
-    const [a, b] = octets;
-    if (a == null || b == null) return true;
-    if (octets.some((o) => Number.isNaN(o) || o > 255)) return true;
-    if (a === 10) return true; // 10.0.0.0/8
-    if (a === 127) return true; // loopback
-    if (a === 0) return true; // "this network"
-    if (a === 169 && b === 254) return true; // link-local / cloud metadata
-    if (a === 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12
-    if (a === 192 && b === 168) return true; // 192.168.0.0/16
-    return false;
+/** Trailing dots are legal in DNS and mean the same host. */
+function canonical_host(hostname: string): string {
+    let host = hostname.toLowerCase();
+    if (host.startsWith('[') && host.endsWith(']')) host = host.slice(1, -1);
+    while (host.endsWith('.')) host = host.slice(0, -1);
+    return host;
+}
+
+/**
+ * The hostname rules — everything that can be decided from the URL text alone.
+ * Address-shaped hosts are judged by `is_private_address`, which understands
+ * both families; a NAME still has to be resolved and re-checked, because a
+ * hostname the attacker controls can point anywhere (see `resolves_to_public`).
+ */
+function is_blocked_host(hostname: string): boolean {
+    const host = canonical_host(hostname);
+    if (host === '') return true;
+    if (BLOCKED_HOSTNAMES.has(host)) return true;
+    if (host.endsWith('.local') || host.endsWith('.internal')) return true;
+    if (host.endsWith('.localhost')) return true;
+    return is_private_address(host);
 }
 
 export interface UrlVerdict {
     ok: boolean;
     /** Normalised absolute URL, present only when ok. */
     url?: string;
+    /** Lower-cased host with any trailing dot removed, present only when ok. */
+    hostname?: string;
     reason?: 'malformed' | 'bad_protocol' | 'blocked_host' | 'too_long';
 }
 
@@ -64,14 +71,48 @@ export function check_browse_url(raw: string | null): UrlVerdict {
         return { ok: false, reason: 'bad_protocol' };
     }
 
-    const host = parsed.hostname.toLowerCase();
-    if (BLOCKED_HOSTNAMES.has(host) || is_blocked_ip(host)) {
-        return { ok: false, reason: 'blocked_host' };
-    }
-    // ".local"/".internal" mDNS + cloud-internal names
-    if (host.endsWith('.local') || host.endsWith('.internal')) {
+    if (is_blocked_host(parsed.hostname)) {
         return { ok: false, reason: 'blocked_host' };
     }
 
-    return { ok: true, url: parsed.toString() };
+    return {
+        ok: true,
+        url: parsed.toString(),
+        hostname: canonical_host(parsed.hostname),
+    };
+}
+
+/**
+ * Resolve `hostname` and confirm EVERY address it answers with is public.
+ *
+ * The text check above can only see what is written in the URL. A hostname the
+ * attacker controls can point at anything — `?url=http://ssrf.attacker.tld/`
+ * whose A record is 169.254.169.254 passed every string rule ever written. No
+ * blocklist can close that; only resolving can.
+ *
+ * Fails CLOSED: a lookup that errors, or returns nothing, is refused.
+ *
+ * KNOWN RESIDUAL RISK — this does not pin the connection. Between this lookup
+ * and the one `fetch` performs, a DNS answer with a very short TTL can flip to
+ * an internal address (classic rebinding). Closing that needs a custom undici
+ * dispatcher whose `connect.lookup` returns the address verified here; it is
+ * deliberately not done in this change because it replaces the runtime's HTTP
+ * agent on a metered function, which is a bigger blast radius than the hole it
+ * closes. It is recorded in docs/redteam-post-phase-2.md.
+ */
+export async function resolves_to_public(hostname: string): Promise<boolean> {
+    const host = canonical_host(hostname);
+    // an IP literal was already judged by `is_blocked_host` — nothing to resolve
+    if (is_private_address(host)) return false;
+    if (/^[0-9a-f:.]+$/i.test(host) && host.includes(':')) return true;
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return true;
+
+    try {
+        const dns = await import('node:dns/promises');
+        const answers = await dns.lookup(host, { all: true, verbatim: true });
+        if (answers.length === 0) return false;
+        return answers.every((a) => !is_private_address(a.address));
+    } catch {
+        return false;
+    }
 }
