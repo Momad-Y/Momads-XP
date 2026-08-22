@@ -30,12 +30,21 @@ export async function bootToDesktop(
     await page.goto('/');
 
     if (skip) {
-        // wait for the point at which skipping is honoured, then skip. The
+        // Wait for the point at which skipping is honoured, then skip. The
         // boot screen ignores the gesture until the seed has landed, so a
         // blind keypress would be a race.
-        await expect(
-            page.locator('#boot-screen[data-boot-skippable="true"]'),
-        ).toBeAttached({ timeout: 30_000 });
+        //
+        // `.or(login card)` matters: if boot has already advanced past the
+        // screen, waiting on an element that will never attach would hang for
+        // the full timeout. Space is harmless at the login screen — its key
+        // handlers are on the user card and the restart link, not the window.
+        const skippable = page.locator(
+            '#boot-screen[data-boot-skippable="true"]',
+        );
+        const login = page.locator('#login-user-card');
+        await expect(skippable.or(login).first()).toBeAttached({
+            timeout: 30_000,
+        });
         await page.keyboard.press('Space');
     }
 

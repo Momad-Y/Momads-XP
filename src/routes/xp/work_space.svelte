@@ -3,6 +3,7 @@
     import { get } from 'svelte/store';
     import Wallpaper from './wallpaper.svelte';
     import { queueProgram, runningPrograms } from '../../lib/store';
+    import { HOMEPAGE } from '../../lib/search';
     import short from 'short-uuid';
     import DesktopFolder from './desktop_folder.svelte';
     import * as finder from '../../lib/finder';
@@ -423,7 +424,7 @@
     }
 
     function get_url(item: Partial<VfsItem> | undefined) {
-        if (item == null) return 'https://wiby.me/';
+        if (item == null) return HOMEPAGE;
 
         if (item.storage_type == 'local') {
             return finder.to_url(item.id);

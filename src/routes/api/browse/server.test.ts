@@ -263,3 +263,90 @@ describe('/api/browse rate limiting', () => {
         expect(limited).toBe(true);
     });
 });
+
+/**
+ * wiby's "surprise me" is a 200 whose BODY meta-refreshes to a random page, so
+ * `fetch(redirect: 'follow')` sees no redirect and the proxy used to serve the
+ * interstitial — the frame moved on by itself while the address bar stayed on
+ * https://wiby.me/surprise/.
+ */
+describe('/api/browse follows an instant meta refresh', () => {
+    function refresh_page(to: string) {
+        return html_response(
+            `<html><head><meta http-equiv="refresh" content="0; URL=${to}"/></head><body>You asked for it!</body></html>`,
+            'https://wiby.me/surprise/',
+        );
+    }
+
+    it('serves the page the refresh points at, and reports it as the landing url', async () => {
+        const spy = vi
+            .fn()
+            .mockResolvedValueOnce(refresh_page('https://random.example/page'))
+            .mockResolvedValueOnce(
+                html_response(
+                    '<html><head></head><body>RANDOM</body></html>',
+                    'https://random.example/page',
+                ),
+            );
+        vi.stubGlobal('fetch', spy);
+
+        const res = await GET(make_event('https://wiby.me/surprise/'));
+        const body = await res.text();
+
+        expect(spy).toHaveBeenCalledTimes(2);
+        expect(body).toContain('RANDOM');
+        expect(body).not.toContain('You asked for it!');
+        // CUR is where we landed, REQ is what the user asked for — the parent
+        // needs both to treat this as a redirect of the CURRENT entry rather
+        // than a new step (src/lib/nav_history.ts)
+        expect(body).toContain('var CUR="https://random.example/page"');
+        expect(body).toContain('var REQ="https://wiby.me/surprise/"');
+    });
+
+    it('re-validates each hop, so a refresh cannot point at the metadata service', async () => {
+        const spy = vi
+            .fn()
+            .mockResolvedValueOnce(refresh_page('http://169.254.169.254/'));
+        vi.stubGlobal('fetch', spy);
+
+        const res = await GET(make_event('https://wiby.me/surprise/'));
+        const body = await res.text();
+
+        // the hop is refused and the interstitial is served as-is; SSRF guards
+        // apply to a url a PAGE hands us exactly as they do to a typed one
+        expect(spy).toHaveBeenCalledTimes(1);
+        expect(body).toContain('You asked for it!');
+    });
+
+    it('stops after the hop budget rather than chasing a refresh loop', async () => {
+        // a FRESH Response per call: a body can only be read once
+        const spy = vi
+            .fn()
+            .mockImplementation(() =>
+                Promise.resolve(refresh_page('https://loop.example/next')),
+            );
+        vi.stubGlobal('fetch', spy);
+
+        await GET(make_event('https://wiby.me/surprise/'));
+        // the first fetch plus MAX_META_REFRESH_HOPS, and no more
+        expect(spy).toHaveBeenCalledTimes(4);
+    });
+
+    it('leaves a DELAYED refresh alone — that page is meant to be read', async () => {
+        const spy = vi
+            .fn()
+            .mockImplementation(() =>
+                Promise.resolve(
+                    html_response(
+                        '<html><head><meta http-equiv="refresh" content="5; URL=https://random.example/"/></head><body>hold on</body></html>',
+                        'https://slow.example/',
+                    ),
+                ),
+            );
+        vi.stubGlobal('fetch', spy);
+
+        const res = await GET(make_event('https://slow.example/'));
+        expect(spy).toHaveBeenCalledTimes(1);
+        expect(await res.text()).toContain('hold on');
+    });
+});

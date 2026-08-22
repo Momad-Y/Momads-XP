@@ -138,3 +138,46 @@ export function rewrite_document(
     }
     return out;
 }
+
+/**
+ * The target of an instant `<meta http-equiv="refresh" content="0; url=X">`,
+ * or null.
+ *
+ * wiby's "surprise me" is exactly this — a 200 whose body meta-refreshes to a
+ * random page — and `fetch(redirect: 'follow')` does NOT follow it, so the
+ * proxy served the interstitial and the address bar sat on
+ * `https://wiby.me/surprise/` while the frame moved on by itself.
+ *
+ * Only a ZERO delay is followed. A page with `content="5; url=..."` is meant
+ * to be read for those five seconds ("click here if you are not redirected"),
+ * and swallowing it server-side would hide content the user is supposed to
+ * see.
+ */
+export function meta_refresh_target(
+    html: string,
+    base_url: string,
+): string | null {
+    // <meta http-equiv=refresh content="0; url=...">, attributes in any order
+    // and quoted however the author felt like it
+    const tag = /<meta\s+[^>]*http-equiv\s*=\s*["']?refresh["']?[^>]*>/i.exec(
+        html,
+    );
+    if (tag == null) return null;
+    const content = /content\s*=\s*["']([^"']*)["']/i.exec(tag[0]);
+    if (content?.[1] == null) return null;
+
+    const [delay_part, ...rest] = content[1].split(';');
+    if (delay_part == null) return null;
+    if (Number.parseFloat(delay_part.trim()) !== 0) return null;
+
+    const url_part = rest.join(';');
+    const url_match = /url\s*=\s*["']?([^"'\s]+)["']?/i.exec(url_part);
+    const raw = url_match?.[1];
+    if (raw == null || raw === '') return null;
+
+    try {
+        return new URL(raw, base_url).toString();
+    } catch {
+        return null;
+    }
+}
