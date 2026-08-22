@@ -92,27 +92,46 @@ export function check_browse_url(raw: string | null): UrlVerdict {
  *
  * Fails CLOSED: a lookup that errors, or returns nothing, is refused.
  *
- * KNOWN RESIDUAL RISK — this does not pin the connection. Between this lookup
- * and the one `fetch` performs, a DNS answer with a very short TTL can flip to
- * an internal address (classic rebinding). Closing that needs a custom undici
- * dispatcher whose `connect.lookup` returns the address verified here; it is
- * deliberately not done in this change because it replaces the runtime's HTTP
- * agent on a metered function, which is a bigger blast radius than the hole it
- * closes. It is recorded in docs/redteam-post-phase-2.md.
+ * The returned address is then PINNED for the actual connection — see
+ * pinned_fetch. Resolving alone would not be enough: the name is resolved a
+ * second time when the socket is opened, and a short-TTL answer can differ
+ * between the two (DNS rebinding).
  */
-export async function resolves_to_public(hostname: string): Promise<boolean> {
+export interface ResolvedHost {
+    address: string;
+    family: 4 | 6;
+}
+
+export async function resolve_public_address(
+    hostname: string,
+): Promise<ResolvedHost | null> {
     const host = canonical_host(hostname);
-    // an IP literal was already judged by `is_blocked_host` — nothing to resolve
-    if (is_private_address(host)) return false;
-    if (/^[0-9a-f:.]+$/i.test(host) && host.includes(':')) return true;
-    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return true;
+    if (is_private_address(host)) return null;
+
+    // already an address — nothing to resolve, and nothing to rebind
+    if (host.includes(':')) return { address: host, family: 6 };
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host))
+        return { address: host, family: 4 };
 
     try {
         const dns = await import('node:dns/promises');
         const answers = await dns.lookup(host, { all: true, verbatim: true });
-        if (answers.length === 0) return false;
-        return answers.every((a) => !is_private_address(a.address));
+        if (answers.length === 0) return null;
+        // EVERY answer must be public: returning the first public one while
+        // another is internal would just hand the attacker a retry.
+        if (answers.some((a) => is_private_address(a.address))) return null;
+        const first = answers[0];
+        if (first == null) return null;
+        return {
+            address: first.address,
+            family: first.family === 6 ? 6 : 4,
+        };
     } catch {
-        return false;
+        return null;
     }
+}
+
+/** Convenience wrapper for callers that only need the yes/no. */
+export async function resolves_to_public(hostname: string): Promise<boolean> {
+    return (await resolve_public_address(hostname)) != null;
 }

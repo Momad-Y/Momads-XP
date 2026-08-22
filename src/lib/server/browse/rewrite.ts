@@ -100,7 +100,7 @@ export function base_tag(current_url: string): string {
     return `<base href="${escape_attr(origin_href)}">`;
 }
 
-function escape_attr(value: string): string {
+export function escape_attr(value: string): string {
     return value
         .replace(/&/g, '&amp;')
         .replace(/"/g, '&quot;')

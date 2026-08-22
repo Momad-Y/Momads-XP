@@ -15,9 +15,12 @@
 import { error } from '@sveltejs/kit';
 import {
     check_browse_url,
-    resolves_to_public,
+    resolve_public_address,
 } from '../../../lib/server/browse/url_guard';
+import type { ResolvedHost } from '../../../lib/server/browse/url_guard';
+import { pinned_fetch } from '../../../lib/server/browse/pinned_fetch';
 import {
+    escape_attr,
     meta_refresh_target,
     rewrite_document,
     should_strip_header,
@@ -49,35 +52,20 @@ const MAX_REDIRECTS = 5;
  * One timed, cookie-less upstream fetch. Returns null instead of throwing so a
  * meta-refresh hop can simply stop following rather than fail the whole page.
  */
-async function fetch_upstream(url: string): Promise<Response | null> {
-    const controller = new AbortController();
-    const timer = setTimeout(() => {
-        controller.abort();
-    }, FETCH_TIMEOUT_MS);
-    try {
-        return await fetch(url, {
-            // MANUAL, not 'follow'. `check_browse_url` validates the string the
-            // caller supplied; following redirects inside `fetch` then walked
-            // wherever the response pointed with no further check, so
-            // `?url=https://attacker.tld/r` returning
-            // `302 Location: http://169.254.169.254/…` defeated every rule in
-            // url_guard. Each hop is now re-validated by `follow_redirects`.
-            redirect: 'manual',
-            signal: controller.signal,
-            headers: {
-                // Identify honestly and ask for a document. No cookies, no
-                // auth: `fetch` sends none by default and we add none.
-                'User-Agent':
-                    'Mozilla/5.0 (compatible; MomadsXP/1.0; +https://momad-xp.netlify.app)',
-                Accept: 'text/html,application/xhtml+xml,*/*;q=0.8',
-                'Accept-Language': 'en',
-            },
-        });
-    } catch {
-        return null;
-    } finally {
-        clearTimeout(timer);
-    }
+async function fetch_upstream(
+    url: string,
+    pin: ResolvedHost,
+): Promise<Response | null> {
+    // node:https with a pinned `lookup`, not `fetch`: undici offers no hook on
+    // the second DNS resolution, so a short-TTL answer could differ between
+    // the check and the connection. Redirects are never followed here — every
+    // hop is re-validated by `follow_redirects`.
+    return pinned_fetch({
+        url,
+        address: pin.address,
+        family: pin.family,
+        timeout_ms: FETCH_TIMEOUT_MS,
+    });
 }
 
 /**
@@ -110,9 +98,10 @@ async function follow_redirects(
         if (!verdict.ok || verdict.url == null || verdict.hostname == null) {
             return null;
         }
-        if (!(await resolves_to_public(verdict.hostname))) return null;
+        const hop_pin = await resolve_public_address(verdict.hostname);
+        if (hop_pin == null) return null;
 
-        const hop_res = await fetch_upstream(verdict.url);
+        const hop_res = await fetch_upstream(verdict.url, hop_pin);
         if (hop_res == null) return null;
         response = hop_res;
         current = verdict.url;
@@ -154,6 +143,22 @@ async function read_capped(res: Response): Promise<string | null> {
         at += chunk.byteLength;
     }
     return new TextDecoder('utf-8').decode(joined);
+}
+
+/**
+ * Shown when the target is not a document — an image, a PDF, a download. The
+ * URL is escaped into both the href and the text; it has been through
+ * `check_browse_url`, so it is a WHATWG-serialised http(s) URL, but this page
+ * is built by hand and must not depend on that.
+ */
+function not_a_page(url: string): string {
+    const safe = escape_attr(url);
+    return `<!doctype html><html><head><meta charset="utf-8"><title>Internet Explorer</title>
+<style>body{font:13px Tahoma,sans-serif;margin:2em;color:#000}a{color:#00c}p{max-width:34em}</style>
+</head><body><h3>This is not a web page</h3>
+<p>The address you opened points at a file rather than a page, so Internet Explorer cannot display it here.</p>
+<p><a href="${safe}" rel="noreferrer noopener">${safe}</a></p>
+</body></html>`;
 }
 
 export const GET: RequestHandler = async (event) => {
@@ -211,11 +216,12 @@ export const GET: RequestHandler = async (event) => {
     // The text rules can only see what is written in the URL. A hostname the
     // caller controls can point anywhere, so it has to be resolved and every
     // answer checked before we connect.
-    if (!(await resolves_to_public(verdict.hostname))) {
+    const pin = await resolve_public_address(verdict.hostname);
+    if (pin == null) {
         error(400, 'blocked_host');
     }
 
-    const first = await fetch_upstream(target);
+    const first = await fetch_upstream(target, pin);
     if (first == null) error(502, 'fetch_failed');
     const followed = await follow_redirects(first, target);
     if (followed == null) error(502, 'fetch_failed');
@@ -231,9 +237,24 @@ export const GET: RequestHandler = async (event) => {
     // so a non-HTML response here means the user navigated straight to an
     // asset. Send them to it rather than streaming it through the function.
     if (!content_type.includes('text/html')) {
-        return new Response(null, {
-            status: 302,
-            headers: { location: landed_url },
+        /**
+         * NOT a 302. Redirecting to whatever URL was asked for made this an
+         * open redirect on our own domain — anyone could hand out
+         * `momad-xp.netlify.app/api/browse?url=…` and have it launder a link
+         * to somewhere else — and the 302/200/502 split was a clean signal for
+         * probing which hosts answer.
+         *
+         * A small page in the frame instead: the user still gets there, but
+         * only by clicking, which is a navigation they chose.
+         */
+        return new Response(not_a_page(landed_url), {
+            status: 200,
+            headers: {
+                'content-type': 'text/html; charset=utf-8',
+                'x-content-type-options': 'nosniff',
+                'cache-control': 'no-store',
+                'x-robots-tag': 'noindex, nofollow',
+            },
         });
     }
 
@@ -276,9 +297,10 @@ export const GET: RequestHandler = async (event) => {
             next_verdict.hostname == null
         )
             break;
-        if (!(await resolves_to_public(next_verdict.hostname))) break;
+        const refresh_pin = await resolve_public_address(next_verdict.hostname);
+        if (refresh_pin == null) break;
 
-        const hop_first = await fetch_upstream(next_verdict.url);
+        const hop_first = await fetch_upstream(next_verdict.url, refresh_pin);
         if (hop_first == null) break;
         const hop_followed = await follow_redirects(
             hop_first,

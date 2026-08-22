@@ -14,6 +14,19 @@ vi.mock('node:dns/promises', () => ({
     lookup: lookup_result,
 }));
 
+/**
+ * The endpoint no longer calls global `fetch` — it goes through
+ * `pinned_fetch`, which uses node:https with the resolved address forced into
+ * `lookup` so a short-TTL DNS answer cannot move the socket. Stubbing that
+ * module is the seam now, and it also lets a test assert WHICH address the
+ * connection was pinned to.
+ */
+const pinned = vi.fn();
+vi.mock('../../../lib/server/browse/pinned_fetch', () => ({
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- a vi.fn() mock is untyped by construction
+    pinned_fetch: (req: unknown) => pinned(req),
+}));
+
 import { GET } from './+server';
 
 const APP = 'https://momad-xp.netlify.app';
@@ -88,11 +101,8 @@ function html_response(body: string, url = 'https://example.com/') {
 }
 
 beforeEach(() => {
-    vi.stubGlobal(
-        'fetch',
-        vi.fn(() =>
-            Promise.resolve(html_response('<html><head></head></html>')),
-        ),
+    pinned.mockImplementation(() =>
+        Promise.resolve(html_response('<html><head></head></html>')),
     );
 });
 
@@ -152,7 +162,7 @@ describe('/api/browse url validation', () => {
 
     it('rejects SSRF targets before making any request', async () => {
         const spy = vi.fn();
-        vi.stubGlobal('fetch', spy);
+        pinned.mockImplementation(spy);
         expect(
             await status_of(make_event('http://169.254.169.254/latest/')),
         ).toBe(400);
@@ -187,7 +197,7 @@ describe('/api/browse response handling', () => {
                     'https://example.com/final',
                 ),
             );
-        vi.stubGlobal('fetch', spy);
+        pinned.mockImplementation(spy);
         const body = await (
             await GET(make_event('https://example.com/start'))
         ).text();
@@ -195,19 +205,25 @@ describe('/api/browse response handling', () => {
         expect(body).toContain('https://example.com/final');
     });
 
-    // A mocked fetch ignores `redirect`, so no behavioural test can prove the
-    // option is set — it has to be asserted on the call itself. With 'follow'
-    // the runtime walks the chain internally and every per-hop check below
-    // becomes unreachable.
-    it('fetches with redirect: manual so hops can be re-validated', async () => {
+    // The connection is PINNED to the address the guard verified, so a
+    // short-TTL DNS answer cannot move the socket between the check and the
+    // connect. Nothing behavioural can observe that with a mocked transport —
+    // it has to be asserted on the call.
+    it('pins the connection to the address the guard verified', async () => {
+        lookup_result.mockResolvedValueOnce([
+            { address: '203.0.113.10', family: 4 },
+        ]);
         const spy = vi
             .fn()
             .mockResolvedValue(html_response('<html><head></head></html>'));
-        vi.stubGlobal('fetch', spy);
+        pinned.mockImplementation(spy);
         await GET(make_event('https://example.com/'));
         expect(spy).toHaveBeenCalledWith(
-            'https://example.com/',
-            expect.objectContaining({ redirect: 'manual' }),
+            expect.objectContaining({
+                url: 'https://example.com/',
+                address: '203.0.113.10',
+                family: 4,
+            }),
         );
     });
 
@@ -222,7 +238,7 @@ describe('/api/browse response handling', () => {
                 },
             }),
         );
-        vi.stubGlobal('fetch', spy);
+        pinned.mockImplementation(spy);
         expect(await status_of(make_event('https://example.com/start'))).toBe(
             502,
         );
@@ -234,7 +250,7 @@ describe('/api/browse response handling', () => {
             { address: '169.254.169.254', family: 4 },
         ]);
         const spy = vi.fn();
-        vi.stubGlobal('fetch', spy);
+        pinned.mockImplementation(spy);
         expect(await status_of(make_event('https://ssrf.attacker.tld/'))).toBe(
             400,
         );
@@ -260,22 +276,24 @@ describe('/api/browse response handling', () => {
         Object.defineProperty(res_obj, 'url', {
             value: 'https://example.com/a.png',
         });
-        vi.stubGlobal(
-            'fetch',
-            vi.fn(() => Promise.resolve(res_obj)),
-        );
+        pinned.mockImplementation(() => Promise.resolve(res_obj));
         const res = await GET(make_event('https://example.com/a.png'));
-        expect(res.status).toBe(302);
-        expect(res.headers.get('location')).toBe('https://example.com/a.png');
+        // an interstitial, NOT a 302: redirecting to any URL made this an open
+        // redirect on our own domain and gave a clean signal for probing which
+        // hosts answer. The user still gets there, but by clicking.
+        expect(res.status).toBe(200);
+        expect(res.headers.get('location')).toBeNull();
+        const page = await res.text();
+        expect(page).toContain('https://example.com/a.png');
+        expect(page).toContain('not a web page');
     });
 
     // raw=1 backs IE's View Source
     it('raw mode returns the ORIGINAL markup, not the rewritten copy', async () => {
         const original =
             '<html><head><title>t</title></head><body>hi</body></html>';
-        vi.stubGlobal(
-            'fetch',
-            vi.fn(() => Promise.resolve(html_response(original))),
+        pinned.mockImplementation(() =>
+            Promise.resolve(html_response(original)),
         );
         const res = await GET(
             make_event('https://example.com/', { raw: true }),
@@ -290,35 +308,35 @@ describe('/api/browse response handling', () => {
     });
 
     it('reports upstream failure as a gateway error', async () => {
-        vi.stubGlobal(
-            'fetch',
-            vi.fn(() => Promise.reject(new Error('dns'))),
-        );
+        // pinned_fetch returns null on any transport failure rather than
+        // throwing — a proxy that cannot reach a site has nothing useful to
+        // say about why
+        pinned.mockImplementation(() => Promise.resolve(null));
         expect(await status_of(make_event('https://example.com/'))).toBe(502);
     });
 
     it('refuses oversized documents', async () => {
         const big = '<html>' + 'x'.repeat(3_100_000);
-        vi.stubGlobal(
-            'fetch',
-            vi.fn(() => Promise.resolve(html_response(big))),
-        );
+        pinned.mockImplementation(() => Promise.resolve(html_response(big)));
         expect(await status_of(make_event('https://example.com/'))).toBe(413);
     });
 
-    it('does not forward cookies or credentials upstream', async () => {
-        const spy = vi.fn(
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars -- typed params give mock.calls a real tuple shape; values are unused
-            (_input: string | URL | Request, _init?: RequestInit) =>
-                Promise.resolve(html_response('<html><head></head></html>')),
-        );
-        vi.stubGlobal('fetch', spy);
+    it('hands the transport nothing but the url, the pin and a timeout', async () => {
+        // credentials cannot be forwarded because the endpoint never supplies
+        // any headers at all — pinned_fetch owns them, and its own test pins
+        // the honest User-Agent and the absence of cookies
+        const spy = vi
+            .fn()
+            .mockResolvedValue(html_response('<html><head></head></html>'));
+        pinned.mockImplementation(spy);
         await GET(make_event('https://example.com/'));
-        const init = spy.mock.calls[0]?.[1];
-        const headers = new Headers(init?.headers);
-        expect(headers.get('cookie')).toBeNull();
-        expect(headers.get('authorization')).toBeNull();
-        expect(headers.get('user-agent')).toContain('MomadsXP');
+        const req: unknown = spy.mock.calls[0]?.[0];
+        expect(Object.keys(req ?? {}).sort()).toEqual([
+            'address',
+            'family',
+            'timeout_ms',
+            'url',
+        ]);
     });
 });
 
@@ -364,7 +382,7 @@ describe('/api/browse follows an instant meta refresh', () => {
                     'https://random.example/page',
                 ),
             );
-        vi.stubGlobal('fetch', spy);
+        pinned.mockImplementation(spy);
 
         const res = await GET(make_event('https://wiby.me/surprise/'));
         const body = await res.text();
@@ -383,7 +401,7 @@ describe('/api/browse follows an instant meta refresh', () => {
         const spy = vi
             .fn()
             .mockResolvedValueOnce(refresh_page('http://169.254.169.254/'));
-        vi.stubGlobal('fetch', spy);
+        pinned.mockImplementation(spy);
 
         const res = await GET(make_event('https://wiby.me/surprise/'));
         const body = await res.text();
@@ -401,7 +419,7 @@ describe('/api/browse follows an instant meta refresh', () => {
             .mockImplementation(() =>
                 Promise.resolve(refresh_page('https://loop.example/next')),
             );
-        vi.stubGlobal('fetch', spy);
+        pinned.mockImplementation(spy);
 
         await GET(make_event('https://wiby.me/surprise/'));
         // the first fetch plus MAX_META_REFRESH_HOPS, and no more
@@ -419,7 +437,7 @@ describe('/api/browse follows an instant meta refresh', () => {
                     ),
                 ),
             );
-        vi.stubGlobal('fetch', spy);
+        pinned.mockImplementation(spy);
 
         const res = await GET(make_event('https://slow.example/'));
         expect(spy).toHaveBeenCalledTimes(1);
