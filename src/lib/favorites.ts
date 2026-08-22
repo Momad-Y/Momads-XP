@@ -74,12 +74,45 @@ function seed_from_profile(): Favorite[] {
     return profile.social.map((s) => ({ name: s.platform, url: s.url }));
 }
 
+/**
+ * `typeof localStorage === 'undefined'` is not enough. With site data blocked
+ * (Safari "Block All Cookies", Chrome's per-site setting) the GETTER itself
+ * throws `SecurityError` — so merely reaching for it took the whole module
+ * down, and because `my_computer.svelte` imports it, double-clicking My
+ * Computer opened no window at all and showed no error.
+ */
+function storage(): Storage | null {
+    try {
+        return typeof localStorage === 'undefined' ? null : localStorage;
+    } catch {
+        return null;
+    }
+}
+
+/** Best effort: a blocked or full store must never break the caller. */
+function persist(list: Favorite[]): void {
+    const store = storage();
+    if (store == null) return;
+    try {
+        store.setItem(STORAGE_KEY, JSON.stringify(list));
+    } catch {
+        // quota or a blocked store — favourites stay in memory for this
+        // session rather than throwing out of the Add Favorite dialog
+    }
+}
+
 function load(): Favorite[] {
-    if (typeof localStorage === 'undefined') return seed_from_profile();
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const store = storage();
+    if (store == null) return seed_from_profile();
+    let raw: string | null;
+    try {
+        raw = store.getItem(STORAGE_KEY);
+    } catch {
+        return seed_from_profile();
+    }
     if (raw == null) {
         const seeded = seed_from_profile();
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(seeded));
+        persist(seeded);
         return seeded;
     }
     try {
@@ -92,11 +125,7 @@ function load(): Favorite[] {
 
 export const favorites = writable<Favorite[]>(load());
 
-favorites.subscribe((list) => {
-    if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-    }
-});
+favorites.subscribe(persist);
 
 export function add_favorite(fav: Favorite): void {
     if (fav.name.trim() === '' || fav.url.trim() === '') return;

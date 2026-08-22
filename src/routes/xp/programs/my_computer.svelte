@@ -806,12 +806,13 @@
     }
 
     export function up() {
-        const current_id = required(history[page_index], 'current folder id');
-        const parent_id = required(
-            $hardDrive?.[current_id],
-            'fs item ' + current_id,
-        ).parent;
-        open(parent_id);
+        // Tolerate a folder that has since been deleted from another window:
+        // the viewer reactively dispatches open(null) in that case, but Up and
+        // Ctrl+ArrowUp could still fire first and `required()` threw out of a
+        // key handler. Going to the root is what XP does at the top anyway.
+        const current_id = history[page_index];
+        if (current_id == null) return; // already at My Computer
+        open($hardDrive?.[current_id]?.parent ?? null);
     }
 
     function open_favorite(url: string) {

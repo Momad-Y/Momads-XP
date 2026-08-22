@@ -3,7 +3,7 @@
     import WorkSpace from './work_space.svelte';
     import ContextMenu from '../../lib/components/xp/ContextMenu.svelte';
     import { set } from 'idb-keyval';
-    import { onMount, onDestroy, createEventDispatcher } from 'svelte';
+    import { onMount, onDestroy, createEventDispatcher, mount } from 'svelte';
     import {
         hardDrive,
         wallpaper,
@@ -17,16 +17,52 @@
 
     let io_worker: ReturnType<typeof setTimeout> | undefined;
 
+    /**
+     * Surfaced ONCE per session. A failed drive write means everything the
+     * visitor does from now on is lost on reload, and it used to disappear
+     * into a bare `void` — the usual cause is IndexedDB quota, which is
+     * reachable because deleted uploads leaked their bytes for a long time.
+     */
+    let persist_failed = false;
+    function on_persist_error() {
+        if (persist_failed) return;
+        persist_failed = true;
+        void import('../../lib/components/xp/Dialog.svelte').then(
+            ({ default: Dialog }) => {
+                const dialog: { destroy: () => void } = mount(Dialog, {
+                    target: document.body,
+                    props: {
+                        title: 'Windows - Write Fault Error',
+                        icon: '/images/xp/icons/Error.png',
+                        message:
+                            'Windows cannot save your changes to the disk. The disk may be full. Anything you change from now on will be lost when you reload.',
+                        button_align: 'center',
+                        get_self: () => dialog,
+                        buttons: [
+                            {
+                                name: 'OK',
+                                focus: true,
+                                action: () => {
+                                    dialog.destroy();
+                                },
+                            },
+                        ],
+                    },
+                });
+            },
+        );
+    }
+
     const unsubscribers = [
         hardDrive.subscribe(() => {
             clearInterval(io_worker);
             io_worker = setTimeout(() => {
-                void set('hard_drive', $hardDrive);
+                void set('hard_drive', $hardDrive).catch(on_persist_error);
             }, 1000);
         }),
         wallpaper.subscribe((value) => {
             if (value == null) return;
-            void set('wallpaper', value);
+            void set('wallpaper', value).catch(on_persist_error);
         }),
         queueCommand.subscribe((cmd) => {
             if (cmd != null) {

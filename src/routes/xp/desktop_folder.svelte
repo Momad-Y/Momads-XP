@@ -9,6 +9,8 @@
         hardDrive,
         clipboard_op,
         queueProgram,
+        runningPrograms,
+        zIndex,
     } from '../../lib/store';
 
     import * as utils from '../../lib/utils';
@@ -332,8 +334,22 @@
         renaming = false;
     }
 
+    /**
+     * A window is focused when its `z_index` matches the live counter — the
+     * same test every window's own keydown uses. The desktop was the ONLY
+     * keyboard surface with no z-order awareness: it gated on a boolean set by
+     * `on:click` and cleared by `click_outside`, which exempts `.context-menu`
+     * (utils.ts) — and a right-click fires no `click` at all. So the desktop
+     * stayed "focused" while an Explorer window was plainly on top, and one
+     * Ctrl+V pasted into both surfaces. With a cut, the second handler then
+     * threw on the id the first had already deleted.
+     */
+    $: a_window_is_focused = $runningPrograms.some(
+        (p) => p.window?.z_index === $zIndex,
+    );
+
     function on_keydown(e: KeyboardEvent) {
-        if (!is_focus) return;
+        if (!is_focus || a_window_is_focused) return;
         if (renaming) return;
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- defensive guard kept from the base (id is a const today)
         if (id == null) return;
