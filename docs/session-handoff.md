@@ -60,7 +60,7 @@ The user chose to wait until **~10 Aug 2026**. That date has now passed, so:
 3. Verify prod: `help.html` → 200, index bundle hash changed from
    `start.2JH2ogIg.js`, security headers present.
 
-`dev` is **21 commits ahead of `main`** and all of it is unreleased. The user
+`dev` is **23 commits ahead of `main`** and all of it is unreleased. The user
 chose to hold a single cutover PR (`dev` → `main`) until just before deploying.
 
 Netlify build settings were set to `allowed_branches:["main"]` + `skip_prs:true`
@@ -71,7 +71,7 @@ locally.
 
 ## 3. WHAT SHIPPED THIS SESSION (all merged to `dev`, none deployed)
 
-PRs #77–#95. Highlights:
+PRs #77–#96. Highlights:
 
 - **System Properties** — profile-driven content, all 4 tabs, dark-text logo.
 - **Explorer File menu** — fleshed out to real XP (Open, Send To, New ▸, Create
@@ -171,9 +171,9 @@ invocations per user action — watch it once deploys resume.
 npm run check        # 0 errors / 128 warnings  (baseline 131 — do not grow)
 npm run lint
 npm run format:check
-npx vitest run       # 234 tests
+npx vitest run       # 252 tests
 npm run build
-npx playwright test  # 85/85
+npx playwright test  # 87 (3 boot flakes under parallel load)
 ```
 
 ---
@@ -201,6 +201,18 @@ are the ones most likely to be "helpfully" reverted later:
 4. **The F5 modal guard searches the whole document and fails CLOSED.** A
    subtree query missed the no-association dialog, which mounts into
    `#desktop`, and `undefined == null` let it refresh before mount.
+
+5. **A redirect REPLACES the current history entry; it never appends** —
+   `src/lib/nav_history.ts`. `/api/browse` follows redirects and the injected
+   reporter announces where it LANDED, so appending made one visit two entries
+   and Back returned to the URL that redirects, which redirected again. IE's
+   Back button was dead on every redirecting site (#96). The reporter announces
+   the REQUESTED url alongside the final one precisely so the parent can tell a
+   redirect of the current page from a stale message sent by a page the user
+   already left. `<base>` stays on the FINAL url — subresources must resolve
+   against where the document really came from.
+   `sync_url_from_iframe` still APPENDS on purpose: same-origin pages carry no
+   reporter, so that is the only way an in-page link click is recorded.
 
 **A finding that was REJECTED — do not "fix" it again.** The `rename_cancelled`
 latch was reported as sticking across renames (premise: no blur fires for an
