@@ -35,7 +35,7 @@ Worth remembering from that work:
   call site and left a sibling path broken.
 
 **Next open question:** nothing pending on the View menu. See §2 — the deploy is
-the outstanding item.
+the outstanding item, and §8 for the rules that came out of red-teaming this work.
 
 ---
 
@@ -60,7 +60,7 @@ The user chose to wait until **~10 Aug 2026**. That date has now passed, so:
 3. Verify prod: `help.html` → 200, index bundle hash changed from
    `start.2JH2ogIg.js`, security headers present.
 
-`dev` is **18 commits ahead of `main`** and all of it is unreleased. The user
+`dev` is **21 commits ahead of `main`** and all of it is unreleased. The user
 chose to hold a single cutover PR (`dev` → `main`) until just before deploying.
 
 Netlify build settings were set to `allowed_branches:["main"]` + `skip_prs:true`
@@ -71,7 +71,7 @@ locally.
 
 ## 3. WHAT SHIPPED THIS SESSION (all merged to `dev`, none deployed)
 
-PRs #77–#93. Highlights:
+PRs #77–#95. Highlights:
 
 - **System Properties** — profile-driven content, all 4 tabs, dark-text logo.
 - **Explorer File menu** — fleshed out to real XP (Open, Send To, New ▸, Create
@@ -171,7 +171,51 @@ invocations per user action — watch it once deploys resume.
 npm run check        # 0 errors / 128 warnings  (baseline 131 — do not grow)
 npm run lint
 npm run format:check
-npx vitest run       # 194 tests
+npx vitest run       # 234 tests
 npm run build
-npx playwright test  # 72/72
+npx playwright test  # 85/85
 ```
+
+---
+
+## 8. RULES THAT CAME OUT OF RED-TEAMING #93/#94/#95 (do not undo)
+
+A four-lens red team on the View-menu work found 1 regression on shipped data,
+6 HIGH and 9 MEDIUM — **none caught by CI**. The fixes are in #95. These four
+are the ones most likely to be "helpfully" reverted later:
+
+1. **XP's Details Size column is ALWAYS KB with thousands separators.** The
+   status bar is the only surface that picks a unit ("13.01 MB"). They are not
+   two drifted copies of one rule — they are XP's two DIFFERENT rules.
+   Unifying them onto `format_size` re-spelled five shipped Desktop items and
+   was reverted. `size_label` and `format_size` must stay separate.
+2. **Escape must NOT close the Explorer Bar.** That was invented, not ported
+   (XP uses the bar's ✕ or a Ctrl+E/I/H re-toggle). Because four
+   `svelte:window` listeners each decide in isolation, it reached through an
+   open dialog, collapsed the menu bar with the bar, and destroyed a typed
+   Search query. `Dialog.svelte` owns Escape now: Escape IS Cancel, topmost
+   dialog only.
+3. **`fs.copy`/`cut` take a REQUIRED scope, and an empty narrowing leaves the
+   clipboard alone.** Three surfaces bind window keydown, so one Ctrl+C can
+   reach two handlers; blanking on empty destroyed what the other just copied.
+4. **The F5 modal guard searches the whole document and fails CLOSED.** A
+   subtree query missed the no-association dialog, which mounts into
+   `#desktop`, and `undefined == null` let it refresh before mount.
+
+**A finding that was REJECTED — do not "fix" it again.** The `rename_cancelled`
+latch was reported as sticking across renames (premise: no blur fires for an
+element removed while focused). It does not reproduce: removing the reset
+leaves every rename test green, and forcing the latch to stick turns two red.
+The reset in `rename()` is defensive only.
+
+**Known coverage gap, deliberate.** The KB-vs-adaptive column rule has no E2E:
+every file reachable in Explorer is under 1 MB, because the larger ones live in
+the Desktop folder, which is in `hidden_items`. Both rules print "61 KB" there.
+`details_columns.test.ts` covers it instead; the e2e comment says so.
+
+**The test lesson, third time now.** Three of #95's claims were carried by tests
+that could not fail — they drove a path that was ALREADY correct, or set up a
+scenario where the guard degenerated to the identity function. Making the
+cross-window delete genuinely load-bearing took three attempts: the second one
+still passed because the chosen desktop item was PROTECTED, so `plan_delete`
+dropped it regardless. Always revert the fix and watch the test go red.
