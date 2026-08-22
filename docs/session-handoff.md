@@ -60,7 +60,7 @@ The user chose to wait until **~10 Aug 2026**. That date has now passed, so:
 3. Verify prod: `help.html` → 200, index bundle hash changed from
    `start.2JH2ogIg.js`, security headers present.
 
-`dev` is **23 commits ahead of `main`** and all of it is unreleased. The user
+`dev` is **25 commits ahead of `main`** and all of it is unreleased. The user
 chose to hold a single cutover PR (`dev` → `main`) until just before deploying.
 
 Netlify build settings were set to `allowed_branches:["main"]` + `skip_prs:true`
@@ -71,7 +71,7 @@ locally.
 
 ## 3. WHAT SHIPPED THIS SESSION (all merged to `dev`, none deployed)
 
-PRs #77–#96. Highlights:
+PRs #77–#97. Highlights:
 
 - **System Properties** — profile-driven content, all 4 tabs, dark-text logo.
 - **Explorer File menu** — fleshed out to real XP (Open, Send To, New ▸, Create
@@ -173,7 +173,7 @@ npm run lint
 npm run format:check
 npx vitest run       # 252 tests
 npm run build
-npx playwright test  # 87 (3 boot flakes under parallel load)
+npx playwright test  # 90 (~1 boot flake per run under parallel load)
 ```
 
 ---
@@ -213,6 +213,13 @@ are the ones most likely to be "helpfully" reverted later:
    against where the document really came from.
    `sync_url_from_iframe` still APPENDS on purpose: same-origin pages carry no
    reporter, so that is the only way an in-page link click is recorded.
+
+**Known suite instability, not a product bug.** The e2e suite now flakes about
+one spec per full run — always `bootToDesktop` timing out at 30s, never the same
+spec twice, always green in isolation. Boot is ≥3s by design plus asset
+preloading and 8 workers contend. It will eventually redden CI on an unrelated
+change; the options are a CI retry, fewer workers, or a shorter boot under test.
+The user has not chosen one, so nothing was changed.
 
 **A finding that was REJECTED — do not "fix" it again.** The `rename_cancelled`
 latch was reported as sticking across renames (premise: no blur fires for an
