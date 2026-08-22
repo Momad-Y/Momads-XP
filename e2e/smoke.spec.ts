@@ -64,8 +64,14 @@ test('the boot screen renders and becomes skippable', async ({ page }) => {
     ).toBeAttached({ timeout: 30_000 });
     await page.keyboard.press('Space');
 
-    // skipping lands on the login screen well inside the un-skipped wait
+    // The budget has to be SHORTER than the un-skipped boot, or the test
+    // passes with the skip deleted: starting.svelte sleeps 3000ms minimum, so
+    // a 10s allowance proved nothing and the affordance the whole 91-spec
+    // suite depends on could have died silently.
+    await expect(page.locator('#boot-screen')).toHaveCount(0, {
+        timeout: 1500,
+    });
     await expect(page.locator('#login-user-card')).toBeVisible({
-        timeout: 10_000,
+        timeout: 1500,
     });
 });

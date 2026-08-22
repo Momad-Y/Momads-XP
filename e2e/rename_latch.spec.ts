@@ -38,6 +38,11 @@ async function startRename(win: Locator, name: string): Promise<Locator> {
     await win.page().locator('.context-menu').getByText('Rename').click();
     const box = win.locator('textarea');
     await expect(box).toBeVisible();
+    // click before typing: fill() focuses WITHOUT dispatching a click, so a
+    // fill-only test drives a path no user can reach. That trap already hid a
+    // live bug once in this repo (Organize Favorites rename), and this file
+    // was the one the audit missed.
+    await box.click();
     return box;
 }
 
@@ -105,6 +110,7 @@ test('Escape cancels a rename on the DESKTOP too, and commits the next', async (
     await page.locator('.context-menu').getByText('Rename').click();
     let box = page.locator('#work-space textarea');
     await expect(box).toBeVisible();
+    await box.click();
     await box.fill('Abandoned.txt');
     await page.keyboard.press('Escape');
     await expect(page.locator('#work-space textarea')).toHaveCount(0);
@@ -117,6 +123,7 @@ test('Escape cancels a rename on the DESKTOP too, and commits the next', async (
     await page.locator('.context-menu').getByText('Rename').click();
     box = page.locator('#work-space textarea');
     await expect(box).toBeVisible();
+    await box.click();
     await box.fill('Committed.txt');
     await page.keyboard.press('Enter');
     await expect(

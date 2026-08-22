@@ -264,8 +264,14 @@
     function refresh() {
         loading = true;
         const src = real_url;
+        const seq = ++nav_seq;
         real_url = null;
         setTimeout(() => {
+            // the same guard resolve_url carries: without it, a refresh
+            // started within 50ms of a navigation restored the OLD url over
+            // the new one, so the address bar and history said one page while
+            // the frame showed another
+            if (seq !== nav_seq) return;
             real_url = src;
         }, 50);
     }
@@ -391,6 +397,10 @@
     // ── Keyboard shortcuts ───────────────────────────────────
 
     function on_keydown(e: KeyboardEvent) {
+        // Focused window only — every other keyboard surface in the app checks
+        // this and IE did not, so Ctrl+L in Contact Me yanked focus into a
+        // buried IE window, and Alt+arrows / F5 fired in EVERY open IE at once.
+        if (window?.z_index !== $zIndex) return;
         if (e.key === 'F5') {
             e.preventDefault();
             refresh();
@@ -966,12 +976,30 @@
                                         <div
                                             class="flex items-center group hover:bg-blue-600 px-1 py-[3px] cursor-pointer"
                                             on:click={() => {
-                                                void load_page(fav.url);
+                                                // the SAME branch the Favorites
+                                                // menu uses. Calling load_page
+                                                // unconditionally sent a folder
+                                                // favourite (C:\Experience) down
+                                                // the URL path, where get_file on
+                                                // a folder threw inside an
+                                                // unawaited promise and left the
+                                                // window on a blank frame with
+                                                // the throbber stuck on.
+                                                if (is_shell_favorite(fav)) {
+                                                    open_shell_favorite(
+                                                        fav.fs_id,
+                                                    );
+                                                } else {
+                                                    void load_page(fav.url);
+                                                }
                                                 sidebar_mode = null;
                                             }}
                                         >
                                             <img
-                                                src="/images/xp/icons/URL.png"
+                                                src={favorite_icon(
+                                                    fav,
+                                                    $hardDrive,
+                                                )}
                                                 class="w-[14px] h-[14px] mr-1 shrink-0"
                                                 alt=""
                                             />

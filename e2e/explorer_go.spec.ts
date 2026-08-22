@@ -47,12 +47,12 @@ test('Go is reachable by keyboard, not just the mouse', async ({ page }) => {
     const guide = win.locator('.dialog').getByText('OK');
     await expect(guide).toBeVisible({ timeout: 15000 });
     await guide.click();
-    await expect(win.getByText(/\.txt$/).first()).toBeVisible({
-        timeout: 15000,
-    });
+    // the address bar must show where we ASKED to go — asserting "some .txt
+    // is visible" passed for a handler that ignored the typed path entirely
+    await expect(addr).toHaveValue(/Projects$/, { timeout: 15000 });
 });
 
-test('Go on an unresolvable path does nothing, exactly like Enter', async ({
+test('Go on an unresolvable path leaves you where you were', async ({
     page,
 }) => {
     await bootToDesktop(page);
@@ -60,10 +60,24 @@ test('Go on an unresolvable path does nothing, exactly like Enter', async ({
     const win = page.locator('#work-space .window').first();
     const addr = win.locator('input').first();
 
+    // navigate somewhere real FIRST, so "nothing happened" has something to
+    // be measured against. Asserting the root's own text proved nothing: it
+    // was already on screen before the click, and did not even wait.
+    await addr.click();
+    await addr.fill('C:\\Experience');
+    await win.getByRole('button', { name: 'Go' }).click();
+    const guide = win.locator('.dialog').getByText('OK');
+    await expect(guide).toBeVisible({ timeout: 15000 });
+    await guide.click();
+    await expect(win.getByText('Printerpix — AI Engineer.txt')).toBeVisible({
+        timeout: 15000,
+    });
+
     await addr.click();
     await addr.fill('C:\\NoSuchFolder');
     await win.getByRole('button', { name: 'Go' }).click();
 
-    // still at the root — no navigation, no crash
-    await expect(win.getByText('Files Stored on This Computer')).toBeVisible();
+    // still in Experience — no navigation, no crash, no jump to the root
+    await expect(win.getByText('Printerpix — AI Engineer.txt')).toBeVisible();
+    await expect(win.getByText('Files Stored on This Computer')).toBeHidden();
 });
