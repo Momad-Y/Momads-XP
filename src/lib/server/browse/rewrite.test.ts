@@ -86,10 +86,52 @@ describe('reporter_script', () => {
         expect(out).toContain("addEventListener('submit'");
         expect(out).toContain('__momadxp');
     });
+
+    // The parent cannot tell a redirect of the page it asked for from a stale
+    // message sent by a page the user has already left — unless the frame says
+    // which URL was REQUESTED. Without it, Back was unusable on any
+    // redirecting site.
+    it('announces the requested url alongside where it landed', () => {
+        const out = reporter_script(
+            'https://www.e.com/final',
+            'https://e.com/asked',
+        );
+        expect(out).toContain('"https://www.e.com/final"');
+        expect(out).toContain('"https://e.com/asked"');
+        expect(out).toContain("post('navigated',CUR,REQ)");
+        expect(out).toContain('requested:requested');
+    });
+
+    it('defaults the requested url to the final one', () => {
+        const out = reporter_script('https://e.com/only');
+        expect(out).toContain('var CUR="https://e.com/only"');
+        expect(out).toContain('var REQ="https://e.com/only"');
+    });
+
+    it('escapes a quote in the REQUESTED url too', () => {
+        const out = reporter_script(
+            'https://e.com/',
+            'https://e.com/a";alert(1);//',
+        );
+        expect(out).toContain('\\"');
+        expect(out).not.toContain('a";alert(1)');
+    });
 });
 
 describe('rewrite_document', () => {
     const url = 'https://example.com/page';
+
+    it('keeps <base> on the FINAL url but reports the requested one', () => {
+        // relative subresources must resolve against where the document really
+        // came from, while history has to key off what was asked for
+        const out = rewrite_document(
+            '<html><head></head><body></body></html>',
+            'https://www.example.com/final',
+            'https://example.com/asked',
+        );
+        expect(out).toContain('<base href="https://www.example.com/final"');
+        expect(out).toContain('var REQ="https://example.com/asked"');
+    });
 
     it('injects base + reporter right after <head>', () => {
         const out = rewrite_document(

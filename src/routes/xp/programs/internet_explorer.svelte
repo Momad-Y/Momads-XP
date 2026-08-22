@@ -25,6 +25,7 @@
     import { desktop_folder } from '../../../lib/system';
     import * as utils from '../../../lib/utils';
     import * as finder from '../../../lib/finder';
+    import { push_entry, replace_entry } from '../../../lib/nav_history';
     import { required } from '../../../lib/types';
     import type {
         MenuBarEntry,
@@ -168,9 +169,11 @@
     // ── Navigation ──────────────────────────────────────────
 
     async function load_page(nav_url?: string) {
-        loading = true;
         let u = nav_url ?? address_input.value;
+        // validate BEFORE showing the throbber: an empty address bar used to
+        // return here with `loading` already true, spinning forever
         if (!u || u.trim() === '') return;
+        loading = true;
 
         if (/^[A-Z]:\\/.test(u)) {
             // local file — pass through
@@ -186,9 +189,11 @@
             }
         }
 
-        // Truncate forward history, push new entry
-        nav_history = [...nav_history.slice(0, page_index + 1), u];
-        page_index = nav_history.length - 1;
+        // Truncate forward history and append — unless this IS the page on
+        // screen, which reloads in place (see src/lib/nav_history.ts).
+        const next = push_entry({ entries: nav_history, index: page_index }, u);
+        nav_history = [...next.entries];
+        page_index = next.index;
         address_text = u;
         await resolve_url(u);
     }
@@ -202,9 +207,21 @@
         await resolve_url(u);
     }
 
+    /**
+     * Bumped by every navigation so a slow resolution cannot land after a
+     * newer one. `to_real_url` awaits IndexedDB for a local file, so clicking
+     * a local .html favourite and then immediately pressing Back used to end
+     * with the favourite on screen and the address bar showing the page you
+     * had gone back to.
+     */
+    let nav_seq = 0;
+
     async function resolve_url(u: string) {
+        const seq = ++nav_seq;
         real_url = null; // reset so Svelte always re-mounts the iframe, even if URL is unchanged
-        real_url = await to_real_url(u);
+        const resolved = await to_real_url(u);
+        if (seq !== nav_seq) return; // a newer navigation overtook this one
+        real_url = resolved;
     }
 
     function back() {
@@ -295,8 +312,17 @@
         const origin = globalThis.location.origin;
         const seen = href.startsWith(origin) ? href.slice(origin.length) : href;
         if (seen === nav_history[page_index]) return;
-        nav_history = [...nav_history.slice(0, page_index + 1), seen];
-        page_index = nav_history.length - 1;
+        // PUSH, not replace: same-origin pages carry no injected reporter, so
+        // this is the only way an in-page link click (help.html -> #legal) gets
+        // recorded, and that IS a new step. Redirects of app-owned pages do not
+        // happen; the proxied case, which does redirect, is handled in
+        // on_frame_message where the requested URL is known.
+        const next = push_entry(
+            { entries: nav_history, index: page_index },
+            seen,
+        );
+        nav_history = [...next.entries];
+        page_index = next.index;
         address_text = seen;
     }
 
@@ -409,14 +435,22 @@
             void load_page(reported); // the user clicked a link inside the page
         } else if (kind === 'navigated') {
             // A proxied page announces itself once it loads, which is how a
-            // redirect gets recorded. It must NOT be trusted blindly: a slow
-            // page finishing after the user has already gone somewhere else
-            // used to overwrite the address bar with the page they had left.
+            // REDIRECT gets recorded. Two rules matter here, and getting either
+            // wrong breaks the Back button.
             const intended = nav_history[page_index];
             if (typeof intended !== 'string') return;
             // we are no longer showing an external page at all
             if (!/^https?:\/\//i.test(intended)) return;
-            // the frame is not currently pointed at the page we intend
+
+            // RULE 1 — the announcement must be about the page we asked for.
+            // The frame reports what the proxy REQUESTED alongside where it
+            // landed; without that, a slow page finishing after the user has
+            // moved on is indistinguishable from a redirect of the current
+            // one, and would rewrite the wrong history entry.
+            const requested: unknown =
+                'requested' in data ? data.requested : undefined;
+            if (typeof requested !== 'string' || requested !== intended) return;
+            // belt and braces: the frame must still point where we intend
             if (
                 real_url == null ||
                 !real_url.includes(encodeURIComponent(intended))
@@ -425,8 +459,17 @@
             }
             if (reported === address_text) return;
 
-            nav_history = [...nav_history.slice(0, page_index + 1), reported];
-            page_index = nav_history.length - 1;
+            // RULE 2 — a redirect REPLACES the current entry, it does not add
+            // one. Appending made Back unusable on any redirecting site: going
+            // back landed on the URL that redirects, which redirected again and
+            // re-appended the destination, so the user never left the page.
+            // (google.com -> www.google.com is the everyday case.)
+            const next = replace_entry(
+                { entries: nav_history, index: page_index },
+                reported,
+            );
+            nav_history = [...next.entries];
+            page_index = next.index;
             address_text = reported;
         }
     }

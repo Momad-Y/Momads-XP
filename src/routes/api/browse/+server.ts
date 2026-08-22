@@ -137,7 +137,7 @@ export const GET: RequestHandler = async (event) => {
     }
     // `upstream.url` reflects redirects, so the reporter announces where the
     // user actually landed rather than where they aimed.
-    const body = rewrite_document(html, upstream.url || target);
+    const body = rewrite_document(html, upstream.url || target, target);
 
     const headers = new Headers();
     upstream.headers.forEach((value, key) => {
