@@ -282,17 +282,41 @@
      * what the sandbox is there to prevent. External https pages are
      * cross-origin regardless, so the flag would buy nothing.
      */
-    $: iframe_sandbox =
-        real_url != null &&
-        real_url.startsWith('/') &&
-        // CRITICAL: /api/browse serves EXTERNAL pages from our own path. It
-        // must never be treated as app-owned — granting it same-origin would
-        // hand any website on the internet our localStorage and the whole VFS.
-        // Proxied pages stay on an opaque origin and report navigation over
-        // postMessage instead.
-        !real_url.startsWith('/api/browse')
-            ? 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-same-origin'
-            : 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox';
+    /**
+     * Is this URL one of OUR pages, safe to run with our origin?
+     *
+     * A string prefix test was not enough: `/api/./browse?url=…` and
+     * `//host/api/browse?url=…` both satisfy `startsWith('/')` while failing
+     * `startsWith('/api/browse')`, and both resolve in the browser back to the
+     * proxy — which would have handed third-party HTML our origin, our
+     * localStorage, the whole VFS and a valid Origin for /api/email.
+     *
+     * Resolving against our own origin first removes the whole class: `.`/`..`
+     * segments collapse, a protocol-relative URL reveals its real host, and
+     * anything that is not literally same-origin fails the host check.
+     */
+    function is_app_owned(url: string | null | undefined): boolean {
+        if (url == null || !url.startsWith('/')) return false;
+        try {
+            const resolved = new URL(url, globalThis.location.origin);
+            if (resolved.origin !== globalThis.location.origin) return false;
+            return !resolved.pathname.startsWith('/api/');
+        } catch {
+            return false;
+        }
+    }
+
+    // CRITICAL: /api/browse serves EXTERNAL pages from our own path. It must
+    // never be treated as app-owned — granting it same-origin would hand any
+    // website on the internet our localStorage and the whole VFS. Proxied
+    // pages stay on an opaque origin and report navigation over postMessage.
+    //
+    // `allow-popups-to-escape-sandbox` is NOT granted to proxied content: an
+    // escaped popup is a fully unsandboxed top-level document, which is exactly
+    // what untrusted HTML must not be able to open.
+    $: iframe_sandbox = is_app_owned(real_url)
+        ? 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-same-origin'
+        : 'allow-scripts allow-forms allow-popups';
 
     /**
      * Follow navigation that happened INSIDE the frame (clicking a link on the
@@ -413,6 +437,26 @@
     }
 
     /**
+     * Do two URLs belong to the same site?
+     *
+     * Compared on the last two labels rather than a full public-suffix list —
+     * that would mean shipping the PSL to the client for one check. The
+     * consequence is that `a.co.uk` and `b.co.uk` count as the same site, which
+     * is wrong but harmless here: the worst case is that the address bar
+     * follows a redirect it should have ignored, never that it shows a
+     * completely unrelated origin.
+     */
+    function same_site(a: string, b: string): boolean {
+        try {
+            const host_a = new URL(a).hostname.toLowerCase().split('.');
+            const host_b = new URL(b).hostname.toLowerCase().split('.');
+            return host_a.slice(-2).join('.') === host_b.slice(-2).join('.');
+        } catch {
+            return false;
+        }
+    }
+
+    /**
      * Navigation reported by the proxy's injected script. The page is untrusted,
      * so only http(s) URLs of sane length are accepted, and only from our own
      * frame.
@@ -456,6 +500,20 @@
                 return;
             }
             if (reported === address_text) return;
+
+            // RULE 1b — a redirect may only move WITHIN the same site.
+            // `requested` is not a secret: the page can read its own
+            // location.search and recover it, so the guard above proves only
+            // that the message came from a page we asked for — not that the
+            // announced URL is honest. Without this a proxied page announced
+            // `https://www.paypal.com/signin` while its own HTML stayed on
+            // screen, and Add to Favorites / Create Shortcut then persisted
+            // that lie into localStorage and the VFS.
+            //
+            // A genuine redirect (google.com -> www.google.com, http -> https)
+            // stays within its registrable domain; a cross-site one keeps
+            // showing what the user asked for, which is the safe direction.
+            if (!same_site(intended, reported)) return;
 
             // RULE 2 — a redirect REPLACES the current entry, it does not add
             // one. Appending made Back unusable on any redirecting site: going

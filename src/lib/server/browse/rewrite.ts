@@ -10,19 +10,25 @@
  */
 
 /** Response headers that would break framing or re-impose the origin's policy. */
-const STRIPPED_HEADERS = [
-    'x-frame-options',
-    'content-security-policy',
-    'content-security-policy-report-only',
-    'cross-origin-opener-policy',
-    'cross-origin-embedder-policy',
-    'permissions-policy',
-    'set-cookie',
-    'strict-transport-security',
-];
+/**
+ * The ONLY upstream headers copied onto our response.
+ *
+ * This was a denylist, which is the wrong shape for a boundary that serves
+ * third-party content from our own origin: everything not explicitly named
+ * passed through. `clear-site-data` was among them, and on a response served
+ * from our origin that header would wipe the visitor's localStorage and the
+ * entire IndexedDB VFS. So were `refresh` (re-navigates the frame around our
+ * reporter), `content-disposition`, `link` and
+ * `access-control-allow-origin`.
+ *
+ * Nothing upstream needs to influence how our origin behaves. `content-type`
+ * is set by the handler itself, so it is not here either.
+ */
+const FORWARDED_HEADERS = ['content-language', 'last-modified'];
 
+/** True when an upstream header must NOT reach the caller. */
 export function should_strip_header(name: string): boolean {
-    return STRIPPED_HEADERS.includes(name.toLowerCase());
+    return !FORWARDED_HEADERS.includes(name.toLowerCase());
 }
 
 /** `<meta http-equiv="content-security-policy">` does the same job as the header. */

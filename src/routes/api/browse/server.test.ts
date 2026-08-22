@@ -1,4 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+/**
+ * The guard now RESOLVES a hostname and rejects it unless every answer is a
+ * public address — a string check cannot see that `ssrf.attacker.tld` points
+ * at 169.254.169.254. Tests must not depend on real DNS, so the lookup is
+ * mocked; `lookup_result` lets a test make a name resolve internally.
+ */
+const lookup_result = vi.fn(() =>
+    Promise.resolve([{ address: '93.184.216.34', family: 4 }]),
+);
+vi.mock('node:dns/promises', () => ({
+    default: { lookup: lookup_result },
+    lookup: lookup_result,
+}));
+
 import { GET } from './+server';
 
 const APP = 'https://momad-xp.netlify.app';
@@ -97,14 +112,20 @@ describe('/api/browse origin gating', () => {
         expect(res.status).toBe(200);
     });
 
-    it('falls back to the Referer origin', async () => {
-        const res = await GET(
-            make_event('https://example.com/', {
-                fetch_site: null,
-                referer: `${APP}/xp`,
-            }),
-        );
-        expect(res.status).toBe(200);
+    it('REFUSES a forged Referer — it is not a proof of origin', () => {
+        // `curl -H 'Referer: <our app>'` used to be accepted, which made this
+        // an anonymising relay billed to us and gave every SSRF finding a
+        // zero-victim path. Sec-Fetch-Site and Origin are browser-set; Referer
+        // is not.
+        return expect(
+            status_of(
+                make_event('https://example.com/', {
+                    fetch_site: null,
+                    origin: null,
+                    referer: APP + '/xp',
+                }),
+            ),
+        ).resolves.toBe(403);
     });
 
     it('refuses to act as an open relay', async () => {
@@ -150,30 +171,85 @@ describe('/api/browse response handling', () => {
     });
 
     it('reports where the user LANDED after a redirect', async () => {
-        vi.stubGlobal(
-            'fetch',
-            vi.fn(() =>
-                Promise.resolve(
-                    html_response(
-                        '<html><head></head></html>',
-                        'https://example.com/final',
-                    ),
+        // a real 302 chain: redirects are followed BY HAND now, so each hop
+        // can be re-validated before it is touched
+        const spy = vi
+            .fn()
+            .mockResolvedValueOnce(
+                new Response(null, {
+                    status: 302,
+                    headers: { location: 'https://example.com/final' },
+                }),
+            )
+            .mockResolvedValueOnce(
+                html_response(
+                    '<html><head></head></html>',
+                    'https://example.com/final',
                 ),
-            ),
-        );
+            );
+        vi.stubGlobal('fetch', spy);
         const body = await (
             await GET(make_event('https://example.com/start'))
         ).text();
+        expect(spy).toHaveBeenCalledTimes(2);
         expect(body).toContain('https://example.com/final');
     });
 
-    it('strips headers that would break framing, and keeps the rest', async () => {
+    // A mocked fetch ignores `redirect`, so no behavioural test can prove the
+    // option is set — it has to be asserted on the call itself. With 'follow'
+    // the runtime walks the chain internally and every per-hop check below
+    // becomes unreachable.
+    it('fetches with redirect: manual so hops can be re-validated', async () => {
+        const spy = vi
+            .fn()
+            .mockResolvedValue(html_response('<html><head></head></html>'));
+        vi.stubGlobal('fetch', spy);
+        await GET(make_event('https://example.com/'));
+        expect(spy).toHaveBeenCalledWith(
+            'https://example.com/',
+            expect.objectContaining({ redirect: 'manual' }),
+        );
+    });
+
+    it('REFUSES a redirect into a private address', async () => {
+        // the whole point: check_browse_url validated only the string the
+        // caller supplied, so a 302 walked past every rule in url_guard
+        const spy = vi.fn().mockResolvedValueOnce(
+            new Response(null, {
+                status: 302,
+                headers: {
+                    location: 'http://169.254.169.254/latest/meta-data/',
+                },
+            }),
+        );
+        vi.stubGlobal('fetch', spy);
+        expect(await status_of(make_event('https://example.com/start'))).toBe(
+            502,
+        );
+        expect(spy).toHaveBeenCalledTimes(1); // never connected to the target
+    });
+
+    it('REFUSES a hostname that resolves to a private address', async () => {
+        lookup_result.mockResolvedValueOnce([
+            { address: '169.254.169.254', family: 4 },
+        ]);
+        const spy = vi.fn();
+        vi.stubGlobal('fetch', spy);
+        expect(await status_of(make_event('https://ssrf.attacker.tld/'))).toBe(
+            400,
+        );
+        expect(spy).not.toHaveBeenCalled(); // no connection at all
+    });
+
+    it('forwards only the allowlisted headers', async () => {
         const res = await GET(make_event('https://example.com/'));
+        // an ALLOWLIST now: a denylist let clear-site-data through onto our
+        // own origin, which would wipe localStorage and the whole VFS
         expect(res.headers.get('x-frame-options')).toBeNull();
         expect(res.headers.get('content-security-policy')).toBeNull();
         expect(res.headers.get('set-cookie')).toBeNull();
-        expect(res.headers.get('x-custom')).toBe('keep-me');
-        expect(res.headers.get('x-robots-tag')).toContain('noindex');
+        expect(res.headers.get('x-custom')).toBeNull();
+        expect(res.headers.get('content-type')).toContain('text/html');
     });
 
     it('sends non-HTML straight to the origin instead of streaming it', async () => {

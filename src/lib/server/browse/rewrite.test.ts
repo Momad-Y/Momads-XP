@@ -22,9 +22,30 @@ describe('should_strip_header', () => {
         }
     });
 
-    it('keeps ordinary headers', () => {
-        expect(should_strip_header('content-type')).toBe(false);
+    it('keeps only the few harmless headers on the allowlist', () => {
         expect(should_strip_header('last-modified')).toBe(false);
+        expect(should_strip_header('content-language')).toBe(false);
+        // content-type is set by the handler itself, not copied
+        expect(should_strip_header('content-type')).toBe(true);
+    });
+
+    // It was a DENYLIST, so anything not named passed through onto our own
+    // origin. Clear-Site-Data would have wiped the visitor's localStorage and
+    // the whole IndexedDB VFS; Refresh re-navigates the frame around our
+    // reporter.
+    it('strips the headers a denylist let through', () => {
+        for (const h of [
+            'clear-site-data',
+            'refresh',
+            'content-disposition',
+            'link',
+            'access-control-allow-origin',
+            'report-to',
+            'nel',
+            'origin-agent-cluster',
+        ]) {
+            expect(should_strip_header(h), h).toBe(true);
+        }
     });
 });
 
