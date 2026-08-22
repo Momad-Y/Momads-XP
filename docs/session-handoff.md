@@ -60,7 +60,7 @@ The user chose to wait until **~10 Aug 2026**. That date has now passed, so:
 3. Verify prod: `help.html` → 200, index bundle hash changed from
    `start.2JH2ogIg.js`, security headers present.
 
-`dev` is **27 commits ahead of `main`** and all of it is unreleased. The user
+`dev` is **34 commits ahead of `main`** and all of it is unreleased. The user
 chose to hold a single cutover PR (`dev` → `main`) until just before deploying.
 
 Netlify build settings were set to `allowed_branches:["main"]` + `skip_prs:true`
@@ -71,7 +71,7 @@ locally.
 
 ## 3. WHAT SHIPPED THIS SESSION (all merged to `dev`, none deployed)
 
-PRs #77–#98. Highlights:
+PRs #77–#103. Highlights:
 
 - **System Properties** — profile-driven content, all 4 tabs, dark-text logo.
 - **Explorer File menu** — fleshed out to real XP (Open, Send To, New ▸, Create
@@ -171,9 +171,9 @@ invocations per user action — watch it once deploys resume.
 npm run check        # 0 errors / 128 warnings  (baseline 131 — do not grow)
 npm run lint
 npm run format:check
-npx vitest run       # 252 tests
+npx vitest run       # 290 tests
 npm run build
-npx playwright test  # 91 (CI 2.9 min; ~1 local flake per 2-3 runs, see §8)
+npx playwright test  # 92 (CI ~3 min; ~1 local flake per 2-3 runs, see §8)
 ```
 
 ---
@@ -239,6 +239,13 @@ lands — `data-boot-skippable` mirrors that state). CI e2e went **5.4 min ->
 2.9 min** with one more test. `smoke.spec` keeps `{ skip: false }` for the full
 startup, and a test covers the skip path itself, because the whole suite now
 depends on it.
+
+**A full red team of everything after Phase 2 ran and its findings are FIXED
+(#100-#103).** Read `docs/redteam-post-phase-2.md` before touching this code —
+it records 43 findings across five lenses (code, security, visual, tests,
+state), what was fixed, and the four things deliberately left undone with
+reasons. The recurring root cause it names, now at SEVEN instances, is a rule
+applied at one call site while its siblings are left alone.
 
 **A finding that was REJECTED — do not "fix" it again.** The `rename_cancelled`
 latch was reported as sticking across renames (premise: no blur fires for an

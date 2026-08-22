@@ -16,6 +16,36 @@ confirmed by looking at the screenshots, as §11 requires.
 
 ---
 
+## STATUS: fixed in #100–#103
+
+| Batch | PR | Covers |
+| --- | --- | --- |
+| Data integrity | #100 | §B — all ten |
+| SSRF / proxy hardening | #101 | §A1–A9 |
+| Regressions + correctness + tests | #102 | §C, §D, §E |
+| Visual parity | #103 | §F1–F8 |
+
+**Deliberately NOT fixed, with reasons:**
+
+- **§A10** (open redirect / SSRF status oracle on the non-HTML branch) — a
+  multiplier on A1–A3, which are closed. Left as-is.
+- **§F9/F10** — IE and Explorer draw dropdowns with different borders and
+  gutters, and Internet Options uses bare headings where System Properties
+  uses bordered cards. Both LOW and cosmetic; they want one pass over the
+  shared chrome, not per-dialog patches.
+- **DNS rebinding.** #101 resolves and verifies every hostname but does not
+  PIN the connection, so a very short TTL can still flip the answer between
+  our lookup and `fetch`'s. Closing it needs a custom undici dispatcher whose
+  `connect.lookup` returns the verified address — replacing the runtime's HTTP
+  agent on a metered function is a bigger blast radius than the hole. Recorded
+  in `url_guard.ts` too.
+- **One test is not mutation-verified and says so.** The greyed-means-inert
+  test in `file_menu_safety.spec.ts` clicks Delete and Rename, but no clean
+  mutant makes it uniquely fail: the SCOPING makes the action a no-op, not the
+  greying, and the CRITICAL test beside it already covers that.
+
+---
+
 ## The pattern, named for the sixth time
 
 Three lenses independently arrived at the same root cause, and it is the one
