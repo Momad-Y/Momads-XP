@@ -1,9 +1,12 @@
 <script lang="ts">
+    import * as utils from '../../../../lib/utils';
     import { hardDrive } from '../../../../lib/store';
     import { recycle_bin_id, hidden_items } from '../../../../lib/system';
     import type { MyComputerInstance, VfsItem } from '../../../../lib/types';
+    import ExplorerBarHeader from './explorer_bar_header.svelte';
 
     export let my_computer_instance: MyComputerInstance;
+    export let on_close: () => void = () => {};
 
     let query = '';
     let results: VfsItem[] = [];
@@ -54,7 +57,8 @@
     class="w-[200px] shrink-0 overflow-auto bg-white border-r border-stone-300 text-[11px] font-MSSS"
     style:background="linear-gradient(rgb(137 155 253) 0%, rgb(84 104 212) 100%)"
 >
-    <div class="m-2 rounded bg-white p-2">
+    <ExplorerBarHeader title="Search" {on_close} />
+    <div class="m-2 mt-0 rounded bg-white p-2">
         <p class="font-bold text-slate-700 mb-1">Search by name</p>
         <input
             class="w-full h-[22px] px-1 border border-stone-400 outline-none"
@@ -85,7 +89,9 @@
                     on:click={() => {
                         reveal(item);
                     }}
-                    on:keydown={() => {}}
+                    on:keydown={utils.activate(() => {
+                        reveal(item);
+                    })}
                     role="button"
                     tabindex="0"
                 >

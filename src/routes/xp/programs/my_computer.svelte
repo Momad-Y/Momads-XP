@@ -32,6 +32,8 @@
     } from '../../../lib/favorites';
     import type { Favorite } from '../../../lib/favorites';
     import { status_info } from '../../../lib/status_bar';
+    import { scoped_ids } from '../../../lib/selection';
+    import { visible_trail } from '../../../lib/history_window';
     import { default_details_columns } from '../../../lib/details_columns';
     import type { DetailsColumnKey } from '../../../lib/details_columns';
     import Sidebar from './my_computer/sidebar.svelte';
@@ -143,8 +145,14 @@
         if (!focused()) return; // focused window only
         if (event.key === 'F5') {
             event.preventDefault();
-            // a modal owns the keyboard: don't refresh the list underneath it
-            if (!show_choose_details) refresh();
+            // A modal owns the keyboard: don't refresh the list underneath it.
+            // Searches the WHOLE document, not this window's subtree: the
+            // no-association dialog mounts into #desktop, so a subtree query
+            // missed it while catching the delete confirmation — two dialogs a
+            // user cannot tell apart behaving differently. And it fails CLOSED
+            // now: `node_ref` is undefined before mount, and `undefined == null`
+            // let the old guard refresh anyway.
+            if (document.querySelector('.dialog') == null) refresh();
             return;
         }
         if (event.key !== 'Escape') return;
@@ -154,6 +162,13 @@
             return;
         }
         if (views_menu) views_menu = false;
+        // Escape does NOT close the Explorer Bar. That was invented rather
+        // than ported — XP dismisses a bar from its ✕ or by re-toggling
+        // Ctrl+E/I/H — and it cost three defects, because four independent
+        // `svelte:window` listeners each decided in isolation: Escape reached
+        // through an open dialog to close the bar behind it, collapsed the
+        // menu bar and the bar together, and discarded a typed Search query
+        // and its results (both are component-local and die with the panel).
     }
 
     // ── File menu ────────────────────────────────────────────
@@ -166,8 +181,7 @@
     // actually showing. Without this, an Explorer sitting on C:\ would happily
     // Delete/Rename/Shortcut an item selected on the desktop — which was a
     // real, reproducible data-loss path (red-team CRITICAL).
-    $: selected_items = $selectingItems
-        .filter((sid) => viewer_visible_ids.includes(sid))
+    $: selected_items = scoped_ids($selectingItems, viewer_visible_ids)
         .map((sid) => $hardDrive?.[sid])
         .filter((it): it is VfsItem => it != null);
     $: single_selected = selected_items.length === 1 ? selected_items[0] : null;
@@ -378,6 +392,12 @@
     ];
 
     /**
+     * The trail, capped so the flyout cannot be clipped out of the window and
+     * always containing the current stop — see src/lib/history_window.ts.
+     */
+    $: go_to_trail = visible_trail(history_entries, page_index);
+
+    /**
      * View > Go To ▸ — the toolbar's three navigation buttons plus the trail
      * itself, with the current stop ticked (XP lists visited folders here).
      */
@@ -393,7 +413,9 @@
             disabled: current_history_id == null,
             action: up,
         },
-        ...history_entries.map((entry) => ({
+        // Capped: the flyout has no scroll and the window clips it, so an
+        // uncapped trail pushed the oldest stops out of reach after ~8 hops.
+        ...go_to_trail.map((entry) => ({
             name: entry.label,
             check: entry.idx === page_index,
             // via pick_history, NOT an inline `page_index = …`: an assignment
@@ -750,11 +772,20 @@
 
     /** Opens a favourite the way both Favorites surfaces do. */
     function open_favorite_entry(fav: Favorite) {
-        if (fav.fs_id != null && fav.fs_id !== '') {
-            viewer?.open_item(fav.fs_id);
-        } else {
+        if (fav.fs_id == null || fav.fs_id === '') {
             open_favorite(fav.url);
+            return;
         }
+        // A favourite outlives its target: deleting to the Recycle Bin mints a
+        // NEW id for the clone and drops the original, and nothing prunes the
+        // Favorites list. `viewer.open_item` resolves through `required()`, so
+        // a stale id THREW out of the click handler. IE degrades to My
+        // Computer here, so Explorer does the same.
+        if ($hardDrive?.[fav.fs_id] == null) {
+            open(null);
+            return;
+        }
+        viewer?.open_item(fav.fs_id);
     }
 
     function add_to_favorites() {
@@ -1004,14 +1035,19 @@
 
         <div class="grow flex flex-row overflow-hidden">
             {#if left_panel === 'search'}
-                <SearchPanel my_computer_instance={mc_interface} />
+                <SearchPanel
+                    my_computer_instance={mc_interface}
+                    on_close={close_explorer_bar}
+                />
             {:else if left_panel === 'folders'}
                 <FoldersTree
                     my_computer_instance={mc_interface}
                     current_id={history[page_index]}
+                    on_close={close_explorer_bar}
                 />
             {:else if left_panel === 'favorites'}
                 <FavoritesPanel
+                    can_add={favorite_target != null}
                     on_open={open_favorite_entry}
                     on_add={add_to_favorites}
                     on_organize={organize_favorites}
@@ -1050,8 +1086,11 @@
             class="shrink-0 flex flex-row items-center border-t border-stone-300 bg-xp-yellow text-[11px] text-slate-800"
             class:hidden={!show_status_bar}
         >
-            <span class="grow px-2 py-0.5 truncate">{status.objects}</span>
+            <span data-status="objects" class="grow px-2 py-0.5 truncate"
+                >{status.objects}</span
+            >
             <span
+                data-status="size"
                 class="w-[110px] shrink-0 px-2 py-0.5 border-l border-stone-300 truncate"
                 >{status.size}</span
             >

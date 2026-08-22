@@ -8,6 +8,7 @@ import * as idb from 'idb-keyval';
 import * as finder from './finder';
 import { Buffer } from 'buffer';
 import { required } from './types';
+import { scoped_ids } from './selection';
 import type { HardDrive, VfsItem, VfsItemDraft } from './types';
 
 /** Snapshot the hard drive store, failing fast (as the untyped code did) if unseeded. */
@@ -15,14 +16,36 @@ function drive_snapshot(): HardDrive {
     return required(get(hardDrive), 'hard drive');
 }
 
-export function copy(): void {
-    clipboard_op.set('copy');
-    clipboard.set(get(selectingItems));
+/**
+ * `scope` is the ids the acting surface is showing; the selection is narrowed
+ * to it (see src/lib/selection.ts). Without it a cut started in one Explorer
+ * carried another window's — or the desktop's — items, and paste MOVES them.
+ */
+/**
+ * `scope` is REQUIRED — a caller that genuinely cannot know what it is showing
+ * passes `null` explicitly, matching `scoped_ids`. It was optional, so a
+ * forgotten argument compiled cleanly and produced a working-looking copy that
+ * clipped nothing.
+ *
+ * An empty narrowing LEAVES THE CLIPBOARD ALONE rather than blanking it. Three
+ * surfaces bind window keydown, so two Ctrl+C handlers can fire on one
+ * keypress; each now writes its own scope, and whichever legitimately narrows
+ * to nothing used to wipe what the other had just copied. Windows treats
+ * Ctrl+C with nothing selected as a no-op, not as "empty the clipboard".
+ */
+function clip(op: 'copy' | 'cut', scope: readonly string[] | null): void {
+    const ids = scoped_ids(get(selectingItems), scope, []);
+    if (ids.length === 0) return;
+    clipboard_op.set(op);
+    clipboard.set(ids);
 }
 
-export function cut(): void {
-    clipboard_op.set('cut');
-    clipboard.set(get(selectingItems));
+export function copy(scope: readonly string[] | null): void {
+    clip('copy', scope);
+}
+
+export function cut(scope: readonly string[] | null): void {
+    clip('cut', scope);
 }
 
 export function paste(id: string, new_id: string | null = null): void {

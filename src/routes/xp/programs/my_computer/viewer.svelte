@@ -22,7 +22,7 @@
     } from '../../../../lib/system';
     import * as fs from '../../../../lib/fs';
     const { long_press, double_tap } = utils;
-    import { createEventDispatcher, tick, mount } from 'svelte';
+    import { createEventDispatcher, onDestroy, tick, mount } from 'svelte';
     import { get, set } from 'idb-keyval';
     import { parse_dir } from '../../../../lib/dir_parser';
     import {
@@ -31,9 +31,11 @@
         visible_columns,
     } from '../../../../lib/details_columns';
     import type { DetailsColumnKey } from '../../../../lib/details_columns';
+    import { scoped_ids } from '../../../../lib/selection';
     import { required } from '../../../../lib/types';
     import { show_no_association_dialog } from '../../../../lib/no_association';
     import type {
+        HardDrive,
         FSItemOriginator,
         MountedComponent,
         MyComputerInstance,
@@ -56,7 +58,11 @@
         Tiles: 'w-[220px] flex-row items-center m-1',
         Icons: 'w-[150px] flex-row items-center m-2',
         List: 'w-[180px] flex-row items-center mx-2 my-0.5',
-        Details: 'w-full flex-row items-center mx-1 my-0.5',
+        // px-1, NOT mx-1: the sticky header uses padding, so a margin here made
+        // every right-anchored column sit 8px out of register and pushed the
+        // row past the scroller, giving Details a permanent phantom
+        // horizontal scrollbar.
+        Details: 'w-full flex-row items-center px-1 my-0.5',
     }[view_mode];
     $: icon_box = {
         Thumbnails: 'w-[80px] h-[80px]',
@@ -128,12 +134,23 @@
     };
 
     /**
-     * Bumped by `refresh()` so the sort is re-run even though nothing about
-     * the folder changed. It rides in the hash because the worker memoises on
-     * that hash — without it, a refresh would be answered from the cache and
-     * the user would see no evidence anything happened.
+     * Bumped by `refresh()` so the folder is re-derived even though nothing
+     * about it changed. It rides in the sort hash because the block below only
+     * posts to the worker when `hash !== last_sort_tx_hash` — without the
+     * nonce a Refresh would null `sorted_items`, never re-post, and the folder
+     * would hang on "working on it..." forever. (NOT for sort.js's `cache`:
+     * that object is read but never written.)
      */
     let refresh_nonce = 0;
+
+    /**
+     * The My Computer ROOT renders `computer`, not the sorted item list, so
+     * the nonce above — read only inside `if (current_folder)` — never reached
+     * it and Refresh was a live no-op there: precisely the dead-control
+     * problem the View menu work existed to remove. Threading the nonce
+     * through the derivation makes F5 re-enumerate the drives, as XP does.
+     */
+    let root_loading = false;
 
     /** View > Refresh (and F5): re-read the folder and re-sort it. */
     export function refresh() {
@@ -145,7 +162,25 @@
         if (renaming) cancel_renaming();
         sorted_items = null;
         refresh_nonce++;
+        if (id == null) {
+            // setTimeout, NOT tick(): tick() resolves inside the same microtask
+            // drain that flushed the write, so no frame could ever be painted
+            // between the two states and Refresh at the root stayed invisible.
+            // A real minimum duration is the only thing that makes the control
+            // observably do something.
+            root_loading = true;
+            if (root_loading_timer != null) clearTimeout(root_loading_timer);
+            root_loading_timer = setTimeout(() => {
+                root_loading = false;
+                root_loading_timer = null;
+            }, 150);
+        }
     }
+
+    let root_loading_timer: ReturnType<typeof setTimeout> | null = null;
+    onDestroy(() => {
+        if (root_loading_timer != null) clearTimeout(root_loading_timer);
+    });
 
     let last_sort_tx_hash: string | null | undefined;
     $: {
@@ -176,10 +211,15 @@
     // Reactive, not a one-shot const: the root list used to be frozen at mount,
     // so a drive renamed elsewhere never updated and View > Refresh had nothing
     // to re-derive here.
-    $: computer = my_computer.flatMap((el) => {
-        const item = $hardDrive?.[el];
-        return item == null ? [] : [item];
-    });
+    $: computer = derive_computer($hardDrive, refresh_nonce);
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- both params exist so the reactive statement re-runs when either changes
+    function derive_computer(drive: HardDrive | null, _nonce: number) {
+        return my_computer.flatMap((el) => {
+            const item = drive?.[el];
+            return item == null ? [] : [item];
+        });
+    }
 
     let node_ref: HTMLDivElement;
     $: {
@@ -270,6 +310,7 @@
         const originator: FSItemOriginator = {
             item,
             my_computer_instance,
+            visible_ids,
             open: (item_id: string) => {
                 open(item_id);
             },
@@ -355,17 +396,29 @@
     // exported so the Explorer File menu can trigger it too (accessors={true});
     // requires a selection — callers must gate on $selectingItems
     export function rename() {
+        // Clear the latch BEFORE arming a new edit. It is only ever cleared
+        // inside end_renaming, and cancelling removes the focused textarea —
+        // which fires no blur in Chromium/WebKit — so one Escape (or one F5,
+        // since refresh() cancels too) left it set and silently discarded the
+        // NEXT rename's commit.
+        rename_cancelled = false;
         renaming = true;
         void tick().then(() => {
-            const item_id = required($selectingItems[0], 'renaming selection');
+            // the SCOPED selection, not $selectingItems[0]: the raw store can
+            // lead with an id belonging to the desktop or another window, and
+            // this then measured the wrong basename — or threw, inside an
+            // unawaited promise, if that id had since been deleted.
+            const item_id = scoped_ids($selectingItems, visible_ids)[0];
+            if (item_id == null) {
+                renaming = false;
+                return;
+            }
             const el = document.querySelector<HTMLTextAreaElement>(
                 `div[fs-id="${item_id}"] textarea`,
             );
-            const end_range = required(
-                $hardDrive?.[item_id],
-                'fs item ' + item_id,
-            ).basename.length;
-            if (el != null) el.setSelectionRange(0, end_range);
+            const end_range = $hardDrive?.[item_id]?.basename.length;
+            if (el != null && end_range != null)
+                el.setSelectionRange(0, end_range);
         });
     }
 
@@ -433,9 +486,9 @@
 
         if (!(e.ctrlKey || e.metaKey)) return;
         if (e.key == 'c') {
-            fs.copy();
+            fs.copy(visible_ids);
         } else if (e.key == 'x') {
-            fs.cut();
+            fs.cut(visible_ids);
         } else if (e.key == 'v') {
             fs.paste(id);
         } else if (e.key == 'a') {
@@ -548,6 +601,7 @@
                     <span class="grow px-1 mx-0.5">Name</span>
                     {#each extra_columns as col (col.key)}
                         <span
+                            data-header={col.key}
                             class="shrink-0 truncate {col.align === 'right'
                                 ? 'text-right pr-2'
                                 : ''}"
@@ -624,6 +678,7 @@
                     {#if view_mode === 'Details'}
                         {#each extra_columns as col (col.key)}
                             <span
+                                data-cell={col.key}
                                 class="shrink-0 text-[11px] text-slate-600 truncate {col.align ===
                                 'right'
                                     ? 'text-right pr-2'
@@ -657,7 +712,15 @@
         {/if}
     </div>
 
-    <div class="w-full" class:hidden={id != null}>
+    {#if id == null && root_loading}
+        <p
+            data-root-loading
+            class="text-center text-sm font-Trebuchet my-2 text-slate-500"
+        >
+            working on it...
+        </p>
+    {/if}
+    <div class="w-full" class:hidden={id != null || root_loading}>
         <p class="ml-2 mt-0.5 font-MSSS text-black text-[11px] font-bold">
             Files Stored on This Computer
         </p>

@@ -182,7 +182,8 @@ export type MountedComponent = Record<string, unknown>;
 /** One button of a Dialog.svelte prompt. */
 export interface DialogButton {
     name: string;
-    action: (event: MouseEvent) => void;
+    /** The event is optional: Escape invokes Cancel with no click behind it. */
+    action: (event?: MouseEvent) => void;
     focus?: boolean;
 }
 
@@ -239,6 +240,14 @@ export interface FSItemOriginator {
     open: (id: string) => void;
     rename: () => void;
     my_computer_instance?: MyComputerInstance;
+    /**
+     * The ids the surface that opened this menu is showing. `selectingItems`
+     * is ONE global store shared by the desktop and every Explorer window, so
+     * destructive actions must narrow to this or they act on another
+     * surface's selection. Absent means "unknown" — callers fail closed onto
+     * `item` alone rather than trusting the raw store.
+     */
+    visible_ids?: string[];
     /** Read by CMFSItem but never populated by current callers. */
     type?: string;
 }

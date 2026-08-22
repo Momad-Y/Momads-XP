@@ -3,6 +3,11 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
     test: {
         include: ['src/**/*.test.ts'],
+        // Pin a non-UTC zone with no DST. CI runners are UTC, where local and
+        // UTC getters are indistinguishable — so a date helper that quietly
+        // switched to getUTC*() would pass there and shift the column by the
+        // offset for every real visitor. Asia/Tokyo (UTC+9) makes that fail.
+        env: { TZ: 'Asia/Tokyo' },
         coverage: {
             provider: 'v8',
             reporter: ['text', 'lcov'],

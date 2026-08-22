@@ -2,6 +2,7 @@
 
 <script lang="ts">
     import { folder_size } from '../../../lib/fs_size';
+    import { type_label, date_label } from '../../../lib/details_columns';
     import { file_icon_url } from '../../../lib/file_icon';
     import Window from '../../../lib/components/xp/Window.svelte';
     import Button from '../../../lib/components/xp/Button.svelte';
@@ -10,7 +11,6 @@
     import { onMount, unmount } from 'svelte';
     import { runningPrograms, hardDrive } from '../../../lib/store';
     import * as utils from '../../../lib/utils';
-    import _ from 'lodash';
     import * as finder from '../../../lib/finder';
     import { required } from '../../../lib/types';
     import type {
@@ -41,13 +41,11 @@
         initial_item == null
             ? []
             : [
-                  [
-                      'Type',
-                      initial_item.type
-                          .split('_')
-                          .map((el) => _.upperFirst(el))
-                          .join(' '),
-                  ],
+                  // One definition of the Type cell, shared with the Details
+                  // column: this said "Folder"/"Removable Storage" where the
+                  // column said "File Folder"/"Removable Disk", so two views of
+                  // one item disagreed.
+                  ['Type', type_label(initial_item)],
                   ['Location', finder.to_url(initial_item.id)],
 
                   ...(initial_item.type == 'file'
@@ -107,14 +105,12 @@
                                 `${String(initial_item.children.filter((el) => drive_item(el).type == 'file').length)} Files, ${String(initial_item.children.filter((el) => drive_item(el).type == 'folder').length)} Folders`,
                             ] satisfies [string, string],
                         ]),
-                  [
-                      'Date Created',
-                      utils.timestamp_to_readable(initial_item.date_created),
-                  ],
-                  [
-                      'Last Modified',
-                      utils.timestamp_to_readable(initial_item.date_modified),
-                  ],
+                  // date_label, not timestamp_to_readable: the latter is
+                  // `date.toString()`, which printed the raw
+                  // "Sun Aug 16 2026 15:04:11 GMT+0400 (…)" and varies by
+                  // timezone.
+                  ['Date Created', date_label(initial_item.date_created)],
+                  ['Last Modified', date_label(initial_item.date_modified)],
               ];
 
     onMount(() => {});

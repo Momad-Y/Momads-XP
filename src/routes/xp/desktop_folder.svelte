@@ -18,6 +18,7 @@
         previewable_exts,
     } from '../../lib/system';
     import * as fs from '../../lib/fs';
+    import { scoped_ids } from '../../lib/selection';
     const { click_outside, long_press, double_tap } = utils;
     import { tick } from 'svelte';
     import RecycleBin from '../../lib/components/xp/RecycleBin.svelte';
@@ -174,6 +175,7 @@
 
         const originator: FSItemOriginator = {
             item,
+            visible_ids: items.map((el) => el.id),
             open: (id: string) => {
                 open(id);
             },
@@ -247,19 +249,53 @@
     }
 
     function rename() {
+        // Clear the latch BEFORE arming a new edit — see the note on
+        // cancel_renaming: it is cleared only inside end_renaming, which never
+        // runs when a cancel removes the focused textarea, so one Escape
+        // silently discarded the NEXT rename's commit.
+        rename_cancelled = false;
         renaming = true;
         void tick().then(() => {
-            const id = required($selectingItems[0], 'renaming selection');
+            // the SCOPED selection: the raw store can lead with an id from an
+            // Explorer window, which measured the wrong basename or threw.
+            const id = scoped_ids(
+                $selectingItems,
+                items.map((el) => el.id),
+            )[0];
+            if (id == null) {
+                renaming = false;
+                return;
+            }
             const el = document.querySelector<HTMLTextAreaElement>(
                 `div[fs-id="${id}"] textarea`,
             );
-            const end_range = required($hardDrive?.[id], 'fs item ' + id)
-                .basename.length;
-            if (el != null) el.setSelectionRange(0, end_range);
+            const end_range = $hardDrive?.[id]?.basename.length;
+            if (el != null && end_range != null)
+                el.setSelectionRange(0, end_range);
         });
     }
 
+    let rename_cancelled = false;
+
+    /**
+     * XP's Escape during an inline rename ABANDONS the edit. Ported verbatim
+     * from viewer.svelte, which got it from red-team M1 — the desktop copy was
+     * left behind, so Escape here silently COMMITTED on the next blur while
+     * the identical gesture in Explorer discarded.
+     */
+    function cancel_renaming() {
+        rename_cancelled = true;
+        renaming = false;
+    }
+
     function end_renaming(e: Event, item: VfsItem) {
+        // Escape abandoned the edit: swallow the blur that tearing down the
+        // textarea triggers, so the typed value is never committed.
+        if (rename_cancelled) {
+            rename_cancelled = false;
+            renaming = false;
+            return;
+        }
         const target = e.target;
         if (!(target instanceof HTMLTextAreaElement)) return;
         const name = utils.sanitize_filename(target.value);
@@ -304,9 +340,9 @@
 
         if (!(e.ctrlKey || e.metaKey)) return;
         if (e.key == 'c') {
-            fs.copy();
+            fs.copy(items.map((el) => el.id));
         } else if (e.key == 'x') {
-            fs.cut();
+            fs.cut(items.map((el) => el.id));
         } else if (e.key == 'v') {
             fs.paste(id);
         } else if (e.key == 'a') {
@@ -434,6 +470,7 @@
                         autofocus
                         on:keydown={(e) => {
                             if (e.key == 'Enter') end_renaming(e, item);
+                            else if (e.key == 'Escape') cancel_renaming();
                         }}
                         on:blur={(e) => {
                             end_renaming(e, item);

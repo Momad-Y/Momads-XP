@@ -45,13 +45,32 @@ export function type_label(item: VfsItem): string {
     if (item.type === 'folder') return 'File Folder';
     if (item.type === 'drive') return 'Local Disk';
     if (item.type === 'removable_storage') return 'Removable Disk';
-    return item.ext !== '' ? `${item.ext.slice(1).toUpperCase()} File` : 'File';
+    // XP names a .lnk by what it IS, not by its extension.
+    if (item.ext.toLowerCase() === '.lnk') return 'Shortcut';
+    // Strip every leading dot and surrounding space: `sanitize_filename` only
+    // removes slashes, so renaming a file to "notes." or "notes. " leaves an
+    // `ext` of '.' or '. ', which rendered as " File" / "  File".
+    const ext = item.ext.replace(/^\.+/, '').trim();
+    return ext !== '' ? `${ext.toUpperCase()} File` : 'File';
 }
 
-/** The Size cell. Folders show nothing, exactly like XP. */
+/**
+ * The Size cell. Folders show nothing, exactly like XP.
+ *
+ * ALWAYS KB with thousands separators — "13,323 KB", never "13.01 MB". The
+ * column and the status bar are not two drifted copies of one rule; they are
+ * XP's two DIFFERENT rules, and only the status bar picks a unit to suit the
+ * number. Routing this through `format_size` re-spelled five shipped Desktop
+ * items into Vista-style adaptive units.
+ */
 export function size_label(item: VfsItem): string {
     if (item.type !== 'file') return '';
-    return `${String(item.size ?? 0)} KB`;
+    const size = item.size ?? 0;
+    // negative and non-finite both collapse to 0, matching `total_size`'s
+    // defence — the two used to guard opposite halves, so the status bar could
+    // contradict a cell two rows above it.
+    const kb = Number.isFinite(size) && size > 0 ? Math.ceil(size) : 0;
+    return `${kb.toLocaleString('en-US')} KB`;
 }
 
 /**
@@ -61,6 +80,9 @@ export function size_label(item: VfsItem): string {
 export function date_label(ms: number | undefined): string {
     if (ms == null || !Number.isFinite(ms) || ms <= 0) return '';
     const d = new Date(ms);
+    // finite but out of Date's range (max 8.64e15) → an Invalid Date, whose
+    // getters are all NaN and which rendered "NaN/NaN/NaN NaN:NaN PM"
+    if (Number.isNaN(d.getTime())) return '';
     const hours = d.getHours();
     const hour12 = hours % 12 === 0 ? 12 : hours % 12;
     const minutes = String(d.getMinutes()).padStart(2, '0');
