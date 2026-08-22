@@ -1,7 +1,7 @@
 <script lang="ts">
     import { my_music_id, my_pictures_id } from '../../../../lib/system';
     import * as fs from '../../../../lib/fs';
-    import { queueProgram } from '../../../../lib/store';
+    import { queueProgram, hardDrive } from '../../../../lib/store';
     import type { MyComputerInstance } from '../../../../lib/types';
     export let my_computer_instance: MyComputerInstance;
 
@@ -22,124 +22,144 @@
         items: SidebarItem[];
     }
 
+    /**
+     * XP shows System Tasks on a DRIVE (and at My Computer), and File and
+     * Folder Tasks FIRST inside a folder. Every folder here got the drive's
+     * pane instead — "Hide the contents of this drive" in `C:\Awards` — and
+     * because File and Folder Tasks was third, at the default window height
+     * its caption was sliced by the status bar and all of its links were off
+     * screen.
+     */
+    $: is_drive =
+        id != null &&
+        ($hardDrive?.[id]?.type === 'drive' ||
+            $hardDrive?.[id]?.type === 'removable_storage');
+    $: is_folder = id != null && !is_drive;
+
+    $: system_tasks = {
+        name: 'System Tasks',
+        items: [
+            ...(id
+                ? [
+                      {
+                          name: 'Hide the contents of this drive',
+                          disabled: true,
+                          icon: 'StartMenuProgramsAlt.png',
+                          action: () => {},
+                      },
+                  ]
+                : [
+                      {
+                          name: 'View System Information',
+                          icon: 'explorerproperties.png',
+                          action: () => {
+                              queueProgram.set({
+                                  path: './programs/system_properties.svelte',
+                              });
+                          },
+                      },
+                  ]),
+
+            {
+                name: 'Add or remove programs',
+                disabled: true,
+                icon: 'Programs.png',
+                action: () => {},
+            },
+
+            ...(id
+                ? [
+                      {
+                          name: 'Search for files or folders',
+                          disabled: true,
+                          icon: 'Search.png',
+                          action: () => {},
+                      },
+                  ]
+                : [
+                      {
+                          name: 'Change a setting',
+                          disabled: true,
+                          icon: 'ControlPanel.png',
+                          action: () => {},
+                      },
+                  ]),
+        ],
+    };
+
+    $: other_places = {
+        name: 'Other Places',
+        items: [
+            {
+                name: 'My Computer',
+                icon: 'MyComputer.png',
+                action: () => {
+                    my_computer_instance.open(null);
+                },
+            },
+            {
+                name: 'My Pictures',
+                icon: 'MyPictures.png',
+                action: () => {
+                    my_computer_instance.open(my_pictures_id);
+                },
+            },
+            {
+                name: 'My Music',
+                icon: 'MyMusic.png',
+                action: () => {
+                    my_computer_instance.open(my_music_id);
+                },
+            },
+            {
+                name: 'My Network Places',
+                disabled: true,
+                icon: 'MyNetworkPlaces.png',
+                action: () => {},
+            },
+        ],
+    };
+
+    $: file_tasks = is_folder
+        ? [
+              {
+                  name: 'File and Folder Tasks',
+                  items: [
+                      {
+                          name: 'Make a new folder',
+                          icon: 'NewFolder.png',
+                          action: () => {
+                              if (id) {
+                                  void fs.new_fs_item(
+                                      'folder',
+                                      '',
+                                      'New Folder',
+                                      id,
+                                  );
+                              }
+                          },
+                      },
+                      {
+                          name: 'Publish this folder to the Web',
+                          disabled: true,
+                          icon: 'Publishtoweb.png',
+                          action: () => {},
+                      },
+                      {
+                          name: 'Share this folder',
+                          disabled: true,
+                          icon: 'SharedFolder.png',
+                          action: () => {},
+                      },
+                  ],
+              },
+          ]
+        : [];
+
     $: menu = [
-        {
-            name: 'System Tasks',
-            items: [
-                ...(id
-                    ? [
-                          {
-                              name: 'Hide the contents of this drive',
-                              disabled: true,
-                              icon: 'StartMenuProgramsAlt.png',
-                              action: () => {},
-                          },
-                      ]
-                    : [
-                          {
-                              name: 'View System Information',
-                              icon: 'explorerproperties.png',
-                              action: () => {
-                                  queueProgram.set({
-                                      path: './programs/system_properties.svelte',
-                                  });
-                              },
-                          },
-                      ]),
-
-                {
-                    name: 'Add or remove programs',
-                    disabled: true,
-                    icon: 'Programs.png',
-                    action: () => {},
-                },
-
-                ...(id
-                    ? [
-                          {
-                              name: 'Search for files or folders',
-                              disabled: true,
-                              icon: 'Search.png',
-                              action: () => {},
-                          },
-                      ]
-                    : [
-                          {
-                              name: 'Change a setting',
-                              disabled: true,
-                              icon: 'ControlPanel.png',
-                              action: () => {},
-                          },
-                      ]),
-            ],
-        },
-        {
-            name: 'Other Places',
-            items: [
-                {
-                    name: 'My Computer',
-                    icon: 'MyComputer.png',
-                    action: () => {
-                        my_computer_instance.open(null);
-                    },
-                },
-                {
-                    name: 'My Pictures',
-                    icon: 'MyPictures.png',
-                    action: () => {
-                        my_computer_instance.open(my_pictures_id);
-                    },
-                },
-                {
-                    name: 'My Music',
-                    icon: 'MyMusic.png',
-                    action: () => {
-                        my_computer_instance.open(my_music_id);
-                    },
-                },
-                {
-                    name: 'My Network Places',
-                    disabled: true,
-                    icon: 'MyNetworkPlaces.png',
-                    action: () => {},
-                },
-            ],
-        },
-        ...(id
-            ? [
-                  {
-                      name: 'File and Folder Tasks',
-                      items: [
-                          {
-                              name: 'Make a new folder',
-                              icon: 'NewFolder.png',
-                              action: () => {
-                                  if (id) {
-                                      void fs.new_fs_item(
-                                          'folder',
-                                          '',
-                                          'New Folder',
-                                          id,
-                                      );
-                                  }
-                              },
-                          },
-                          {
-                              name: 'Publish this folder to the Web',
-                              disabled: true,
-                              icon: 'Publishtoweb.png',
-                              action: () => {},
-                          },
-                          {
-                              name: 'Share this folder',
-                              disabled: true,
-                              icon: 'SharedFolder.png',
-                              action: () => {},
-                          },
-                      ],
-                  },
-              ]
-            : []),
+        ...file_tasks,
+        ...(is_folder ? [] : [system_tasks]),
+        other_places,
     ] satisfies SidebarSection[];
 </script>
 

@@ -87,7 +87,7 @@
                     <!-- eslint-disable-next-line svelte/require-each-key -- inherited unkeyed each; keying changes DOM reuse semantics -->
                     {#each menu_group.items as item_group, group_index}
                         <div
-                            class="w-full border-slate-200 {group_index ==
+                            class="w-full border-stone-300 {group_index ==
                             menu_group.items.length - 1
                                 ? ''
                                 : 'border-b'}"

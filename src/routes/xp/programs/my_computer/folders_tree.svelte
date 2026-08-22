@@ -1,7 +1,7 @@
 <script lang="ts">
     import { hardDrive } from '../../../../lib/store';
     import * as utils from '../../../../lib/utils';
-    import { my_computer } from '../../../../lib/system';
+    import { my_computer, hidden_items } from '../../../../lib/system';
     import type { MyComputerInstance, VfsItem } from '../../../../lib/types';
     import ExplorerBarHeader from './explorer_bar_header.svelte';
 
@@ -19,6 +19,10 @@
             .filter(
                 (c): c is VfsItem =>
                     c != null &&
+                    // the viewer and the search panel both hide these; the
+                    // tree did not, so it offered Desktop / Recycle Bin /
+                    // Wallpapers while the pane beside it showed none of them
+                    !hidden_items.includes(c.id) &&
                     (c.type === 'folder' ||
                         c.type === 'drive' ||
                         c.type === 'removable_storage'),
@@ -73,7 +77,10 @@
                     {#if kids.length > 0}
                         <button
                             type="button"
-                            class="w-3 shrink-0 text-[9px] text-slate-600"
+                            class="w-3 shrink-0 text-[9px] {current_id ===
+                            root.id
+                                ? 'text-slate-50'
+                                : 'text-slate-600'}"
                             on:click|stopPropagation={() => {
                                 expanded[root.id] = !expanded[root.id];
                             }}>{expanded[root.id] ? '−' : '+'}</button

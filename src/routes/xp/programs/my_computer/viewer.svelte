@@ -28,6 +28,8 @@
     import {
         column_value,
         default_details_columns,
+        size_label,
+        type_label,
         visible_columns,
     } from '../../../../lib/details_columns';
     import type { DetailsColumnKey } from '../../../../lib/details_columns';
@@ -53,21 +55,39 @@
         'Thumbnails' | 'Tiles' | 'Icons' | 'List' | 'Details' = 'Icons';
 
     // Per-mode layout classes for the item box, icon and label.
+    /**
+     * XP's five layouts, which three of these were not:
+     *  - Thumbnails: big preview, caption BELOW, centred
+     *  - Tiles: 48px icon, name in bold with two subtext lines beside it
+     *  - Icons: 32px icon, caption BELOW in a grid
+     *  - List: small icon, name beside it, flowing down then across
+     *  - Details: small icon, name, then one cell per chosen column
+     * Icons was icon-left/label-right (which is Tiles' shape), Tiles was a
+     * smaller Icons, and the label-below layout XP calls Icons was only
+     * reachable as Thumbnails.
+     */
     $: item_box = {
         Thumbnails: 'w-[120px] flex-col items-center m-2 text-center',
         Tiles: 'w-[220px] flex-row items-center m-1',
-        Icons: 'w-[150px] flex-row items-center m-2',
-        List: 'w-[180px] flex-row items-center mx-2 my-0.5',
+        Icons: 'w-[90px] flex-col items-center m-2 text-center',
+        // the wrapper switches to CSS columns for List (see `list_flow`), so
+        // this only has to size the row
+        List: 'w-full flex-row items-center px-2 my-0.5',
         // px-1, NOT mx-1: the sticky header uses padding, so a margin here made
         // every right-anchored column sit 8px out of register and pushed the
         // row past the scroller, giving Details a permanent phantom
         // horizontal scrollbar.
-        Details: 'w-full flex-row items-center px-1 my-0.5',
+        // min-w-full + w-max, NOT w-full: a row pinned to the scroller's
+        // width can never overflow, so every pixel lost to a narrowed window
+        // came out of the only flexible cell — the NAME. At ~490px wide every
+        // filename rendered as a single letter while Size/Type/Date kept full
+        // width. XP keeps column widths and scrolls horizontally instead.
+        Details: 'min-w-full w-max flex-row items-center px-1 my-0.5',
     }[view_mode];
     $: icon_box = {
         Thumbnails: 'w-[80px] h-[80px]',
-        Tiles: 'w-[32px] h-[32px]',
-        Icons: 'w-[50px] h-[50px]',
+        Tiles: 'w-[48px] h-[48px]',
+        Icons: 'w-[32px] h-[32px]',
         List: 'w-[16px] h-[16px]',
         Details: 'w-[16px] h-[16px]',
     }[view_mode];
@@ -579,8 +599,12 @@
         }
     }}
 >
+    <!-- XP's List view fills the first column top-to-bottom and then wraps to
+         the next column; an inline-flow of inline-blocks reads across the rows
+         instead, which is the wrong order for anyone who used XP -->
     <div
         class="w-full min-h-[90%]"
+        class:columns-[180px]={view_mode === 'List'}
         class:hidden={id == null}
         on:contextmenu|self={show_void_menu}
         on:click|self={() => {
@@ -595,10 +619,10 @@
         {#if sorted_items}
             {#if view_mode === 'Details'}
                 <div
-                    class="flex flex-row items-center border-b border-stone-300 bg-[#f1f0e8] text-[11px] font-bold text-slate-700 px-1 sticky top-0"
+                    class="flex flex-row items-center border-b border-stone-300 bg-[#f1f0e8] text-[11px] font-bold text-slate-700 px-1 sticky top-0 min-w-full w-max"
                 >
                     <span class="w-[16px] shrink-0"></span>
-                    <span class="grow px-1 mx-0.5">Name</span>
+                    <span class="grow px-1 mx-0.5 min-w-[180px]">Name</span>
                     {#each extra_columns as col (col.key)}
                         <span
                             data-header={col.key}
@@ -664,17 +688,44 @@
                             style:background-image={file_icon_url(item)}
                         ></div>
                     {/if}
-                    <p
-                        class="px-1 mx-0.5 text-[11px] {view_mode === 'List' ||
-                        view_mode === 'Details'
-                            ? 'truncate grow'
-                            : 'break-words line-clamp-2 text-ellipsis'} leading-tight
-                        {$selectingItems.includes(item.id) && is_focus
-                            ? 'bg-blue-600 text-slate-50'
-                            : ''}"
+                    <!-- a wrapper that disappears (display:contents) in every
+                         mode but Tiles, where XP stacks the name above two
+                         subtext lines beside a 48px icon -->
+                    <div
+                        class={view_mode === 'Tiles'
+                            ? 'flex flex-col min-w-0 grow'
+                            : 'contents'}
                     >
-                        {item.name}
-                    </p>
+                        <p
+                            class="px-1 mx-0.5 text-[11px] {view_mode ===
+                                'List' || view_mode === 'Details'
+                                ? 'truncate grow min-w-[180px]'
+                                : // w-full + min-w-0: Thumbnails is the only
+                                  // column-flex box, so without a width the label
+                                  // sized to max-content and the parent's
+                                  // overflow-hidden sliced a long name at BOTH
+                                  // ends — "med_Abdelnasser_Resun", no ellipsis
+                                  'break-words line-clamp-2 text-ellipsis w-full min-w-0'} leading-tight
+                        {$selectingItems.includes(item.id) && is_focus
+                                ? 'bg-blue-600 text-slate-50'
+                                : ''}"
+                        >
+                            {item.name}
+                        </p>
+                        {#if view_mode === 'Tiles'}
+                            <!-- XP's Tiles puts type and size under the name -->
+                            <span
+                                class="px-1 mx-0.5 text-[11px] text-slate-600 truncate"
+                                >{type_label(item)}</span
+                            >
+                            {#if size_label(item) !== ''}
+                                <span
+                                    class="px-1 mx-0.5 text-[11px] text-slate-600 truncate"
+                                    >{size_label(item)}</span
+                                >
+                            {/if}
+                        {/if}
+                    </div>
                     {#if view_mode === 'Details'}
                         {#each extra_columns as col (col.key)}
                             <span
