@@ -662,20 +662,25 @@
 
     $: mc_interface = { window, up, open };
 
+    /** The address bar's <input>, so the Go button can read what was typed. */
+    let address_input: HTMLInputElement | undefined = undefined;
+
+    /**
+     * Navigate to a typed path. Shared by Enter and the Go button — the arrow
+     * was a bare <div> with no handler at all, so it looked live and did
+     * nothing, which is the class of defect this chrome work exists to remove.
+     */
+    function go_to_address(value: string) {
+        const id = finder.to_id(value) ?? finder.to_id_nocase(value);
+        if (id == null) return; // unresolvable path: same as Enter, no-op
+        open(id);
+        address_input?.blur();
+    }
+
     function on_user_input(e: KeyboardEvent) {
         const target = e.target;
         if (!(target instanceof HTMLInputElement)) return;
-        if (e.key == 'Enter') {
-            let id = finder.to_id(target.value);
-
-            if (id == null) {
-                id = finder.to_id_nocase(target.value);
-            }
-            if (id) {
-                open(id);
-                target.blur();
-            }
-        }
+        if (e.key == 'Enter') go_to_address(target.value);
     }
 
     export function destroy() {
@@ -983,6 +988,7 @@
             <span class="px-2 text-slate-800">Address</span>
             <div class="grow h-[25px] relative">
                 <input
+                    bind:this={address_input}
                     class="absolute inset-0 pl-7 outline-none"
                     type="text"
                     on:click={(e) => {
@@ -999,9 +1005,17 @@
                     style:background-image={file_icon_url(current_history_item)}
                 ></div>
             </div>
-            <div
-                class="w-[30px] h-[20px] bg-[url(/images/xp/icons/Go.png)] bg-center bg-contain bg-no-repeat"
-            ></div>
+            <!-- a <button>, not a <div>: it was unreachable by keyboard and
+                 had no click handler at all -->
+            <button
+                type="button"
+                aria-label="Go"
+                title="Go"
+                class="w-[30px] h-[20px] shrink-0 bg-[url(/images/xp/icons/Go.png)] bg-center bg-contain bg-no-repeat cursor-pointer"
+                on:click={() => {
+                    go_to_address(address_input?.value ?? '');
+                }}
+            ></button>
         </div>
 
         <!-- XP's Links toolbar: the web half of the shared Favorites list -->
