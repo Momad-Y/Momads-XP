@@ -182,8 +182,14 @@ export const GET: RequestHandler = async (event) => {
      * page are exactly the case `sec-fetch-site: same-origin` covers.
      */
     const fetch_site = event.request.headers.get('sec-fetch-site');
-    let same_origin_request =
-        fetch_site === 'same-origin' || fetch_site === 'none';
+    // ONLY `same-origin`. `none` means "the user typed this address or opened a
+    // bookmark" — it is not something a page can cause, but it IS one curl
+    // header, so accepting it re-opened the relay this check exists to close
+    // (verified against a real deploy: every other spoof got 403, `none` got
+    // 200). Nothing legitimate needs it: the iframe loads /api/browse as a
+    // frame navigation from our own page, and View Source fetches it from that
+    // page — both are `same-origin`.
+    let same_origin_request = fetch_site === 'same-origin';
     if (!same_origin_request) {
         const origin = event.request.headers.get('origin');
         same_origin_request = is_allowed_origin(origin);

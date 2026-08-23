@@ -122,6 +122,21 @@ describe('/api/browse origin gating', () => {
         expect(res.status).toBe(200);
     });
 
+    // `none` is what a browser sends for a typed address or a bookmark. It is
+    // also one curl header, and accepting it re-opened the relay — caught by
+    // probing a real deploy, where every other spoof was refused and this one
+    // returned 200.
+    it('REFUSES sec-fetch-site: none, which curl sets for free', () => {
+        return expect(
+            status_of(
+                make_event('https://example.com/', {
+                    fetch_site: 'none',
+                    origin: null,
+                }),
+            ),
+        ).resolves.toBe(403);
+    });
+
     it('REFUSES a forged Referer — it is not a proof of origin', () => {
         // `curl -H 'Referer: <our app>'` used to be accepted, which made this
         // an anonymising relay billed to us and gave every SSRF finding a
