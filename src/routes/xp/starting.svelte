@@ -10,7 +10,9 @@
         SEED_VERSION,
         merge_on_reseed,
         shouldReseed,
+        snapshot_seed_fields,
     } from '../../lib/seed';
+    import type { SeedFieldSnapshot } from '../../lib/seed';
     import type {
         ContextMenuRequest,
         LoadPageEvent,
@@ -187,18 +189,30 @@
     async function read_cached(): Promise<{
         cached: StoredHardDrive | undefined;
         version: string | undefined;
+        seed_fields: SeedFieldSnapshot | undefined;
     }> {
         try {
             return {
                 cached: await get<StoredHardDrive>('hard_drive'),
                 version: await get<string>('hard_drive_seed_version'),
+                // The user-mutable fields of the seed this visitor was GIVEN.
+                // Undefined for drives stored before Phase 3 — the merge then
+                // infers no edits and no deletions, which is exactly the old
+                // behaviour. Guessing without it would delete files.
+                seed_fields: await get<SeedFieldSnapshot>(
+                    'hard_drive_seed_fields',
+                ),
             };
         } catch (error) {
             console.error(
                 'persisted drive unreadable; booting from the seed',
                 error,
             );
-            return { cached: undefined, version: undefined };
+            return {
+                cached: undefined,
+                version: undefined,
+                seed_fields: undefined,
+            };
         }
     }
 
@@ -239,7 +253,11 @@
                     // seed updates; on any merge failure fall back to the
                     // plain new seed (never a broken drive).
                     try {
-                        hard_drive = merge_on_reseed(cached, fetched);
+                        hard_drive = merge_on_reseed(
+                            cached,
+                            fetched,
+                            read.seed_fields,
+                        );
                     } catch (merge_error) {
                         console.error(
                             're-seed merge failed; using plain seed',
@@ -250,6 +268,13 @@
                 }
                 await set('hard_drive', hard_drive);
                 await set('hard_drive_seed_version', SEED_VERSION);
+                // Snapshot the seed AS FETCHED, not the merged drive: the next
+                // re-seed compares the visitor's drive against what the seed
+                // gave them, and merging has already folded their edits in.
+                await set(
+                    'hard_drive_seed_fields',
+                    snapshot_seed_fields(fetched),
+                );
             } catch (error) {
                 // Re-seed fetch failed (offline / flaky network). A returning
                 // visitor has a perfectly usable cached drive — boot from it

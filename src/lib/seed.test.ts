@@ -1,7 +1,12 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { SEED_VERSION, merge_on_reseed, shouldReseed } from './seed';
+import {
+    SEED_VERSION,
+    merge_on_reseed,
+    shouldReseed,
+    snapshot_seed_fields,
+} from './seed';
 import type { HardDrive, VfsItem } from './types';
 
 describe('seed versioning', () => {
@@ -166,6 +171,247 @@ describe('merge_on_reseed', () => {
         // the cached drive at all and must not survive into the merged one
         expect(merge_on_reseed(cached, seed)['dir']?.children).toEqual([
             'copy',
+        ]);
+    });
+});
+
+/**
+ * Phase 3 (plan T3). `merge_on_reseed` rebuilds from `{ ...seed }`, so every id
+ * the seed contains is replaced WHOLESALE. Carry-by-provenance rescues items
+ * the visitor AUTHORED; until now nothing rescued items the visitor MODIFIED.
+ *
+ * Production went live 2026-08-23, so the Phase 3 SEED_VERSION bump is the
+ * first re-seed against real user data. Every test below was written to FAIL
+ * first: revert the carry in `seed.ts` and it goes red.
+ */
+/**
+ * Return a copy of `drive` with `fields` applied to item `id`.
+ *
+ * Written as a helper because `drive[id]` is possibly-undefined under this
+ * repo's strict index-access rules, and `no-non-null-assertion` is an error —
+ * so spreading an indexed lookup inline does not typecheck.
+ */
+function patch(
+    drive: HardDrive,
+    id: string,
+    fields: Partial<VfsItem>,
+): HardDrive {
+    const current = drive[id];
+    if (current == null) throw new Error(`no such item: ${id}`);
+    return { ...drive, [id]: { ...current, ...fields } };
+}
+
+describe('merge_on_reseed — the visitor edited a SEED item', () => {
+    /** A drive with one folder holding one file, as the seed ships it. */
+    const seed_drive = (): HardDrive => ({
+        folder: item({
+            id: 'folder',
+            type: 'folder',
+            name: 'Docs',
+            basename: 'Docs',
+            children: ['icon'],
+            sort_option: 0,
+            sort_order: 0,
+            date_modified: 1000,
+        }),
+        icon: item({
+            id: 'icon',
+            name: 'My CV.exe',
+            basename: 'My CV',
+            ext: '.exe',
+            parent: 'folder',
+            date_modified: 1000,
+        }),
+    });
+
+    it('keeps a renamed seed item renamed', () => {
+        const seed = seed_drive();
+        const before = snapshot_seed_fields(seed);
+        const cached = patch(seed_drive(), 'icon', {
+            name: 'Resume.exe',
+            basename: 'Resume',
+        });
+
+        const out = merge_on_reseed(cached, seed_drive(), before);
+        expect(out.icon?.name).toBe('Resume.exe');
+        expect(out.icon?.basename).toBe('Resume');
+    });
+
+    it('keeps a dragged desktop icon where the visitor put it', () => {
+        // The seed NEVER sets desktop_css_transform (verified: zero
+        // occurrences in hard_drive.json), so its presence alone means the
+        // visitor dragged the icon — no comparison needed.
+        const seed = seed_drive();
+        const cached = patch(seed_drive(), 'icon', {
+            desktop_css_transform: 'translate(120px, 240px)',
+        });
+
+        const out = merge_on_reseed(
+            cached,
+            seed_drive(),
+            snapshot_seed_fields(seed),
+        );
+        expect(out.icon?.desktop_css_transform).toBe('translate(120px, 240px)');
+    });
+
+    it('keeps a per-folder sort setting', () => {
+        const seed = seed_drive();
+        const cached = patch(seed_drive(), 'folder', {
+            sort_option: 2,
+            sort_order: 1,
+        });
+
+        const out = merge_on_reseed(
+            cached,
+            seed_drive(),
+            snapshot_seed_fields(seed),
+        );
+        expect(out.folder?.sort_option).toBe(2);
+        expect(out.folder?.sort_order).toBe(1);
+    });
+
+    it('keeps an image the visitor saved over from Paint', () => {
+        // fs.save_file rewrites url + storage_type in place. Reverting them
+        // loses the edit AND orphans the idb blob forever, because free_blob
+        // only runs from del_fs.
+        const seed = seed_drive();
+        const cached = patch(seed_drive(), 'icon', {
+            url: 'blob-key-42',
+            storage_type: 'local',
+        });
+
+        const out = merge_on_reseed(
+            cached,
+            seed_drive(),
+            snapshot_seed_fields(seed),
+        );
+        expect(out.icon?.url).toBe('blob-key-42');
+        expect(out.icon?.storage_type).toBe('local');
+    });
+
+    it('lets a NEW seed value through when the visitor never touched the field', () => {
+        // The inverse of the tests above, and the reason the snapshot exists:
+        // carrying blindly would freeze every seed item against future content
+        // updates. Comparing against the seed the visitor RECEIVED tells the
+        // two cases apart.
+        const before = snapshot_seed_fields(seed_drive());
+        const cached = seed_drive(); // untouched by the visitor
+
+        const next = patch(seed_drive(), 'icon', {
+            name: 'Curriculum Vitae.exe',
+        });
+
+        const out = merge_on_reseed(cached, next, before);
+        expect(out.icon?.name).toBe('Curriculum Vitae.exe');
+    });
+
+    it('carries the visitor edit and the seed update independently, field by field', () => {
+        const before = snapshot_seed_fields(seed_drive());
+        const cached = patch(seed_drive(), 'icon', { name: 'Mine.exe' }); // visitor renamed
+        const next = patch(seed_drive(), 'icon', {
+            name: 'New.exe',
+            date_modified: 9999,
+        }); // seed changed both
+
+        const out = merge_on_reseed(cached, next, before);
+        expect(out.icon?.name).toBe('Mine.exe'); // visitor wins where they edited
+        expect(out.icon?.date_modified).toBe(9999); // seed wins where they did not
+    });
+});
+
+describe('merge_on_reseed — the visitor DELETED a seed item', () => {
+    const seed_drive = (): HardDrive => ({
+        root: item({
+            id: 'root',
+            type: 'folder',
+            children: ['keep', 'gone'],
+        }),
+        keep: item({ id: 'keep', parent: 'root' }),
+        gone: item({ id: 'gone', parent: 'root' }),
+    });
+
+    it('does not resurrect it', () => {
+        const before = snapshot_seed_fields(seed_drive());
+        const cached = patch(seed_drive(), 'root', { children: ['keep'] });
+        delete cached.gone;
+
+        const out = merge_on_reseed(cached, seed_drive(), before);
+        expect(out.gone).toBeUndefined();
+        expect(out.keep).toBeDefined();
+    });
+
+    it('also drops it from its parent .children', () => {
+        // Folders render from parent.children, never .parent (see seed.ts), so
+        // a tombstoned id left in a children array is a dangling reference —
+        // the exact shape `properties.svelte` once crashed on.
+        const before = snapshot_seed_fields(seed_drive());
+        const cached = seed_drive();
+        delete cached.gone;
+
+        const out = merge_on_reseed(cached, seed_drive(), before);
+        expect(out.root?.children).toEqual(['keep']);
+    });
+
+    it('does NOT tombstone an item that is simply NEW in this seed', () => {
+        // The failure mode that makes a naive implementation destructive: an
+        // id absent from the cached drive is only a deletion if the visitor
+        // was ever GIVEN it.
+        const before = snapshot_seed_fields(seed_drive());
+        const cached = seed_drive();
+
+        const next = patch(seed_drive(), 'root', {
+            children: ['keep', 'gone', 'fresh'],
+        });
+        next.fresh = item({ id: 'fresh', parent: 'root' });
+
+        const out = merge_on_reseed(cached, next, before);
+        expect(out.fresh).toBeDefined();
+        expect(out.root?.children).toContain('fresh');
+    });
+
+    it('infers nothing without a snapshot — legacy drives are untouched', () => {
+        // First re-seed after this shipped, or any drive stored before it.
+        // Guessing here would DELETE a visitor's files, so the merge falls
+        // back to exactly the previous behaviour.
+        const cached = seed_drive();
+        delete cached.gone;
+
+        const out = merge_on_reseed(cached, seed_drive());
+        expect(out.gone).toBeDefined(); // resurrected, as before — deliberately
+    });
+});
+
+describe('snapshot_seed_fields', () => {
+    it('captures only the user-mutable fields', () => {
+        const snap = snapshot_seed_fields({
+            a: item({
+                id: 'a',
+                name: 'A.txt',
+                basename: 'A',
+                ext: '.txt',
+                sort_option: 1,
+                sort_order: 0,
+                date_modified: 77,
+            }),
+        });
+        expect(snap.a).toEqual({
+            name: 'A.txt',
+            basename: 'A',
+            ext: '.txt',
+            sort_option: 1,
+            sort_order: 0,
+            date_modified: 77,
+        });
+        // type/children/date_created are seed-owned and must not be captured
+        expect(snap.a).not.toHaveProperty('type');
+        expect(snap.a).not.toHaveProperty('children');
+    });
+
+    it('covers every id in the seed', () => {
+        const seed = { a: item({ id: 'a' }), b: item({ id: 'b' }) };
+        expect(Object.keys(snapshot_seed_fields(seed)).sort()).toEqual([
+            'a',
+            'b',
         ]);
     });
 });

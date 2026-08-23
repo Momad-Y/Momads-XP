@@ -31,6 +31,102 @@ function is_stale_placeholder(item: VfsItem): boolean {
 }
 
 /**
+ * The fields on a SEED item that the visitor can change from the UI.
+ *
+ * WHY THIS EXISTS: `merge_on_reseed` rebuilds from `{ ...seed }`, so every id
+ * the seed contains is replaced WHOLESALE. Carry-by-provenance (below) rescues
+ * items the visitor AUTHORED; it does nothing for items the visitor MODIFIED.
+ * Before this, a re-seed silently reset all five desktop icon positions, every
+ * per-folder sort setting, every rename of a seed item, and restored anything
+ * the visitor had deleted. Production went live 2026-08-23, so the Phase 3
+ * bump is the first re-seed against real user data.
+ *
+ * Verified write sites, one per field:
+ *   name/basename/ext      desktop_folder.svelte:328-332, viewer.svelte:482-486
+ *   desktop_css_transform  desktop_folder.svelte:158
+ *   sort_option/sort_order CMFSVoid.ts:60,78
+ *   date_modified          fs.ts:114,223,280,363,400,446,491,556
+ *   url/storage_type       fs.ts:486-494 (save_file — Paint saving over a seed image)
+ */
+export type SeedUserFields = Partial<
+    Pick<
+        VfsItem,
+        | 'name'
+        | 'basename'
+        | 'ext'
+        | 'sort_option'
+        | 'sort_order'
+        | 'date_modified'
+        | 'url'
+        | 'storage_type'
+        | 'desktop_css_transform'
+    >
+>;
+
+/** Snapshot of the user-mutable fields of every seed item, keyed by id. */
+export type SeedFieldSnapshot = Record<string, SeedUserFields>;
+
+const USER_FIELDS = [
+    'name',
+    'basename',
+    'ext',
+    'sort_option',
+    'sort_order',
+    'date_modified',
+    'url',
+    'storage_type',
+    'desktop_css_transform',
+] as const;
+
+/**
+ * Project a seed into the field snapshot persisted alongside it.
+ *
+ * Storing this (~6 KB for the 59-item seed, vs 24 KB for the seed itself) is
+ * what makes the carry UNAMBIGUOUS. Without it we cannot tell "the visitor
+ * renamed this" from "a later seed renamed it" — and guessing wrong either
+ * discards the visitor's edit or freezes the item against future content
+ * updates. Comparing against the seed the visitor actually received answers it
+ * exactly.
+ */
+export function snapshot_seed_fields(seed: HardDrive): SeedFieldSnapshot {
+    const out: SeedFieldSnapshot = {};
+    for (const [id, item] of Object.entries(seed)) {
+        const fields: SeedUserFields = {};
+        for (const key of USER_FIELDS) {
+            const v = item[key];
+            if (v !== undefined) Object.assign(fields, { [key]: v });
+        }
+        out[id] = fields;
+    }
+    return out;
+}
+
+/**
+ * Fields the visitor changed on `id` since the seed they were given.
+ *
+ * `desktop_css_transform` is special-cased: the seed never sets it (verified —
+ * zero occurrences in `static/json/hard_drive.json`), so its mere presence in
+ * the cached drive means the visitor dragged the icon.
+ */
+function user_edits(
+    cached: VfsItem,
+    previous: SeedUserFields | undefined,
+): SeedUserFields {
+    const edits: SeedUserFields = {};
+    if (previous == null) return edits;
+    for (const key of USER_FIELDS) {
+        const now = cached[key];
+        if (now === undefined) continue;
+        if (key === 'desktop_css_transform') {
+            Object.assign(edits, { [key]: now });
+            continue;
+        }
+        if (now !== previous[key]) Object.assign(edits, { [key]: now });
+    }
+    return edits;
+}
+
+/**
  * Re-seed merge (Phase 2 spec D3): the new seed owns every id it contains; the
  * visitor's OWN items are carried when their parent resolves in seed ∪ carried
  * (transitively), then relinked into their seed parent's `children` (folders
@@ -44,7 +140,11 @@ function is_stale_placeholder(item: VfsItem): boolean {
  * uploads survived — the worst possible signal. Pasted copies of seed items
  * had the same problem, and so would the next item kind anyone adds.
  */
-export function merge_on_reseed(cached: HardDrive, seed: HardDrive): HardDrive {
+export function merge_on_reseed(
+    cached: HardDrive,
+    seed: HardDrive,
+    previous?: SeedFieldSnapshot,
+): HardDrive {
     const candidates = Object.values(cached).filter(
         (i) => seed[i.id] == null && !is_stale_placeholder(i),
     );
@@ -63,6 +163,58 @@ export function merge_on_reseed(cached: HardDrive, seed: HardDrive): HardDrive {
     }
 
     const result: HardDrive = { ...seed };
+
+    // ── TOMBSTONES ───────────────────────────────────────────────────────────
+    // An id that was in the seed the visitor RECEIVED and is absent from their
+    // cached drive can only have been deleted by them. Without this, `{...seed}`
+    // resurrects it — and because recycling is clone-then-delete (`clone_fs`
+    // mints a NEW id, `del_fs` removes the original), the bin copy is ALSO
+    // carried, so the visitor ends up with the file in two places at once.
+    //
+    // Derived, not tracked: this needs no hook in `del_fs`, so there is no call
+    // site to forget. When `previous` is absent — the first re-seed after this
+    // shipped, or a legacy drive — no tombstones are inferred and behaviour is
+    // exactly as before. That is deliberate: guessing here would delete a
+    // visitor's files.
+    const tombstoned: string[] = [];
+    if (previous != null) {
+        for (const id of Object.keys(previous)) {
+            if (cached[id] == null && result[id] != null) {
+                tombstoned.push(id);
+                // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+                delete result[id];
+            }
+        }
+        // Folders render from `parent.children`, never `.parent` (see above),
+        // so a tombstoned id left in a children array is a dangling reference.
+        for (const [id, item] of Object.entries(result)) {
+            if (item.children.some((c) => tombstoned.includes(c))) {
+                result[id] = {
+                    ...item,
+                    children: item.children.filter(
+                        (c) => !tombstoned.includes(c),
+                    ),
+                };
+            }
+        }
+    }
+
+    // ── CARRY THE VISITOR'S EDITS ONTO SURVIVING SEED ITEMS ──────────────────
+    // `{ ...seed }` above replaced each of these wholesale. Anything the
+    // visitor changed relative to the seed they were given is restored on top.
+    // Anything they did NOT change keeps the new seed's value, so content
+    // updates still reach them.
+    if (previous != null) {
+        for (const [id, seed_item] of Object.entries(result)) {
+            const before = cached[id];
+            if (before == null) continue;
+            const edits = user_edits(before, previous[id]);
+            if (Object.keys(edits).length > 0) {
+                result[id] = { ...seed_item, ...edits };
+            }
+        }
+    }
+
     for (const id of carried) {
         const c = cached[id];
         if (c == null) continue;
