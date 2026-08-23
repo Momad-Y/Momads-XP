@@ -1,651 +1,740 @@
-# Phase 3 spec — Developer & Interactive Apps
+# Phase 3 spec — Developer & Interactive Apps (v2)
 
-> Gate 1 of the §11 six-gate workflow. Source scope: `SPECIFICATION.md` §3.2
-> and §9 Phase 3. This document is the input to gate 2 (red-team the spec),
-> gate 3 (plan) and gate 6 (did we build what we said).
+> Gate 1 of the §11 six-gate workflow, **revised after gate 2**. The red team's
+> findings and my disposition on each are in `docs/phase-3-redteam-spec.md`;
+> v1 is commit `adb14ec`. Source scope: `SPECIFICATION.md` §3.2 and §9 Phase 3.
+
+## 0. What changed from v1, and why
+
+Gate 2 returned 2 CRITICAL, 12 HIGH and ~15 MEDIUM findings, 15 missing
+sub-decisions and 11 scope gaps. Five claims v1 made about the codebase were
+false. One finding was rejected with a concrete counter. The four structural
+changes:
+
+1. **Python is isolated on an opaque origin (new D-B0).** v1's worker reasoned
+   only about hangs; a plain worker inherits our origin and hands user-typed
+   Python the VFS in IndexedDB and both API endpoints.
+2. **Apps are wired through a registry (D-E1), per `SPECIFICATION.md` §6.3** —
+   which v1 contradicted without citing. The real call-site count is 12, not 5,
+   and `launch()` has no `else`, so a mistyped path is a silent no-op.
+3. **Root config work is up-front (new D-E8).** Vite emits workers as IIFE by
+   default; the Pyodide worker would have shipped broken past every green gate
+   and failed only on the deployed site.
+4. **A visual-decisions block exists (new §3).** v1 deliberated 25 engineering
+   decisions and zero visual ones against an exit criterion demanding ≥95%
+   parity on four surfaces, two of which have no reference anywhere in `design/`.
+
+---
 
 ## 1. Scope
 
-Four apps, all reachable **only from the Start Menu** (§3.5 caps the desktop at
-five icons and names CMD / Python / Paint / Music Player as Start-Menu-only —
-so Phase 3 adds **no desktop icons**):
+Four apps, all Start-Menu-only (§3.5 caps the desktop at five icons and names
+these four as Start-Menu-only), plus the hardening and config work gate 2
+attached to them.
 
 | App | State today | Phase 3 delivers |
 | --- | --- | --- |
-| CMD | `placeholder_entry('Command Prompt', …)` → `placeholder.svelte` | Real xterm.js terminal, 15 commands, 3 easter eggs |
-| Python REPL | `placeholder_entry('Python', …)` → `placeholder.svelte` | Pyodide CPython in-page, real banner, real execution |
-| Paint | **Already wired** — `paint.svelte` frames the bundled jspaint, with XP chrome, Save As (PNG/JPEG/BMP) and `doctypes` registration | Verification + parity + gaps only (see D-C1) |
-| Music Player | Start-menu label points at the inherited `media_player_classic.svelte` | New WMP-styled app: track list, transport, volume, seek, Canvas visualizer |
+| CMD | `placeholder_entry` → `placeholder.svelte` | xterm.js terminal, 15 commands, 3 easter eggs |
+| Python REPL | `placeholder_entry` → `placeholder.svelte` | Pyodide CPython on an **opaque origin**, real banner, real execution |
+| Paint | `paint.svelte` frames bundled jspaint; Save As + `doctypes` already wired | Hardening (D-C3), parity, gap verification — **not** a rebuild |
+| Music Player | Start-menu label points at inherited MPC | New WMP-styled app: track list, transport, volume, seek, Canvas visualizer |
 
-### Exit criteria (from §9)
+Also in scope, because Phase 3 is the phase that blesses or breaks them:
 
-All four apps functional and styled authentically. Concretely, gate 6 must be
-able to tick:
+- **jspaint hardening** (D-C3) — a live `#load:<url>` primitive on the
+  production domain, an Imgur upload path, 12 third-party image fetches per
+  open, and a frame with no `sandbox`. Verified on production, pre-existing.
+- **Root config** (D-E8) — `vite.config.js` worker format, vitest DOM
+  environment, `pyodide` types-only devDependency.
+- **App registry** (D-E1) — §6.3's `appRegistry.ts`, replacing the 20-branch
+  if-chain for the three new apps and making a missing entry a type error.
+
+### Exit criteria
 
 1. Start ▸ All Programs ▸ Command Prompt opens a terminal titled `momad@xp:~`,
-   prints the §3.2 intro verbatim, and every command in the §3.2 Phase-3 list
-   produces output sourced from `profile.json`.
-2. Start ▸ All Programs ▸ Python opens a REPL that prints a real
-   `Python 3.13.x` banner from the running Pyodide, evaluates arbitrary
-   expressions, and shows `Welcome to Momad's XP` from the pre-loaded greeting.
-3. Start ▸ All Programs ▸ Paint opens jspaint inside XP chrome; File ▸ Save As
-   writes a PNG into the VFS; the §3.2 tool set is present.
-4. Start ▸ All Programs ▸ Music Player opens a player that plays bundled
-   tracks with working play/pause, next/prev, volume, seek, track list and a
-   live Canvas visualizer.
-5. §11 visual parity ≥95% on all four new/changed surfaces at 1280×800.
+   prints the intro (see D-A6 — §3.2's third line is amended for Phase 3), and
+   every command in §3.2's Phase-3 list outputs data read from `profile.json`.
+2. Start ▸ All Programs ▸ Python opens a REPL that prints the real banner from
+   the running Pyodide, evaluates arbitrary expressions, shows the pre-loaded
+   greeting, and **runs on an opaque origin** — proven by a test that asserts
+   Python cannot read the VFS or reach `/api/*`.
+3. Start ▸ All Programs ▸ Paint opens jspaint in XP chrome; File ▸ Save As
+   writes a PNG into the VFS; §3.2's tool set is present; D-C3's hardening is
+   verified **on the deployed site**, not just locally.
+4. Start ▸ All Programs ▸ Music Player plays bundled tracks with working
+   play/pause, next/prev, volume, seek, track list and a live visualizer that
+   shows real spectral movement.
+5. §11 visual parity ≥95% against the references fixed in §3 below — **each
+   surface has a named reference before implementation starts**.
 6. Full gate chain green; `docs/phase-3-guide.md` written.
 
 ### Explicitly OUT of scope
 
-- **Filesystem commands** (`ls`, `cd`, `cat`, `pwd`) — §3.2 assigns these to
-  Phase 6 by name. Phase 3 ships the core command set only.
-- **Spotify embed mode** — §3.2 marks it stretch.
-- **Games, AI chatbot, SFX polish** — Phases 4, 5, 6.
-- **A custom Canvas Paint** — see D-C1.
+- `ls`/`cd`/`cat`/`pwd` — §3.2 assigns them to Phase 6 by name (D-A6).
+- Spotify embed mode — §3.2 marks it stretch.
+- `input()` in the REPL (D-B7). Games, AI chatbot, SFX polish — Phases 4–6.
+- A custom Canvas Paint (D-C1).
 
 ---
 
-## 2. Sub-decisions
+## 2. Corrections to false claims v1 made
 
-Each is a binding choice. Per `decision-presentation.md` every one carries
-for-and-against and a deciding factor; the two documented exceptions
-(forced-by-fact, inherited-from-prior-phase) are used only where they truly
-apply and are labelled.
+Recorded so they are not re-introduced:
 
-### D-A1 — Terminal renderer: xterm.js vs a custom DOM terminal
+| v1 claimed | Truth |
+| --- | --- |
+| `contact` reads `profile.about` contact fields | `about` has exactly one key, `bio`. Contact data is in `profile.meta` |
+| Only My Computer and IE have `.exe` entries | The shipped seed gives Desktop **five** `.exe` children |
+| `start_menu.spec.ts` is the e2e that breaks | It asserts labels only. **`e2e/shell.spec.ts`** breaks — 2 tests, one of them the sole coverage of the 24px cascade rule |
+| Adding an app touches five call sites | Twelve (D-E1) |
+| xterm.js is ~250 KB gzipped | ~89 KB total, measured on the published tarball |
+| Portrait mobile gets a cramped terminal | §4.6 renders a static page with no windows and forbids loading xterm.js at all |
 
-**Option 1 — xterm.js** (`@xterm/xterm` + `@xterm/addon-fit`)
-*For:* §3.2 and §9 both name xterm.js explicitly, so it is the specified
-choice; gives a real VT emulator, so the Python REPL's ANSI-coloured
-tracebacks and the `matrix` easter egg render without hand-rolled escape
-handling; canvas/DOM renderer already solves selection, scrollback and
-resize.
-*Against:* ~250 KB gzipped added to the bundle for two apps; its own CSS must
-be imported and then overridden to look like XP's console; it owns keyboard
-input, so every XP-level shortcut (Ctrl+C, Escape-closes-menus) has to be
-reconciled with it; no built-in line editor (see D-A2).
+---
 
-**Option 2 — custom DOM terminal** (a `<div>` of lines + a hidden input)
-*For:* zero dependency, trivially styled to XP's console, ~100 lines; keyboard
-handling stays in our own code where the Escape/Ctrl+C conventions already
-live.
-*Against:* re-implements scrollback, selection, wrapping and ANSI parsing —
-and Pyodide's error output *is* ANSI-coloured, so the parser is not optional;
-diverges from the written spec, which a later reader would read as drift.
+## 3. Visual decisions (new — gate 2's highest-leverage finding)
 
-**Verdict: xterm.js.** Deciding factor: the spec names it, and the Python REPL
-makes ANSI parsing mandatory rather than optional — writing that ourselves is
-the expensive half of a terminal, so the "zero dependency" saving is smaller
-than it looks. **Against, accepted:** bundle weight, which D-E3 mitigates by
-lazy-loading both terminal apps.
+Exit criterion 5 demands ≥95% parity. `design/` holds icons but **no screenshot
+reference for a terminal, a Python REPL or a media player**; §3.2 specifies CMD
+as a *Linux-style* terminal, which Windows XP never had; and `paint.svelte:241`
+runs jspaint's `classic.css`, so Paint's target was undefined. Each surface now
+gets a named reference *before* code is written.
 
-### D-A2 — Line editing: an addon vs our own readline
+### D-V1 — Terminal font
 
-**Option 1 — own readline in `src/lib/cmd/readline.ts`**
-*For:* xterm.js ships no line editor, and the community addons for it are
-unmaintained; a pure-TS readline (cursor, backspace, ←/→, Home/End, ↑/↓
-history) is ~120 lines, is 100% unit-testable without a DOM, and therefore
-counts toward the diff-coverage gate rather than hiding in a `.svelte` file.
-*Against:* we own the edge cases (wide chars, paste with embedded newlines,
-wrapping across the terminal width).
+§10 assigns **Lucida Console** to "CMD terminal, monospace contexts". It does
+not exist on Linux or Android, and xterm.js defaults to
+`courier-new, courier, monospace`.
 
-**Option 2 — pull an xterm readline addon from npm**
-*For:* less code to write.
-*Against:* the candidates are single-maintainer packages with no releases in
-years; adding an unmaintained dependency to satisfy 120 lines of logic is a
-poor trade, and it would put the logic outside our test suite.
+*Option 1 — declare the §10 stack with fallbacks* (`'Lucida Console', 'DejaVu
+Sans Mono', 'Consolas', monospace`). **For:** honours §10 where the font exists
+(Windows/macOS), degrades to a metrically similar mono elsewhere; zero bytes.
+**Against:** the rendered surface differs by platform, so parity screenshots are
+platform-dependent — they must be taken on one fixed platform.
+*Option 2 — bundle a webfont.* **For:** identical everywhere. **Against:** §10
+lists Lucida Console as "Web-safe", i.e. deliberately not bundled; adds weight
+for one app; licensing for Lucida Console is not ours to grant.
 
-**Verdict: own readline, as a pure TS module.** Deciding factor: it is the
-only option that is unit-testable, and this repo's diff-cover ≥80% gate on
-changed `.ts` makes testability a hard requirement, not a preference.
-**Against, accepted:** we own paste/wrap edge cases; the plan budgets tests for
-each.
+**Verdict: option 1**, and parity screenshots are taken on the CI/dev Linux box
+so the measured surface is the DejaVu fallback. Deciding factor: §10 already
+chose "web-safe", and bundling a font we cannot license is not available.
 
-### D-A3 — Where the command layer lives
+### D-V2 — Terminal colour scheme
 
-**Option 1 — pure module `src/lib/cmd/` (registry + dispatch + formatters), the
-`.svelte` component only wires it to xterm**
-*For:* commands become pure `(args, profile) => string[]`, testable without a
-browser; matches the shape the repo already uses for `status_bar.ts`,
-`details_columns.ts`, `nav_history.ts`; keeps the component under the size
-limit in the global rules.
-*Against:* more files; a formatting change touches a module plus its test
-rather than one component.
+§3.2 says "black background, white/green monospace text" without choosing.
+**Verdict:** black `#000000` background, `#c0c0c0` default foreground (XP
+console grey-white), `#00ff00` for the prompt and the `matrix` egg, XP's
+16-colour ANSI palette for everything else. Deciding factor: "white/green" is
+satisfied by grey-white body text with a green prompt, which is what a
+bash-style prompt actually looks like, and a full ANSI palette is required
+anyway by Pyodide's coloured tracebacks (D-B6). **Against, accepted:** pure
+`#ffffff` would be brighter than XP's console; grey-white is the faithful choice.
 
-**Option 2 — dispatch inside `cmd.svelte`**
-*For:* one file, direct access to the terminal handle.
-*Against:* `.svelte` is exempt from diff-coverage, so this is precisely the
-"hide logic in a component to dodge the gate" anti-pattern the handoff §6
-warns against; and the repo's own history shows component-resident logic is
-where the cross-window bugs came from.
+### D-V3 — Python branding
 
-**Verdict: pure module.** Deciding factor: an explicit standing rule in
-`session-handoff.md` §6 forbids option 2's motivation, and every comparable
-Phase-2 feature already took option 1. **Against, accepted:** more files.
+§3.2 requires "Python branding" and v1 decided nothing.
+**Verdict:** title `Python 3.13 — Momad's XP`, icon
+`/images/xp/icons/Python.png` (**exists in the shipped icon set and is
+currently unused**; `start_menu.svelte:132` passes the generic
+`ApplicationWindow.png`), prompt `>>>` in Python-blue `#3572A5`, otherwise
+identical to CMD's chrome. Deciding factor: the correct icon is already in the
+repo, so the only reason v1's generic icon survived was that nobody looked.
+**Against, accepted:** the title hardcodes `3.13`, which D-B1's pin makes true
+today — the plan derives it from the runtime banner instead of a literal.
 
-### D-A4 — What the commands print, and from where
+### D-V4 — Media player: WMP or Winamp, and which generation
 
-Commands read `profile` from `src/lib/profile.ts` (the CLAUDE.md rule: no
-hardcoded personal content in components — and a command module is no more
-exempt than a component). Mapping:
+§3.2 offers either and v1 asserted "WMP-styled" with no deliberation.
+
+*Option 1 — Windows Media Player 9 (the XP-era default).* **For:** it is what
+shipped *with* XP, so it is the period-correct choice and sits naturally beside
+the rest of the desktop; `WindowsMediaPlayer9.png` ships in the icon set;
+abundant reference screenshots exist. **Against:** WMP9's real chrome is a
+skinned, rounded, blue-gradient shell that is a large amount of custom CSS to
+reach ≥95%.
+*Option 2 — Winamp 2.x classic.* **For:** iconic, and its fixed 275×116 skin is
+far simpler to reproduce faithfully; the visualizer is native to its design.
+**Against:** it is not a Windows XP surface — it is a third-party app of the
+era, so it weakens the "this is XP" illusion; no icon in the set.
+*Option 3 — WMP10.* **For:** more capable. **Against:** WMP10 shipped after XP
+RTM as a separate download; less period-correct than 9.
+
+**Verdict: WMP 9**, reference `design/research/ref-wmp9.png` (to be captured at
+gate 3 before implementation). Deciding factor: it is the only option that both
+shipped with XP and has an icon already in the repo, and §3.2 lists Windows
+Media Player first. **Against, accepted:** more custom CSS than Winamp would
+need; the plan budgets the skin as its own task.
+
+### D-V5 — Parity references, per surface
+
+| Surface | Reference | Why |
+| --- | --- | --- |
+| CMD | XP Command Prompt window chrome + a real bash session for the content area | §3.2 asks for XP chrome around a Linux-style terminal; the chrome is the part XP defines and the part parity can score |
+| Python REPL | Same chrome as CMD; content scored against a real CPython REPL transcript | The window is the XP surface; the transcript is correctness, not parity |
+| Paint | `design/research/gate-07-paint.png` (already captured) + real XP Paint for the chrome | jspaint's interior runs `classic.css` and is **not** scored against XP Paint's interior — recorded as a documented deviation, not a silent one |
+| Music Player | `design/research/ref-wmp9.png` | D-V4 |
+
+**Verdict:** parity is scored on **the XP window chrome and the app's own
+layout**, not on the interior of a vendored bundle we do not control.
+Deciding factor: §11's own standard distinguishes inherited surfaces ("do not
+regress") from new ones ("compare against the closest reference") — jspaint's
+interior is neither, and pretending to score it produces a fake number.
+**Against, accepted:** Paint's interior gets no parity figure; the phase guide
+states this explicitly rather than reporting a score that was never measured.
+
+---
+
+## 4. Sub-decisions
+
+Unchanged from v1 unless marked. Full for-and-against per
+`decision-presentation.md`; the two documented exceptions are labelled.
+
+### D-B0 — Python isolation architecture **(NEW — resolves both CRITICALs)**
+
+v1's D-B2 chose a Web Worker reasoning only about hangs. A dedicated worker
+inherits the creating document's origin, so Python typed by a visitor gets:
+`js.fetch("/api/browse")` with a genuine `Sec-Fetch-Site: same-origin` (the
+header §5 calls unforgeable origin proof), `/api/email` with a valid `Origin`
+and a bypassable `too_fast` check, and **`indexedDB`, which is exposed in
+workers and holds the entire VFS**. Reachable by a pasted snippet or by a bad
+byte on the CDN, which has no integrity control either (`importScripts` accepts
+no `integrity`; Pyodide fetches its own payload from `indexURL` afterwards).
+
+*Option 1 — plain dedicated worker (v1).* **For:** simplest; solves hangs.
+**Against:** full same-origin authority for arbitrary user code. Not viable.
+*Option 2 — opaque-origin sandboxed iframe hosting the runtime.* **For:** it is
+this project's own shipped pattern (§5: the IE frame is sandboxed **without**
+`allow-same-origin`); on an opaque origin there is no IndexedDB of ours, no
+cookies, and fetches present `Origin: null` / `Sec-Fetch-Site: cross-site`,
+which both endpoints already reject; it simultaneously caps the CDN-compromise
+blast radius; and because the host page lives in `static/`, Vite never processes
+it — which sidesteps D-E8's worker-format trap entirely. **Against:** an extra
+`postMessage` hop; code in `static/` is outside lint/test/coverage; and whether
+the runtime also needs a worker *inside* the frame for thread isolation depends
+on whether the browser gives a sandboxed frame its own event loop — which is
+not guaranteed by spec.
+*Option 3 — self-host Pyodide and keep the plain worker.* **For:** removes the
+CDN supply-chain half. **Against:** does nothing about C1 — user-typed Python
+still runs with our origin's authority. Solves the smaller problem.
+
+**Verdict: option 2 — the runtime is isolated on an opaque origin.** Deciding
+factor: it is the only option that addresses the actual threat (arbitrary user
+code with our origin's authority), and it is a pattern already shipped and
+reviewed in this codebase rather than an invention.
+
+**Against, accepted, and how each is handled:**
+- *Thread isolation is not guaranteed by the sandbox alone.* **Gate 3 opens with
+  a spike** that measures whether an infinite loop in the sandboxed frame blocks
+  the parent. If it does, a worker is created *inside* the frame from a
+  `blob:` URL (blob URLs inherit the creating context's opaque origin, so the
+  worker is same-origin with the frame). The spike decides; the fallback is
+  written down now so it is not invented under pressure.
+- *`static/` code is untested.* The host page is a thin bootstrap only; the
+  protocol, the readline and every formatter live in tested `src/` modules on
+  the parent side.
+- *The interception result must be re-confirmed.* Playwright's ability to stub
+  the CDN was verified for a dedicated worker; whichever context D-B0's spike
+  lands on, D-B5's stub is re-proved against it before the plan locks.
+
+### D-B1 — Pyodide delivery **(REVISED)**
+
+v1 rejected the npm package by conflating "npm package" with "CDN `indexURL`":
+its data files *can* be emitted into `build/` and served same-origin, so the
+rejection's stated reason was wrong. And the repo's lint config makes the
+rejection expensive: `eslint.config.js:29-32` applies `strictTypeChecked` with
+`no-explicit-any` and `no-unsafe-type-assertion` as errors, and a dynamic
+`import(CDN_URL)` is `any` all the way down. The `.d.ts` files live only in the
+package v1 rejected.
+
+**Verdict: CDN at runtime, pinned to an exact version, PLUS `pyodide` as a
+types-only devDependency**, with a unit test asserting the CDN version constant
+equals the devDependency's version. Deciding factor: it is the only combination
+that satisfies §3.2's size reasoning *and* the lint gate, and the version
+assertion converts "the pin drifted from the types" from a silent class of bug
+into a red test.
+
+**Version pin.** Verified against the live registry and each build's own
+`pyodide-lock.json`: `latest` is **314.0.5 → Python 3.14.2**; **0.28.3 → Python
+3.13.2**. `v314.0.5/full/pyodide.asm.js` 404s (renamed `.mjs`) and classic
+workers are gone in 314.x. **Pin 0.28.3**, because §3.2 and exit criterion 2
+specify a `3.13.x` banner. The spec records that **§3.2's "3.13.x" is a
+consequence of this pin, not an independent requirement** — a later bump to
+314.x changes the banner, the asset filenames and the worker contract, so "a
+bump is one edit" is false and is not claimed.
+
+**Integrity/privacy posture, recorded rather than defaulted:** SRI is not
+available (`importScripts` takes no `integrity`, and the runtime fetches its own
+payload afterwards), so the blast radius is capped by D-B0's opaque origin
+instead. `netlify.toml` gains `connect-src` / `script-src` entries scoped to the
+Pyodide origin. The phase guide discloses that opening Python sends ~5 MB from
+jsDelivr and reveals the visitor's IP and UA to it.
+
+### D-B2 — Hang isolation **(SUPERSEDED by D-B0)**
+
+The verdict (do not run Pyodide on the main thread) stands; the mechanism is now
+D-B0's. Recorded correction: terminate-and-respawn **destroys every variable the
+visitor defined**, so it is a restart, not an interrupt, and the UI says
+`Restarting Python… (session state cleared)`. `setInterruptBuffer` is genuinely
+unavailable — verified `crossOriginIsolated: false`, so `SharedArrayBuffer`
+throws — so a true interrupt is not on the table at any price.
+
+### D-B5 — E2E strategy **(REVISED)**
+
+v1 offered a false trichotomy and described two mechanisms in one breath
+("route-stub the CDN" *and* "against a fake worker"), which are mutually
+exclusive. A fourth option exists and is standard Playwright.
+
+**Verdict:** the default suite is hermetic and uses **one** mechanism —
+`page.route` stubs the runtime origin (verified to intercept `fetch()` and
+dynamic `import()` from inside a dedicated worker on the pinned Playwright
+1.61.1; re-proved against whatever context D-B0's spike selects). Real execution
+is covered by a **tagged `@online` Playwright project excluded from the default
+run**, plus a cheap CI check that the pinned URL returns 200. Deciding factor:
+v1's option 3 left the spec's own stated risk ("a bad pin is a dead app with no
+local test that would catch it") permanently true; a URL check is three lines
+and closes it. **Against, accepted:** the `@online` project is only run
+deliberately; the phase guide names when.
+
+### D-B7 — `input()` **(REASONING REWRITTEN)**
+
+The verdict (defer) stands; v1's deciding factor was false. JSPI (`run_sync`)
+gives blocking `input()` with **no** `SharedArrayBuffer` and **no** COOP/COEP;
+it landed in Pyodide 0.25 and is auto-detected. The honest reasoning: JSPI is
+experimental and **absent from Safari stable**, so it cannot carry a
+user-facing feature in Phase 3. This correction matters beyond this decision —
+v1's "input() ⇒ COOP/COEP ⇒ breaks Phase 4" would have been carried forward as
+settled fact. `input()` prints a clear refusal; verified that with no stdin
+handler it *raises* rather than hanging, so the refusal is a message, not a
+rescue from deadlock.
+
+### D-A6 — Deferred filesystem commands **(REVISED — resolves the banner conflict)**
+
+Both lenses caught what v1 missed: exit criterion 1 required printing §3.2's
+intro **verbatim**, and its third line is `Navigate my portfolio like a
+filesystem — try 'ls' or 'cd experience'.` — advertising the two commands v1
+deferred. The visitor's first interaction with the flagship developer app would
+be a dead end the app pointed them at.
+
+*Option 1 — pull `ls`/`cd`/`cat`/`pwd` forward.* **For:** the banner becomes
+true. **Against:** a scope change at gate 1, and it needs the POSIX-ish path
+model Phase 6 owns.
+*Option 2 — keep the banner, keep the stubs.* **For:** no spec edit. **Against:**
+ships a self-contradicting first screen.
+*Option 3 — amend the banner's third line for Phase 3 and restore it in Phase 6.*
+**For:** ~1 line; the banner stops lying; Phase 6's scope is untouched.
+**Against:** edits `SPECIFICATION.md`'s fixed copy, so exit criterion 1 can no
+longer say "verbatim".
+
+**Verdict: option 3.** Phase 3's third line becomes `Type 'about' to start, or
+'projects' to see what I have built.`; §3.2 gains a note that the
+filesystem-navigation line returns with the Phase 6 commands. `ls`/`cd`/`cat`/
+`pwd` remain *known* commands answering `not available yet — filesystem
+navigation lands in a later update`. Deciding factor: it is the only option that
+makes the shipped app self-consistent without moving Phase 6's work.
+**Against, accepted:** a spec-copy edit and a weaker exit criterion — both
+recorded here rather than discovered at gate 6.
+
+### D-A8 — Unknown commands **(REVERSED)**
+
+v1 chose cmd.exe's `'foo' is not recognized as an internal or external
+command.` for the joke, overriding §3.2 line 1 — "Linux-style terminal (**bash
+emulation, not Windows cmd**)" — with taste, and recorded the deviation nowhere.
+**Verdict reversed:** bash's `momad@xp:~$ foo: command not found`, and lookup
+is **case-sensitive**, as bash is. Deciding factor: §3.2 states the intent in
+bold and v1 had no argument against it beyond preference; a spec directive
+beats a joke. **Against, accepted:** the cmd.exe string is funnier to a Windows
+audience; the window is still titled Command Prompt in the Start Menu, which is
+where that joke already lives.
+
+### D-A4 — Command data sources **(CORRECTED)**
+
+v1's mapping was factually wrong. Verified: `profile.about` has exactly one key,
+`bio`; name, title, location, email, avatar and resume live in `profile.meta`.
 
 | Command | Source |
 | --- | --- |
-| `about` | `profile.about` |
+| `about` | `profile.about.bio` |
 | `skills` | `profile.skills` |
 | `experience` | `profile.experience` |
 | `projects` | `profile.projects` |
-| `contact` | `profile.about` contact fields + `profile.social` |
+| `contact` | `profile.meta.email`, `profile.meta.location` + `profile.social` |
 | `social` | `profile.social` |
-| `whoami` | literal `momad` (§3.2 states the exact output) |
-| `uname -a` | composed from `profile.systemProperties` + fixed XP strings |
-| `help`, `clear`, `echo`, `date`, `time` | no profile data |
-
-**Option 1 — formatters return `string[]` of already-wrapped lines**
-*For:* pure, snapshot-testable, no terminal handle needed.
-*Against:* wrapping decisions are made without knowing the terminal width.
-
-**Option 2 — formatters return a structured tree the renderer wraps**
-*For:* correct wrapping at any width.
-*Against:* a whole layout engine for four screens of text.
-
-**Verdict: `string[]`, wrapped by xterm at its own width, with our formatters
-emitting short lines (≤72 cols) and column alignment only where the content is
-naturally narrow (skills, social).** Deciding factor: xterm already reflows,
-so option 2 solves a problem we do not have. **Against, accepted:** a very
-narrow window will wrap our aligned columns awkwardly; the plan adds a minimum
-window width instead.
-
-### D-A5 — Easter eggs: `matrix`, `hack`, `sudo`
-
-`sudo` is a one-liner (`momad is not in the sudoers file. This incident will
-be reported.`) and needs no decision. `matrix` and `hack` are animations.
-
-**Option 1 — timed animation owned by the component, cancellable by any key**
-*For:* matches every real terminal toy; the user is never trapped; a single
-`AbortController`-style latch covers both eggs and the app close path.
-*Against:* needs an explicit teardown on window close or the interval leaks
-after the component is unmounted.
-
-**Option 2 — fixed-length animation that must run to completion**
-*For:* simpler.
-*Against:* a user who opens `matrix` and wants to type is stuck; and a leaked
-interval writing into a disposed xterm throws.
-
-**Verdict: option 1 — cancellable, with teardown on unmount.** Deciding
-factor: the teardown is required in *both* options (the window can be closed
-mid-animation), so option 2's simplicity is illusory while its UX is worse.
-**Against, accepted:** the cancellation latch is state that must be reset per
-invocation — and this repo has a scar (`rename_cancelled`) from exactly that
-shape, so the plan requires a test that runs two animations back to back.
-
-### D-A6 — Confirming `ls`/`cd`/`cat`/`pwd` stay out
-
-**Option 1 — defer to Phase 6 as written**
-*For:* §3.2 assigns them to Phase 6 by name; they require a second filesystem
-model (a POSIX-ish view of the portfolio) that does not exist yet and that
-Phase 6 can build against a settled `profile.json`.
-*Against:* a terminal without `ls` invites the user to type it and get
-"command not found", which reads as broken rather than deferred.
-
-**Option 2 — pull them forward**
-*For:* completes the illusion.
-*Against:* an unscoped scope change at gate 1 — the autonomy rule says scope
-changes go to the owner — and it needs the path model Phase 6 owns.
-
-**Verdict: defer, but make the deferral legible** — `ls`/`cd`/`cat`/`pwd` are
-*known* commands that print `<cmd>: not available yet — filesystem navigation
-lands in a later update`, and `help` lists them under a "coming soon" heading.
-Deciding factor: it costs ~10 lines to turn a dead end into a deliberate one,
-without touching Phase 6's scope. **Against, accepted:** a stub reply is still
-not the feature.
-
-### D-A7 — Window chrome and title
-
-§3.2 specifies title `momad@xp:~`, black background, monospace. Inherited
-`Window.svelte` supplies XP chrome; the terminal is the content.
-**Marked: inherited-from-prior-phase** — window chrome, taskbar registration
-and z-order were settled in Phase 1 and every Phase-2 app follows the same
-pattern (`Window.svelte` + `runningPrograms` + `exec_path`). No alternative is
-weighed here; deviating would be the decision needing justification.
-
-### D-A8 — Unknown commands and casing
-
-**Verdict:** case-insensitive command lookup (XP's shell is), arguments passed
-through verbatim (so `echo Hello` keeps its case), unknown input prints
-`'foo' is not recognized as an internal or external command.` — XP's real
-wording. Deciding factor: §3.2 asks for "bash emulation" in *style* but the
-window is Command Prompt; the XP error string is the more recognisable joke and
-costs nothing. **Against, accepted:** mixing a bash-flavoured prompt with a
-cmd.exe error string is technically inconsistent — a deliberate, documented
-inconsistency in favour of the gag.
-
-### D-B1 — Pyodide delivery: pinned CDN vs self-host vs npm
-
-**Option 1 — pinned CDN** (`cdn.jsdelivr.net/pyodide/v0.28.x/full/`)
-*For:* §3.2 states this explicitly, and states the reason (the dist is tens of
-MB and would bloat `static/`); jsDelivr serves the official build; zero repo
-size cost; no Netlify bandwidth cost.
-*Against:* a third-party runtime origin — if jsDelivr is down or blocked, the
-app cannot start; it is the only external runtime dependency in the product;
-and it must be pinned by exact version or a CDN-side change silently alters
-behaviour.
-
-**Option 2 — self-host in `static/`**
-*For:* no external dependency, works offline, no supply-chain surface.
-*Against:* ~10 MB minimum for a trimmed dist (the full one is far larger),
-against a repo whose `static/` already carries 45 MB of jspaint; every deploy
-uploads it; §3.2 rejected this in writing.
-
-**Option 3 — npm `pyodide` package bundled by Vite**
-*For:* version-locked in the lockfile.
-*Against:* the package still fetches its `.wasm`/`.zip` data files at runtime
-from wherever `indexURL` points, so it does not remove the network hop — it
-only adds a build-time dependency on top of it.
-
-**Verdict: pinned CDN, exact version, with an explicit failure UI.** Deciding
-factor: the spec already weighed size against dependency and chose CDN; option
-3's "lock it in npm" benefit does not survive the fact that Pyodide loads its
-payload at runtime regardless. **Against, accepted:** an external origin can
-fail — so the REPL must degrade to a legible error inside the terminal
-("Python runtime unavailable — check your connection"), never a blank window
-or a hang, and the version is a single named constant so a bump is one edit.
-
-### D-B2 — Execution context: main thread vs Web Worker
-
-**Option 1 — main thread**
-*For:* far simpler; `print()` and results come back synchronously; Pyodide's
-own console API (`PyodideConsole`) is designed for this.
-*Against:* `while True: pass` freezes the whole desktop — not just the REPL —
-with no way back except a page reload. That is a hard hang of the entire
-product, triggerable by one line of user input.
-
-**Option 2 — Web Worker**
-*For:* a runaway loop freezes only the worker; the app stays alive and the
-worker can be terminated and respawned, which is a real "interrupt" story.
-*Against:* all I/O crosses `postMessage`, so `print` streaming, incremental
-input and error objects need a protocol; Pyodide-in-worker is a documented
-pattern but it is meaningfully more code; and reloading the worker means
-reloading Pyodide (seconds).
-
-**Verdict: Web Worker.** Deciding factor: option 1's failure mode is a
-total-product hang reachable by typing three words into a REPL we are inviting
-people to type into — that is not an acceptable state for a portfolio site,
-and no amount of simplicity buys it back. **Against, accepted:** a
-`postMessage` protocol and a slower recovery path; the plan makes the protocol
-a typed, unit-tested module rather than ad-hoc message shapes, and Ctrl+C
-terminates and respawns the worker with a "Restarting Python…" line.
-
-### D-B3 — Does Python reuse CMD's terminal core?
-
-**Option 1 — shared `src/lib/term/` core (xterm bootstrap + readline + theme),
-two thin app components**
-*For:* one terminal look, one keyboard model, one place to fix a wrapping bug;
-the readline from D-A2 is needed identically by both.
-*Against:* a shared abstraction written before its second consumer exists is
-the classic wrong abstraction — Python needs multi-line continuation and
-interrupt semantics CMD does not.
-
-**Option 2 — duplicate the bootstrap in each app**
-*For:* each app evolves freely.
-*Against:* this repo's single most-repeated defect is "a rule applied at one
-call site, siblings left alone" — now at seven instances. Two independent
-terminals is that pattern pre-installed.
-
-**Verdict: share the *mechanical* layer (xterm construction, XP theme, fit,
-readline, teardown), keep *semantics* per app (prompt string, submit handler,
-continuation, interrupt).** Deciding factor: the seven-instance history makes
-duplicated mechanism the higher risk, while the semantic split keeps the
-abstraction honest about what actually differs. **Against, accepted:** the
-shared layer must not grow app-specific branches; if it needs an `if (python)`
-it has become the wrong abstraction and the plan says to split it instead.
-
-### D-B4 — Load UX and failure handling
-
-**Verdict:** the REPL window opens immediately, prints `Loading Python
-runtime…`, streams a progress line, then the real banner. On failure (CDN
-unreachable, wasm blocked, worker error) it prints a single legible error and
-leaves the window usable so it can be closed normally; no spinner-forever, no
-silent blank.
-*For:* Pyodide is a multi-second, multi-megabyte load on a cold cache; showing
-nothing reads as broken.
-*Against:* a progress line requires wiring Pyodide's loader messages through
-the worker protocol.
-Deciding factor: the global rule "never silently swallow errors / provide
-user-friendly messages in UI-facing code" applies directly, and a portfolio
-visitor on hotel wifi is the likely first user of this window.
-
-### D-B5 — E2E strategy for an app whose runtime is on a CDN
-
-This is the sharpest cross-decision conflict in the phase: the standing
-constraint is **"new e2e specs must not reach the internet"**, and D-B1 puts
-the Python runtime on the internet.
-
-**Option 1 — Playwright route-stub the CDN, assert the REPL's *shell* (banner
-line, prompt, error path) against a fake worker**
-*For:* honours the constraint; fast and deterministic; covers the parts that
-are ours (the protocol, the readline, the failure UI).
-*Against:* never executes real Python, so "the REPL actually runs code" is not
-covered by CI.
-
-**Option 2 — let one e2e spec hit the real CDN**
-*For:* proves the whole thing end to end.
-*Against:* violates the constraint; adds ~10 MB and several seconds to every
-CI run; makes the suite fail when jsDelivr hiccups — and this suite already
-has a measured flake problem we are told not to make worse.
-
-**Option 3 — stub in e2e AND verify real execution on the deployed site**
-*For:* CI stays hermetic; the real-runtime claim is verified where it matters,
-which is the standing "probe the running deploy" rule that has already caught
-two holes nothing else did.
-*Against:* the real-execution check is manual, so it is only as reliable as the
-gate-6 checklist that names it.
-
-**Verdict: option 3.** Deciding factor: the constraint is not negotiable and
-the deploy-probe rule already exists precisely for claims CI cannot make.
-**Against, accepted:** the manual step is recorded as an explicit line in the
-gate-6 checklist and in `docs/phase-3-guide.md` §8, not left to memory.
-
-### D-B6 — Multi-line input
-
-**Verdict:** use Pyodide's `PyodideConsole`, which reports
-`incomplete`/`complete`/`syntax-error` per pushed line; on `incomplete` the
-prompt becomes `...` and the buffer accumulates.
-*For:* it is CPython's own `codeop` semantics, so `def f():` behaves exactly as
-a real REPL — hand-rolled brace counting does not.
-*Against:* couples us to a Pyodide API that has moved between major versions.
-Deciding factor: correctness of the REPL is the feature; and the version is
-pinned anyway (D-B1), so API drift is a deliberate upgrade, not a surprise.
-
-### D-B7 — Output routing
-
-**Verdict:** `stdout` and `stderr` stream to the terminal as they are produced
-(not batched at completion); the repr of a non-`None` result prints after; a
-Python exception prints the real traceback. `input()` is **not** supported in
-Phase 3 — it prints a clear `input() is not supported here` rather than
-deadlocking the worker.
-*For:* streaming is what makes a `for i in range(5): print(i)` loop feel real;
-refusing `input()` explicitly beats a hang.
-*Against:* `input()` is a natural thing for a visitor to try, and refusing it
-is a visible gap.
-Deciding factor: supporting `input()` needs a blocking read across a worker
-boundary (`SharedArrayBuffer` + `Atomics.wait`), which needs COOP/COEP headers
-— and §5 of the spec already records that COOP/COEP breaks other embeds on
-this site. So it is not a small feature, it is an architecture change that
-would damage Phase 4.
-
-### D-C1 — Paint: keep the bundled jspaint, or write a Canvas app?
-
-**Option 1 — keep jspaint** (already at `static/html/jspaint`, already framed
-by `paint.svelte`, already wired into `doctypes` for `.bmp/.png/.jpg/.jpeg`,
-already integrated with Save As through its `systemHooks`)
-*For:* §3.2 offers it as an explicit option and Phase 0 deliberately kept it;
-it is a far more complete Paint than we would write, and the integration work
-(Save As into the VFS, open-from-Explorer) is already shipped and tested;
-Phase 3 cost is verification and parity, not construction.
-*Against:* 45 MB of `static/`; it is third-party code running same-origin (it
-must, for `contentDocument` access — `netlify.toml` documents this); its chrome
-is jspaint's own XP-ish styling, which may not hit ≥95% against real XP Paint
-in every corner.
-
-**Option 2 — custom Canvas Paint**
-*For:* removes 45 MB and the same-origin third-party surface; total control of
-parity.
-*Against:* re-implements pencil/brush/eraser/fill/shapes/text/undo/palette —
-easily the largest single item in the phase — and would *replace working,
-shipped, integrated functionality with less of it*. Also strands the existing
-`doctypes` and Save As wiring.
-
-**Verdict: keep jspaint. Phase 3's Paint work is a verification-and-gap pass,
-not a build.** Deciding factor: option 2 spends the phase's largest budget to
-end up with fewer features than are already deployed — the only genuine
-argument for it is bundle size, which is a Phase 6 concern and does not justify
-deleting working code. **Against, accepted:** we keep 45 MB and a same-origin
-third-party bundle. The plan therefore requires (a) confirming every §3.2 tool
-and menu item exists, (b) parity screenshots against real XP Paint, (c) an
-explicit note in the phase guide that jspaint is third-party and same-origin by
-necessity, and (d) checking that jspaint ships no network calls of its own.
-
-### D-C2 — What if jspaint fails a §3.2 requirement?
-
-**Verdict:** gaps are closed in *our wrapper* (window chrome, title, Save As
-filetypes, icon) rather than by patching the vendored bundle. Deciding factor:
-a patched vendor bundle is unmaintainable and invisible to review; if a gap is
-genuinely inside jspaint and material, it is recorded in the phase guide as a
-known limitation rather than forked.
-
-### D-D1 — Music Player: new app vs extending the inherited MPC
-
-**Option 1 — new `music_player.svelte`, MPC untouched**
-*For:* §3.2 asks for a WMP/Winamp-styled player with a track list and
-visualizer; MPC is a *file* player with no playlist concept, reached by
-double-clicking media in Explorer, and it is load-bearing for `.mp3/.mp4/.wav`
-via `doctypes`; rebuilding it into a playlist app would regress that path.
-*Against:* two media players in one product, and two places that touch
-`systemVolume` and the audio element lifecycle.
-
-**Option 2 — extend MPC into the Music Player**
-*For:* one player.
-*Against:* MPC's whole contract is "play the file I was opened with"; adding a
-playlist, a visualizer and a different chrome to it changes the behaviour of
-every existing Explorer double-click — a regression to an inherited surface,
-which is exactly what gate 4 is told to hunt for.
-
-**Verdict: new app; MPC keeps the file-association role untouched.** Deciding
-factor: MPC is on the `doctypes` path for three extensions and changing it
-would regress shipped behaviour for a feature that does not need it.
-**Against, accepted:** two players coexist — so D-D6 defines the boundary
-explicitly rather than leaving it to chance.
-
-### D-D2 — Where the tracks come from
-
-**Option 1 — synthesize original instrumental tracks locally with ffmpeg and
-commit them as MP3s**
-*For:* no licensing question at all (we authored them), no download of
-third-party binaries into the repo, fully reproducible from a committed script,
-and the player is *demonstrably* functional at gate 6 rather than
-functional-in-principle.
-*Against:* synthesized tracks are not real music — they are pleasant tones, and
-a visitor may find them thin.
-
-**Option 2 — ship no audio, document a placeholder for the owner to fill**
-*For:* zero bytes, and the owner picks music they like.
-*Against:* the exit criterion is "functional"; a player with no tracks cannot
-be shown to work, and the visualizer cannot be parity-checked.
-
-**Option 3 — fetch CC0 tracks from an external source**
-*For:* real music.
-*Against:* pulls unverified binaries into the repo, and the licence claim would
-rest on a page I cannot audit at commit time.
-
-**Verdict: option 1 — three short original instrumental tracks generated by a
-committed `scripts/gen-tracks.sh`, with the phase guide documenting exactly how
-to drop in real MP3s instead.** Deciding factor: it is the only option that is
-both licence-clean by construction and demonstrably functional at gate 6.
-**Against, accepted:** the shipped music is placeholder-grade; that is stated
-plainly in the phase guide's "Required assets" section, and swapping it is one
-manifest edit. *Flagged for the owner at handoff:* if he wants his own tracks,
-this is where they go.
-
-### D-D3 — Do the tracks live in `static/` or in the VFS?
-
-**Option 1 — `static/audio/music/` + a manifest the app reads**
-*For:* the player always has content, even after a VFS reset; no seeding
-churn; no interaction with `hidden_items`, protected ids or the seed-version
-stamp.
-*Against:* the tracks are then invisible in Explorer's `My Music` folder, which
-is an obvious place a visitor would look.
-
-**Option 2 — seed them into the VFS `My Music` folder**
-*For:* discoverable in Explorer; double-clicking one opens MPC, which already
-works.
-*Against:* touches `scripts/vfs-base.json` and forces a `SEED_VERSION` bump,
-which is a shipped-data migration — and the seed has already produced one
-regression on real user data this project had to fix.
-
-**Verdict: both, deliberately — `static/` is the source of truth the player
-reads from a manifest, and the same files are *also* seeded into `My Music` as
-remote-URL VFS entries.** Deciding factor: the player must not depend on
-mutable user state (a visitor can delete files), but an empty `My Music` in a
-Windows recreation is a visible hole; pointing the VFS entries at the same
-static URLs makes the second copy metadata-only, so there is no duplication of
-bytes. **Against, accepted:** a seed change and a `SEED_VERSION` bump, with the
-carry-by-provenance rule in `seed.ts` respected — the plan calls this out as
-the phase's single highest-risk edit.
-
-### D-D4 — Visualizer and browser autoplay policy
-
-**Verdict:** Web Audio `AnalyserNode` fed from a `MediaElementAudioSourceNode`,
-drawn on a Canvas at `requestAnimationFrame`; the `AudioContext` is created
-**on the first user gesture** (the play click), not on mount.
-*For:* browsers block or suspend an `AudioContext` created without a gesture,
-which would produce a dead visualizer with no error; creating it on play is the
-documented pattern.
-*Against:* the visualizer cannot render anything before the first play, so the
-idle state needs a designed "flat line" look rather than being accidentally
-blank.
-Deciding factor: this is a hard browser rule, not a preference — building it
-the other way produces a feature that silently does not work, which is the
-failure mode this project has been bitten by most.
-Note: `MediaElementAudioSourceNode` **routes the audio through the graph**, so
-once connected, the element's own output is muted unless the graph is connected
-to the destination. That is a known footgun; the plan makes it an explicit
-wiring step with a test.
-
-### D-D5 — Volume: app slider vs the global `systemVolume`
-
-**Marked: inherited-from-prior-phase.** MPC already multiplies its own slider
-by `$systemVolume` (`audio_volume = wmp_volume * $systemVolume`) and the tray
-volume control is a shipped surface. The Music Player follows the identical
-rule. Deviating — e.g. ignoring the tray — is what would need justification.
-
-### D-D6 — Boundary with MPC when opening an `.mp3` from Explorer
-
-**Option 1 — `.mp3` keeps opening MPC; Music Player is Start-Menu-only**
-*For:* no change to shipped `doctypes` behaviour; matches XP, where
-double-clicking a file and opening Media Player are different acts.
-*Against:* a visitor who double-clicks a track in `My Music` gets the plain
-player, not the pretty one.
-
-**Option 2 — `.mp3` opens the Music Player**
-*For:* the nicer app wins.
-*Against:* changes a shipped association; MPC also handles `.wav`/`.mp4`, so
-either it keeps some audio types (incoherent) or the Music Player must handle
-video too (out of scope).
-
-**Verdict: option 1, plus Music Player appears in `doctypes['.mp3']` as the
-*second* entry** — so it shows up in Explorer's "Open With" list without
-becoming the default. Deciding factor: it gives the discoverability of option 2
-with none of the shipped-behaviour change, and `doctypes` already models
-multiple handlers this way (`.png` lists Image Viewer then Paint).
-**Against, accepted:** the default double-click is still the plainer player.
-
-### D-E1 — Launch wiring: every call site
-
-Adding an app touches **five** places, and the repo's recurring defect is
-missing one:
-
-1. `src/routes/xp/start_menu.svelte` — replace the two `placeholder_entry`
-   calls; repoint Music Player
-2. `src/routes/xp/work_space.svelte` — the `launch()` if-chain needs a branch
-   per new component
-3. `src/lib/system.ts` — `doctypes` (Music Player under `.mp3`) and any icon
-   mapping
-4. `scripts/vfs-base.json` → `npm run generate:vfs` — see D-E2
-5. e2e locators — `start_menu.spec.ts` asserts the current placeholder
-   behaviour and will break
-
-**Verdict:** the plan carries this as an explicit five-point checklist per app,
-and gate 6 re-derives the list from the code rather than trusting the plan.
-Deciding factor: seven recorded instances of exactly this failure.
-
-### D-E2 — Do the new apps get VFS `.exe` entries?
-
-**Option 1 — no**
-*For:* only My Computer and Internet Explorer have `.exe` entries today, and
-those exist because they are *desktop icons*; §3.5 keeps these four off the
-desktop, so nothing needs to resolve them from the VFS.
-*Against:* they are then invisible to Explorer and to Search.
-
-**Option 2 — yes, seeded into a `Program Files`-ish folder**
-*For:* discoverable; consistent with a real system.
-*Against:* invents VFS structure the spec does not ask for, and every seeded
-item is shipped data with a migration cost.
-
-**Verdict: no `.exe` entries in Phase 3.** Deciding factor: nothing in the
-phase's exit criteria reaches these apps through the VFS, and the seed is the
-riskiest file in the repo to touch — D-D3 already spends that budget on the
-music tracks, which do have a user-visible reason.
-
-### D-E3 — Bundle size
-
-**Verdict:** both terminal apps are `await import(…)`-loaded through the
-existing `work_space.launch()` pattern, so xterm.js lands only when a terminal
-is opened; Pyodide is fetched by the worker, so it never enters the main
-bundle; the visualizer is plain Canvas with no library.
-**Marked: inherited-from-prior-phase** for the lazy-load mechanism —
-`work_space.svelte` already dynamic-imports all 20 programs. The new part is
-only the assertion that xterm's CSS is imported *inside* the lazily-loaded
-component, not globally; the plan verifies this by inspecting the built chunk
-list, because a stray top-level import silently defeats it.
-
-### D-E4 — Test strategy
-
-**Verdict:** logic in `.ts` modules with unit tests (command registry,
-formatters, readline, worker protocol, playlist model, manifest validation);
-`.svelte` covered by e2e; diff-cover run locally before every push. Every new
-test must be shown to fail against the un-fixed code — the handoff records
-three separate occasions where a test could not fail. Deciding factor: the
-diff-cover gate is a hard CI gate at 80% on changed `.ts`, and the
-"tests that cannot fail" scar is at three instances.
-
-### D-E5 — Lockfile
-
-**Marked: forced-by-fact.** CLAUDE.md: CI's `npm ci` runs npm 10; the local
-toolchain is npm 11.6.2 / Node 25. Any `package.json` change is followed by
-`npx -y npm@10 install`. No alternative exists that keeps CI green.
-
-### D-E6 — Sounds for the new apps
-
-**Verdict:** none in Phase 3. §9 assigns SFX to Phase 6, and `static/audio`
-already holds the XP set for it. Deciding factor: adding ad-hoc sounds now
-would pre-empt Phase 6's sound-manager design (§6.5) and create a second place
-that plays audio outside it. **Against, accepted:** the apps are silent apart
-from the music itself.
-
-### D-E7 — Mobile
-
-**Verdict:** the four apps inherit the existing mobile rules (§4.6) with no
-special handling, except that the terminals declare a minimum usable width and
-the Music Player's visualizer canvas resizes with its window.
-*For:* §4.6 and `mobile.ts` are shipped and tested; a portrait phone user is
-not the audience for a Python REPL.
-*Against:* a terminal at 360 px is genuinely unusable.
-Deciding factor: making terminals mobile-first is a design project of its own
-and is not in §9's exit criteria; the honest move is to let them open and be
-cramped rather than to special-case them badly. Recorded as a known limitation.
+| `whoami` | `profile.meta.shortName.toLowerCase()` |
+| `uname -a` | `profile.systemProperties` + fixed XP strings |
+
+`whoami` is **derived, not literal** — v1's literal `momad` contradicted D-A4's
+own preamble and §3.2's "All command output data sourced from JSON".
+Formatters return `string[]`; the ≤72-column rule is now owned together with the
+minimum window width in D-E11 rather than orphaned between two decisions.
+
+### D-A2 — Readline **(REASONING CORRECTED, verdict stands)**
+
+v1's deciding factor ("the only unit-testable option") was false and post-hoc.
+The honest one is D-B3's: Python needs continuation and interrupt semantics no
+generic readline addon exposes, so a shared addon would need forking anyway.
+**Newly budgeted:** xterm enables **bracketed paste**, so the readline must
+decode `ESC[200~` / `ESC[201~` or every multi-line paste corrupts the buffer —
+v1 budgeted nothing for it.
+
+### D-A5 — Easter eggs **(EXTENDED)**
+
+Verdict stands (cancellable, teardown on unmount). v1's latch covered the
+animations and forgot the runtime: a `print()` chunk arriving after the window
+closes writes into a disposed xterm and throws asynchronously into no handler.
+**One `disposed` flag owned by the shared core gates the animation loop, the
+runtime's message handler and every write path**, and teardown tears down the
+runtime. Tested both ways: two animations back to back (the `rename_cancelled`
+shape), and close-during-execution.
+
+### D-A1, D-A3, D-B3, D-B4, D-B6 — unchanged
+
+Corrections only: xterm.js is **~89 KB gzipped total**, not ~250 KB (measured),
+which strengthens D-A1 since weight was its only "against"; the package is
+`@xterm/xterm` (`xterm` is deprecated) and `addon-fit` reaches into
+`terminal._core._renderService`, so both are pinned exactly. D-B6 verified
+correct: `PyodideConsole().push()` returns `incomplete` / `complete` /
+`syntax-error` as claimed, unchanged across 0.28 → 314.x.
+
+### D-A9 — Terminal sizing **(NEW)**
+
+Verified: there is **zero `ResizeObserver` anywhere in `src/`**, and
+`Window.svelte`'s jQuery-UI resizing reports to nothing — so nothing would ever
+call `fit()`. Worse, `FitAddon.fit()` returns silently when the parent's
+computed height is `auto` (`parseInt("auto")` → `NaN`), which is exactly what a
+flex child without an explicit height gives. Symptom: a terminal frozen at 80×24
+inside a 700×500 window, clipped, with no console error.
+**Verdict:** the terminal container gets an explicit height, a `ResizeObserver`
+drives `fit()`, and the first `fit()` is deferred a frame past the window's open
+transition. Deciding factor: without this the app is broken on first open in a
+way that produces no error to debug from. **Against, accepted:** the first
+`ResizeObserver` in the codebase; it is scoped to the terminal component.
+
+### D-C1 — Paint **(REVISED — a third option v1 omitted)**
+
+Verdict (do not rebuild Paint) stands, but v1's option set was incomplete: §9
+Phase 0's own exit criteria name **"jspaint alone is 45MB; *optionally slim its
+dist further*"**, which answers the only genuine "against" at a fraction of a
+rebuild's cost. And v1 scheduled its check (d) — "confirm jspaint ships no
+network calls" — to run *after* locking the verdict. It has now run and
+falsified the premise (D-C3).
+**Verdict: keep jspaint, slim the dist, and harden it (D-C3).** The rebuild
+option remains rejected: it spends the phase's largest budget to ship fewer
+features than are already deployed.
+
+### D-C2 — Where gaps get closed **(REVISED)**
+
+v1 said gaps are closed in our wrapper, never the vendored bundle. That is
+impossible for the gaps that matter: the wrapper only overrides `systemHooks`
+and toggles pointer-events, so it **cannot** remove a jspaint menu item — and
+Upload-To-Imgur and Load-From-URL are menu items.
+**Verdict: a committed prune script may delete script tags and menu entries from
+the vendored bundle; it may not patch jspaint's logic.** Deciding factor:
+removing a capability is a reviewable one-line diff and is not the
+unmaintainable "forked vendor" v1 was guarding against; patching behaviour is.
+**Against, accepted:** the vendored tree is no longer pristine upstream; the
+prune script documents exactly what was removed and why.
+
+### D-C3 — jspaint hardening **(NEW)**
+
+Verified on the **live production site**: `/html/jspaint/index.html`,
+`package.json`, `CNAME`, `src/imgur.js` and `CHANGELOG.md` all return 200. The
+tree is directly linkable, and `sessions.js:505-556` honours `#load:<url>` —
+fetching and rendering an arbitrary attacker URL on the owner's domain — and
+`#session:<id>` (Firebase, hardcoded key). `index.html` loads `imgur.js`
+(hardcoded Imgur client ID, live as File ▸ Upload To Imgur),
+`speech-recognition.js` (audio to Google) and `sessions.js`, and embeds **12**
+`i.postimg.cc` images in a `hidden` div — `hidden` is `display:none`, which does
+not suppress image fetches, so every Paint open leaks the visitor's IP to a
+third party. `paint.svelte:331-343` sets **no `sandbox` and no `allow`**.
+
+**Verdict:** prune `imgur.js`, `speech-recognition.js`, `sessions.js` and the
+`i.postimg.cc` news block from the vendored `index.html` via a committed script;
+prune the tree to the files `index.html` actually loads; add `sandbox` and a
+`Permissions-Policy` denying camera/microphone/geolocation; add
+`X-Robots-Tag: noindex` for `/html/*`. Deciding factor: this is a live
+phishing-grade primitive on the owner's production domain, and Phase 3 is the
+phase that blesses the bundle carrying it. **Against, accepted:** removing
+`sessions.js` also removes jspaint's multi-user and session-restore features,
+which this embed never exposed; and `sandbox` must be verified not to break
+`contentDocument` access, which `netlify.toml` documents Paint depends on —
+that verification is a gate-3 spike, and if `sandbox` breaks it, the prune
+alone still closes the two data paths.
+
+### D-D2 — Music assets **(REVISED)**
+
+Verdict (generate locally, commit, document the swap) stands; v1's "against"
+was about taste and missed the coupling to D-D4. Three pure ffmpeg tones give an
+`AnalyserNode` a one- or two-spike spectrum — the visualizer, an explicit §3.2
+feature and an exit criterion, would look **broken**, not thin.
+**Verdict:** the generator produces **broadband material with real spectral
+movement** — layered harmonics, a percussive transient track and a filtered
+noise sweep — so the analyser has something to draw. Deciding factor: the music
+exists to make the visualizer demonstrable; content that defeats it fails the
+only reason it is there. Also recorded: `scripts/gen-tracks.sh` is
+**documentation, not a CI gate** — unlike every other generated artifact in this
+repo, which has a freshness check — because ffmpeg is not a declared dependency.
+
+### D-D3 — Track location **(REVISED — the real risk named)**
+
+Verdict ("both": `static/` is the source of truth, the same files seeded into
+`My Music` as remote-URL entries) stands, but v1 asserted the seed's
+carry-by-provenance rule handles the migration. **It does not.** Traced:
+`seed.ts:48` selects only ids *absent* from the new seed, and `seed.ts:65` is
+`const result = { ...seed }` — every seed id is replaced wholesale. Provenance
+carries user-**authored items**; it says nothing about user **modifications to
+seed items**. So on the bump, a returning visitor loses: all five desktop icon
+positions (`desktop_folder.svelte:158` writes `desktop_css_transform` onto those
+seed items), per-folder sort settings, and renames — and recycled seed items
+return, since the desktop `.exe`s and the 11 wallpapers are not in
+`protected_items`. Production went live 2026-08-23, so this is the **first**
+bump against real user data.
+
+**Verdict:** `merge_on_reseed` gains a named set of user-owned mutable fields
+carried forward onto surviving seed items — `desktop_css_transform`,
+`sort_option`, `sort_order`, and `parent` when it equals the Recycle Bin — each
+with a unit test that reverts the carry and goes red. Deciding factor: v1 spent
+this migration's budget on a feature while claiming a safety property that does
+not exist; the fix is small and the alternative is silently resetting shipped
+users' desktops.
+**Also recorded, and genuinely one-way:** carried items can never be reaped, so
+a track renamed in a later phase persists in every returning visitor's
+`My Music` forever. Track ids are therefore fixed now and treated as permanent.
+**Units:** `VfsItem.size` is **KB** (`types.ts:35`); the wallpaper entries prove
+the convention. A byte-valued seed entry would render `3,145,728 KB`.
+**And a bonus:** these are the first >1 MB files in a *visible* folder, which
+makes `3,072 KB` (Details) sit beside `3.00 MB` (status bar) on a shipped
+surface for the first time. §8 rule 1 records that divergence as XP's two
+different rules and warns the next reader will "unify" them. The phase adds the
+E2E §8 called impossible — it is now free — converting a documented gap into
+coverage instead of a regression.
+
+### D-D4 — Visualizer **(EXTENDED with three verified footguns)**
+
+Verdict (AnalyserNode + Canvas, context created on the first user gesture)
+stands. v1 named the routing footgun; the sharper ones are:
+- **`createMediaElementSource()` is a permanent one-shot binding on the
+  element.** A second call throws `InvalidStateError` **even from a different
+  `AudioContext`** — the check is on the element. So play → pause → play throws.
+  Cache one source node per element in a `WeakMap`.
+- **A CORS-cross-origin element must output silence** into the graph. Playback
+  still works; the analyser reads zeros. This matters because the phase guide
+  tells the owner how to swap in his own tracks — a remote URL there kills the
+  visualizer with nothing but a console warning.
+- **`await ctx.resume()` outside a user gesture never settles** — the promise
+  neither resolves nor rejects. `resume()` is called synchronously first thing
+  inside the click handler, before any other `await`.
+**And the gate cannot catch it:** headless Chromium ignores the autoplay policy
+— `new AudioContext().state` is `"running"` — so a regression moving context
+creation back to `onMount` passes CI and fails for every real visitor. Recorded
+as a manual gate-6 deploy-probe line.
+
+### D-D6 — MPC boundary **(EXTENDED)**
+
+Verdict stands (`.mp3` keeps opening MPC; Music Player is the second
+`doctypes['.mp3']` entry). Three corrections:
+- **`CMFSItem.ts:49` reads `doctypes[item.ext]` with no `.toLowerCase()`** —
+  alone among five call sites. Harmless today; the second handler makes it
+  user-visible. Fixed here; instance #8 of the recurring root cause.
+- The second handler surfaces on **one** path only: `CMFSItem.ts:73-76` renders
+  Open With at `length >= 2`, but `viewer.svelte:393`,
+  `desktop_folder.svelte:236` and `favorites.ts:52` all take `[0]`, so File ▸
+  Open never shows it. Given §1b's "no dead entries" standard the guide says so.
+- `profile.json → folderOptions.fileTypes` is a hand-written list rendered by
+  `folder_options.svelte:99-111` and asserted by `xp_chrome_a.spec.ts:151`; a
+  new association without a row there makes a shipped surface contradict itself.
+
+### D-D5, D-D1 — unchanged
+
+Recorded addition to D-D1: MPC **already ships a visualizer**
+(`media_player_classic.svelte:342`, `/html/visualizers/{1..12}.html`), so the
+product will have two. D-E12 arbitrates.
+
+### D-E1 — App wiring **(REPLACED)**
+
+v1 answered a 20-branch if-chain — the source of seven wiring defects — by
+adding three more branches and writing a checklist, against a spec section it
+never cited. `SPECIFICATION.md` **§6.3 mandates a central `appRegistry.ts`**
+with exactly the fields at issue (`singleton`, `minSize`, `desktopIcon`,
+`startMenu`, lazy `component`). And `launch()` has **no `else`**, so a mistyped
+path is a silent no-op — no window, no error, no failing test.
+
+*Option 1 — extend the if-chain (v1).* **For:** no refactor of shipped code.
+**Against:** contradicts §6.3; keeps the silent-no-op trap; makes the checklist
+the only defence, and v1's checklist was provably wrong at gate 1.
+*Option 2 — full migration of all 20 programs to §6.3's registry.* **For:**
+one shape everywhere. **Against:** a 20-program refactor inside a feature phase,
+touching every shipped launch path — a regression surface far larger than the
+feature.
+*Option 3 — introduce the registry, register the three new apps through it, and
+route the if-chain's fallthrough into it.* **For:** satisfies §6.3; new apps get
+`singleton` and `minSize` declaratively; a missing entry becomes a type error;
+existing programs are untouched. **Against:** two mechanisms coexist until a
+later phase finishes the migration.
+
+**Verdict: option 3**, plus an `else` on `launch()` that throws in dev and logs
+in production. Deciding factor: it is the only option that both honours §6.3 and
+keeps the blast radius inside Phase 3's own apps. **Against, accepted:** two
+mechanisms; the phase guide records the migration as Phase 6 work.
+
+**The verified call-site set is 12, not 5** (v1's list was wrong at item 5 and
+missing six):
+
+| # | Site | Miss ⇒ |
+| --- | --- | --- |
+| 1 | `start_menu.svelte:128-144` | no launcher |
+| 2 | `work_space.svelte` `launch()` | **silent no-op — no `else`** |
+| 3 | …its `exec_path: path` | window rect never persists |
+| 4 | …its `runningPrograms.update` | no taskbar button, **and** the desktop's Ctrl+C guard stops backing off |
+| 5 | `work_space.svelte:39` `singleton_programs` | duplicate runtimes |
+| 6 | `system.ts` `doctypes` | no association / no Open With |
+| 7 | `system.ts` `icons` (separate record) | default icon in Explorer |
+| 8 | `scripts/vfs-base.json` → `generate:vfs` | CI freshness gate fails |
+| 9 | `e2e/start_menu.spec.ts:52-60` | red |
+| 10 | **`e2e/shell.spec.ts:5-51`** | red, **and** the 24px cascade rule loses its only coverage |
+| 11 | `profile.json → folderOptions.fileTypes` | shipped surface contradicts the association |
+| 12 | `starting.svelte:34` preload array | the documented preload-regen gotcha |
+
+On #10: the cascade test needs a **rect-less** window, and
+`work_space.svelte:394-405` is the only branch omitting `exec_path`, so it
+cannot be re-pointed at a real Phase 3 app — it moves to a Games placeholder,
+which survives to Phase 4.
+
+### D-E8 — Root config **(NEW)**
+
+Verified in this repo: `resolveConfig(...).worker` is `{"format":"iife"}`. A
+worker that statically imports the Pyodide ESM emits an undefined global with
+only a Rollup *warning*; `build`, `svelte-check`, ESLint, vitest and Playwright
+all stay green and it fails **only on the deployed site**, as an opaque
+`worker.onerror`. Any local dynamic import inside a worker is instead a hard
+build failure attributed to `index.html`.
+
+**Verdict:** three up-front config tasks, each verified by inspecting output
+rather than by a green gate —
+1. `vite.config.js` gains `worker: { format: 'es' }`. **Verified by reading the
+   emitted worker file**, and re-checking the existing `sort.js` worker, whose
+   emitted format this also changes.
+2. vitest gains a DOM environment (`jsdom`) **or** a coverage exclusion for the
+   terminal/runtime entry files — decided at gate 3 by which keeps diff-cover
+   honest. Verified: vitest currently has no `environment` (→ Node), no
+   `jsdom`/`happy-dom` installed, zero existing DOM tests, and coverage includes
+   all `src/**/*.ts` against an 80% CI gate.
+3. `pyodide` added as a types-only devDependency (D-B1).
+Two of these are `package.json` edits, so **`npx -y npm@10 install`** follows
+each (D-E5). Deciding factor: gate 2 named this the most likely cause of a
+mid-implementation re-plan precisely because a plan written at the app level
+would not anticipate root-config work. **Against, accepted:** `worker.format`
+changes an existing shipped worker's output; that is why it is verified by
+reading the artifact.
+
+### D-E11 — Keyboard arbitration **(NEW)**
+
+D-A1's own "against" named this and no v1 decision resolved it. Verified: every
+window-level keydown consumer guards on `window?.z_index === $zIndex` **except**
+`Dialog.svelte:53-68`, which compares only against other `.dialog` nodes — so
+Escape typed at a REPL prompt cancels a background Explorer's dialog. And
+`desktop_folder.svelte:352` backs off only via `a_window_is_focused`, so a
+terminal branch that omitted `runningPrograms.update` would make **Ctrl+C at a
+Python prompt copy the desktop selection** — §8 rule 3's exact failure mode.
+
+**Verdict:** terminals bind keyboard handling on the xterm textarea **only**,
+never `svelte:window`, and never `stopPropagation` at window level; Escape
+remains Dialog's; `Dialog.svelte` gains the same z-index guard every other
+consumer already has. Ctrl+C in a terminal is handled by xterm and does not
+reach the desktop handler. Deciding factor: §8 rule 2 names "handlers each
+deciding in isolation" as a root cause of three shipped defects, and Phase 3
+adds two keyboard-hungry surfaces. **Against, accepted:** Dialog's guard is a
+change to a shipped, red-teamed component; it gets its own test.
+
+Also owned here: the **minimum terminal width** v1 orphaned between D-A4 and
+D-E7 — `min_width` is set via `WindowOptions.min_width`, which already exists
+and every program already sets, sized so the ≤72-column formatters do not wrap.
+
+### D-E12 — Singleton and audio arbitration **(NEW)**
+
+`work_space.svelte:39` has a real `singleton_programs` list that v1 never
+mentioned. Each Python instance is its own runtime: measured **~5.04 MiB wire**
+per instance plus a full CPython heap, so three Start-Menu clicks is a tab kill
+on a mid-range phone.
+**Verdict:** Python and Music Player are **singletons**; CMD is
+multi-instance. Deciding factor: the two singletons own a scarce exclusive
+resource (a multi-megabyte runtime; the audio output and the visualizer's
+context), while a second terminal is cheap and genuinely useful.
+**Against, accepted:** a visitor cannot run two REPLs side by side.
+**Audio arbitration:** the Music Player pauses on window close and does not
+auto-pause MPC; if both play, both are heard — matching XP, where two media
+apps do not coordinate. Recorded so it is a decision, not an accident.
+
+### D-E3 — Bundle size **(TRAP CORRECTED)**
+
+Verified: CSS code-splitting works exactly as v1 described — a `.css` imported
+by a dynamic chunk emits as its own asset and is not linked from the entry HTML.
+So v1's stated trap ("a stray top-level import of the CSS") is not the risk. The
+real one: **a module both statically and dynamically imported is not split**,
+and Rollup reports it as a *warning*, not an error. **Verdict:** gate on that
+warning string in the build log, and assert no `.xterm-` rules appear in entry
+CSS. Deciding factor: the failure is a silent ~89 KB regression on initial page
+load that no existing gate would surface.
+
+### D-E7 — Mobile **(REWRITTEN — v1's premise was false)**
+
+v1 reasoned about "a terminal at 360 px" and mitigated with a minimum width.
+Verified: §4.6 renders portrait (<1024px) as a **single static page with no
+window management**, explicitly defers "CMD terminal, Python REPL, Paint", and
+forbids loading "Pyodide, js-dos, **xterm.js**"; `mobile.ts:19-22` returns
+`desktop` only at ≥1024px and the mode is locked at load. The cramped terminal
+cannot occur.
+**Verdict:** no mobile-specific work, and the plan **asserts** that the mobile
+bundle never pulls xterm.js or Pyodide (§4.6's performance requirement, now
+testable via the chunk check D-E3 already adds). The real undecided case is
+§4.6's own note that **≥1024px touch devices get the full desktop** — xterm's
+hidden textarea, the on-screen keyboard and Ctrl+C have no story there.
+**Verdict:** recorded as a known limitation with a named owner (Phase 6, which
+already owns touch polish), not silently inherited. Deciding factor: §4.6
+already decided the portrait case; the honest gap is the touch-desktop case, and
+naming it beats v1's mitigation of an impossible one.
+
+### D-E4 — Test strategy **(EXTENDED)**
+
+Verdict stands. The new problem v1 missed: the terminal bootstrap and the
+runtime entry are `.ts`, counted by coverage, and untestable in a Node
+environment (`terminal.open()` throws without a DOM). The existing worker dodges
+this by being `.js` (`my_computer/sort.js`), which also puts it outside the
+strict-lint block — a precedent that conflicts with CLAUDE.md's strict-TS rule.
+D-E8 task 2 decides between `jsdom` and a coverage exclusion at gate 3.
+Unchanged and re-emphasised: **every new test must be shown to fail against the
+un-fixed code** — three shipped occasions of tests that could not fail.
+
+### D-A7, D-E2, D-E5, D-E6, D-E9, D-E10 — unchanged
+
+D-A7's inherited-from-prior-phase exception is narrowed to window chrome,
+taskbar registration and z-order only; the title/icon, singleton and min-size
+choices it was quietly carrying are now D-V3, D-E12 and D-E11.
+D-E2 (no `.exe` entries) stands on §3.5, but v1's premise was wrong: the shipped
+seed gives Desktop **five** `.exe` children. The real rule is "every §3.5
+desktop icon is an `.exe`", which still excludes these four.
 
 ---
 
-## 3. Risks carried into gate 3
+## 5. Risks carried into gate 3
 
-| Risk | Why it bites here |
+| Risk | Why it bites |
 | --- | --- |
-| Seed migration (D-D3) | Shipped user data; this project has already had one seed regression |
-| `MediaElementAudioSourceNode` muting the element (D-D4) | Silent failure — audio "works" until the graph is connected |
-| Worker protocol drift (D-B2) | Untyped `postMessage` shapes are where the bugs hide |
-| xterm CSS leaking into the main bundle (D-E3) | Silently defeats the lazy load; only visible in the chunk list |
-| Five-call-site wiring (D-E1) | The single most repeated defect in this repo |
-| Pyodide pinned version (D-B1) | A CDN 404 on a bad pin is a dead app with no local test that would catch it |
-| E2E flake budget | The suite already flakes ~1 spec per 2–3 local runs; four new apps' specs must not make that worse |
+| D-B0's thread isolation is unproven | Opens gate 3 as a spike; the fallback (blob-URL worker inside the frame) is written down now |
+| `worker.format` change touches a shipped worker | Verified by reading the emitted file, not by a green build |
+| `sandbox` on the Paint frame may break `contentDocument` | `netlify.toml` documents Paint depends on it; gate-3 spike, and the prune alone still closes the data paths |
+| Seed migration carries user-owned fields | First bump against real user data; each carried field gets a revert-and-go-red test |
+| Track ids are permanent | Carried items can never be reaped |
+| Autoplay + `createMediaElementSource` | Both fail silently, and headless Chromium cannot catch the first |
+| Parity on invented surfaces | §3 fixes references now; Paint's interior is explicitly unscored |
+| E2E flake budget | The suite already flakes ~1 spec per 2–3 local runs |
 
-## 4. What gate 2 should attack
+## 6. What gate 4 should attack
 
-Deliberate invitations for the red team: the D-B5 hermetic-e2e-vs-real-runtime
-compromise; the D-C1 "don't build Paint" verdict (is verification really
-enough for an exit criterion that says *functional and styled authentically*?);
-D-D2's synthesized music; D-D3's decision to spend a seed migration on audio
-files; D-B2's worker complexity versus the odds anyone types an infinite loop;
-and whether D-A6's "known but deferred" stubs are honest or are dead entries of
-the kind Phase 2 spent a whole PR removing.
+The D-B0 spike's fallback if a sandboxed frame does **not** get its own event
+loop; whether option 3's two coexisting wiring mechanisms are worse than the
+if-chain they partially replace; whether D-C3's prune breaks jspaint in ways the
+e2e suite cannot see; whether D-D3's carried-field list is complete or whether
+there is a sixth user-owned field on seed items; whether D-V5's decision not to
+score jspaint's interior is honest scoping or a pre-authorised waiver of exit
+criterion 5; and whether pinning Pyodide 0.28.3 to satisfy a "3.13.x" banner is
+worth shipping two ABI generations behind.
