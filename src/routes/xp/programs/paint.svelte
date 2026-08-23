@@ -328,8 +328,24 @@
             </div>
         {/if}
 
+        <!--
+            `allow-same-origin` is REQUIRED, not an oversight: the wrapper reads
+            `iframe.contentDocument` and `contentWindow.systemHooks` to bridge
+            Save As into the VFS, and a sandbox without it makes both throw
+            (measured: contentDocument -> null, systemHooks -> SecurityError).
+            netlify.toml already documents that dependency.
+
+            So this is NOT origin isolation — jspaint still runs on our origin,
+            and the real hardening is scripts/prune-jspaint.mjs. What the
+            attribute does buy is the rest of the sandbox: no top-level
+            navigation, no popups, no form submission, no modals, no
+            pointer-lock. Removing those costs jspaint's `saveAs` downloads,
+            its `alert()` fallbacks and its `target=_blank` help links — all
+            enumerated in docs/phase-3-guide.md.
+        -->
         <iframe
             src="/html/jspaint/index.html"
+            sandbox="allow-scripts allow-same-origin"
             bind:this={iframe}
             width="100%"
             height="100%"
