@@ -1,11 +1,68 @@
-# Session handoff — post-Phase-2 chrome work
+# Session handoff — Phase 2 closed out, Phase 3 next
 
-Written at the end of a long session so the next one can resume without
-re-deriving anything. Read this first, then `docs/phase-2-guide.md`.
+Read this first, then `docs/redteam-post-phase-2.md`, then
+`docs/phase-2-guide.md`. §1 is the live task; everything after it is the
+record of how Phase 2 got here and the rules that must not be undone.
 
 ---
 
-## 1. DONE — the View menu has no dead entries left (PR #93)
+## 1. NEXT UP — Phase 3, on the owner's "go"
+
+Phase 2 is closed out and deployed (§2). **Phase 3 is specced but not started.**
+The owner will say "go"; until then, do not begin.
+
+### Scope (SPECIFICATION.md §9, Phase 3 — "Developer & Interactive Apps")
+
+- **CMD** — xterm.js terminal, intro message, `help`/`about`/`skills`/
+  `experience`/`whoami`, output read from `profile.json`; easter eggs
+  `matrix`, `hack`, `sudo`
+- **Python REPL** — Pyodide 3.13.x in-page via a pinned CDN, replacing the
+  base's pyodide.org iframe
+- **Paint** — the bundled jspaint kept in Phase 0, wrapped in XP chrome, or a
+  custom Canvas app
+- **Music Player** — local tracks, play/pause/next/prev, volume, seek, track
+  list, Canvas visualizer (§3.2 records WHY the Spotify embed cannot satisfy
+  this: no volume control, no audio-stream access)
+
+**Exit criteria:** all four functional and styled authentically.
+
+### The six gates (SPECIFICATION.md §11) — run in order, back to back
+
+1. **Spec** the phase (superpowers brainstorming first), output a written
+   phase spec: scope, exit criteria, sub-decisions each with for/against
+2. **Red-team the spec** — fresh-context subagent, find-problems framing:
+   scope gaps, hidden sub-decisions, cross-decision conflicts, wrong assumptions
+3. **Plan** — files, order, test strategy, risks
+4. **Red-team the plan** — sequencing, missed dependencies, untestable steps,
+   regressions to inherited surfaces
+5. **Implement** — TDD on `feature/*` off `dev`, CI-gated PRs into `dev`
+6. **Red-team the implementation** — code review + security review on the diff,
+   plus the §11 visual parity loop (screenshots at 1280x800, >=95%), then the
+   `docs/phase-3-guide.md` handoff
+
+**Autonomy rule (§11):** the gates run back-to-back WITHOUT pausing for
+approval between them. Stop only for owner-level things — destructive or
+irreversible actions beyond the plan, scope changes, account/credential/spend
+decisions, or a red-team finding that invalidates a locked decision.
+
+### Carry these constraints into Phase 3
+
+- Read `docs/redteam-post-phase-2.md` first — 43 findings, what was fixed, the
+  rules that must not be undone, and one finding explicitly REJECTED.
+- **Probe the running deploy.** Two security holes survived 306 unit tests, 92
+  e2e tests and five red-team lenses, and only fell to curling the live
+  function — one of them only on production, because drafts are not cached the
+  same way.
+- The recurring root cause, now at SEVEN instances: a rule applied at one call
+  site while its siblings are left alone. When adding a rule, enumerate every
+  call site.
+- New e2e specs must not reach the internet — use `e2e/stub_browse.ts`.
+- Phase 3 adds heavy deps (xterm.js, Pyodide). npm 10 locks are mandatory:
+  after ANY package.json change run `npx -y npm@10 install`.
+
+---
+
+## 1b. DONE — the View menu has no dead entries left (PR #93)
 
 All 11 entries work. The 6 that were greyed were implemented together:
 
