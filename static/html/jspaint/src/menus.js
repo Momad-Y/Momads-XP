@@ -61,63 +61,6 @@
 				description: localize("Saves the active document with a new name."),
 			},
 			MENU_DIVIDER,
-			{
-				item: localize("&Load From URL"),
-				// shortcut: "", // no shortcut: Ctrl+L is taken, and you can paste a URL with Ctrl+V, so it's not really needed
-				speech_recognition: [
-					"load from url",
-					"load from a url",
-					"load from address",
-					"load from an address",
-					"load from a web address",
-					// this is ridiculous
-					// this would be really simple in JSGF format
-					"load an image from a URL",
-					"load an image from an address",
-					"load an image from a web address",
-					"load image from a URL",
-					"load image from an address",
-					"load image from a web address",
-					"load an image from URL",
-					"load an image from address",
-					"load an image from web address",
-					"load image from URL",
-					"load image from address",
-					"load image from web address",
-
-					"load an picture from a URL",
-					"load an picture from an address",
-					"load an picture from a web address",
-					"load picture from a URL",
-					"load picture from an address",
-					"load picture from a web address",
-					"load an picture from URL",
-					"load an picture from address",
-					"load an picture from web address",
-					"load picture from URL",
-					"load picture from address",
-					"load picture from web address",
-				],
-				action: () => { file_load_from_url(); },
-				description: localize("Opens an image from the web."),
-			},
-			{
-				item: localize("&Upload To Imgur"),
-				speech_recognition: [
-					"upload to imgur", "upload image to imgur", "upload picture to imgur",
-				],
-				action: () => {
-					// include the selection in the saved image
-					deselect();
-
-					main_canvas.toBlob((blob) => {
-						sanity_check_blob(blob, () => {
-							show_imgur_uploader(blob);
-						});
-					});
-				},
-				description: localize("Uploads the active document to Imgur"),
-			},
 			// MENU_DIVIDER,
 			// {
 			// 	item: localize("Manage Storage"),

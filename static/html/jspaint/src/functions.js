@@ -1668,12 +1668,6 @@ function render_history_as_gif() {
 				// revoking on image load(+error) breaks right click > "Save image as" and "Open image in new tab"
 				URL.revokeObjectURL(blob_url);
 			});
-			$win.$Button("Upload to Imgur", () => {
-				$win.close();
-				sanity_check_blob(blob, () => {
-					show_imgur_uploader(blob);
-				});
-			}).focus();
 			$win.$Button(localize("Save"), () => {
 				$win.close();
 				sanity_check_blob(blob, () => {
