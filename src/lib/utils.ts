@@ -1102,3 +1102,28 @@ export function long_press(node: HTMLElement, duration = 500) {
         },
     };
 }
+
+/**
+ * The part of a KeyboardEvent this helper actually needs. Structural rather
+ * than `KeyboardEvent` so it is testable under the node environment, and so a
+ * caller cannot be surprised by which fields are read.
+ */
+export interface ActivationKey {
+    key: string;
+    preventDefault: () => void;
+}
+
+/**
+ * Keyboard activation for a list row that is a `role="button"` div.
+ *
+ * Four panels shipped `on:keydown={() => {}}` — an empty handler that silences
+ * the a11y lint while leaving the row focusable, announced as a control, and
+ * completely inert. This makes Enter and Space actually do what the click does.
+ */
+export function activate(fn: () => void): (e: ActivationKey) => void {
+    return (e: ActivationKey) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        e.preventDefault();
+        fn();
+    };
+}

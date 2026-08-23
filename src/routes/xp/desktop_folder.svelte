@@ -1,6 +1,7 @@
 <svelte:options accessors={true} />
 
 <script lang="ts">
+    import { file_icon_url } from '../../lib/file_icon';
     import {
         contextMenu,
         selectingItems,
@@ -8,16 +9,18 @@
         hardDrive,
         clipboard_op,
         queueProgram,
+        runningPrograms,
+        zIndex,
     } from '../../lib/store';
 
     import * as utils from '../../lib/utils';
     import {
         doctypes,
-        icons,
         desktop_folder,
         previewable_exts,
     } from '../../lib/system';
     import * as fs from '../../lib/fs';
+    import { scoped_ids } from '../../lib/selection';
     const { click_outside, long_press, double_tap } = utils;
     import { tick } from 'svelte';
     import RecycleBin from '../../lib/components/xp/RecycleBin.svelte';
@@ -174,6 +177,7 @@
 
         const originator: FSItemOriginator = {
             item,
+            visible_ids: items.map((el) => el.id),
             open: (id: string) => {
                 open(id);
             },
@@ -247,19 +251,53 @@
     }
 
     function rename() {
+        // Clear the latch BEFORE arming a new edit — see the note on
+        // cancel_renaming: it is cleared only inside end_renaming, which never
+        // runs when a cancel removes the focused textarea, so one Escape
+        // silently discarded the NEXT rename's commit.
+        rename_cancelled = false;
         renaming = true;
         void tick().then(() => {
-            const id = required($selectingItems[0], 'renaming selection');
+            // the SCOPED selection: the raw store can lead with an id from an
+            // Explorer window, which measured the wrong basename or threw.
+            const id = scoped_ids(
+                $selectingItems,
+                items.map((el) => el.id),
+            )[0];
+            if (id == null) {
+                renaming = false;
+                return;
+            }
             const el = document.querySelector<HTMLTextAreaElement>(
                 `div[fs-id="${id}"] textarea`,
             );
-            const end_range = required($hardDrive?.[id], 'fs item ' + id)
-                .basename.length;
-            if (el != null) el.setSelectionRange(0, end_range);
+            const end_range = $hardDrive?.[id]?.basename.length;
+            if (el != null && end_range != null)
+                el.setSelectionRange(0, end_range);
         });
     }
 
+    let rename_cancelled = false;
+
+    /**
+     * XP's Escape during an inline rename ABANDONS the edit. Ported verbatim
+     * from viewer.svelte, which got it from red-team M1 — the desktop copy was
+     * left behind, so Escape here silently COMMITTED on the next blur while
+     * the identical gesture in Explorer discarded.
+     */
+    function cancel_renaming() {
+        rename_cancelled = true;
+        renaming = false;
+    }
+
     function end_renaming(e: Event, item: VfsItem) {
+        // Escape abandoned the edit: swallow the blur that tearing down the
+        // textarea triggers, so the typed value is never committed.
+        if (rename_cancelled) {
+            rename_cancelled = false;
+            renaming = false;
+            return;
+        }
         const target = e.target;
         if (!(target instanceof HTMLTextAreaElement)) return;
         const name = utils.sanitize_filename(target.value);
@@ -296,18 +334,31 @@
         renaming = false;
     }
 
+    /**
+     * A window is focused when its `z_index` matches the live counter — the
+     * same test every window's own keydown uses. The desktop was the ONLY
+     * keyboard surface with no z-order awareness: it gated on a boolean set by
+     * `on:click` and cleared by `click_outside`, which exempts `.context-menu`
+     * (utils.ts) — and a right-click fires no `click` at all. So the desktop
+     * stayed "focused" while an Explorer window was plainly on top, and one
+     * Ctrl+V pasted into both surfaces. With a cut, the second handler then
+     * threw on the id the first had already deleted.
+     */
+    $: a_window_is_focused = $runningPrograms.some(
+        (p) => p.window?.z_index === $zIndex,
+    );
+
     function on_keydown(e: KeyboardEvent) {
-        if (!is_focus) return;
+        if (!is_focus || a_window_is_focused) return;
         if (renaming) return;
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- defensive guard kept from the base (id is a const today)
         if (id == null) return;
-        console.log('keyevent in desktop_folder');
 
         if (!(e.ctrlKey || e.metaKey)) return;
         if (e.key == 'c') {
-            fs.copy();
+            fs.copy(items.map((el) => el.id));
         } else if (e.key == 'x') {
-            fs.cut();
+            fs.cut(items.map((el) => el.id));
         } else if (e.key == 'v') {
             fs.paste(id);
         } else if (e.key == 'a') {
@@ -330,16 +381,6 @@
 
     function on_drop_over(e: DragEvent) {
         e.preventDefault();
-    }
-
-    function file_icon(item: VfsItem) {
-        if (item.icon != null) {
-            return `url(${item.icon})`;
-        }
-        if (icons[item.ext] != null) {
-            return `url(/images/xp/icons/${icons[item.ext] ?? ''})`;
-        }
-        return null;
     }
 </script>
 
@@ -416,7 +457,7 @@
                 {#if previewable_exts.includes(item.ext)}
                     <Previewable
                         size={40}
-                        default_icon={file_icon(item)}
+                        default_icon={file_icon_url(item)}
                         fs_id={item.id}
                     ></Previewable>
                 {:else}
@@ -428,7 +469,7 @@
                         {item.type == 'folder'
                             ? 'bg-[url(/images/xp/icons/FolderClosed.png)]'
                             : 'bg-[url(/images/xp/icons/Default.png)]'} "
-                        style:background-image={file_icon(item)}
+                        style:background-image={file_icon_url(item)}
                     ></div>
                 {/if}
                 <p
@@ -445,6 +486,7 @@
                         autofocus
                         on:keydown={(e) => {
                             if (e.key == 'Enter') end_renaming(e, item);
+                            else if (e.key == 'Escape') cancel_renaming();
                         }}
                         on:blur={(e) => {
                             end_renaming(e, item);

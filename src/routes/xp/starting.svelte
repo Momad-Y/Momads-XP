@@ -174,9 +174,58 @@
         ).then(completion);
     }
 
+    /**
+     * Read the persisted drive, treating an unreadable store as "no cache".
+     *
+     * These two `get()` calls used to sit outside every try, so anything that
+     * makes IndexedDB reject — Firefox private browsing, "block site data",
+     * a corrupt store — rejected `onMount`, left `core_ready` false, and hung
+     * the visitor on a black boot screen FOREVER. The skip affordance could
+     * not save them either: `skip_boot` returns early until `core_ready`.
+     * There is no in-app reset, so DevTools was the only way out.
+     */
+    async function read_cached(): Promise<{
+        cached: StoredHardDrive | undefined;
+        version: string | undefined;
+    }> {
+        try {
+            return {
+                cached: await get<StoredHardDrive>('hard_drive'),
+                version: await get<string>('hard_drive_seed_version'),
+            };
+        } catch (error) {
+            console.error(
+                'persisted drive unreadable; booting from the seed',
+                error,
+            );
+            return { cached: undefined, version: undefined };
+        }
+    }
+
+    /**
+     * Normalise a cached drive, or discard it if it cannot be normalised.
+     * Runs BEFORE the merge: `merge_on_reseed` reads `.children` on raw cached
+     * items, so a drive predating that field threw inside the merge and the
+     * merge's own fallback then replaced the visitor's whole drive with the
+     * plain seed — total loss of their files behind a console line.
+     */
+    function usable_cache(
+        cached: StoredHardDrive | undefined,
+    ): StoredHardDrive | undefined {
+        if (cached == null) return undefined;
+        try {
+            migrate_files_format(cached);
+            return cached;
+        } catch (error) {
+            console.error('cached drive is malformed; discarding it', error);
+            return undefined;
+        }
+    }
+
     async function load_hard_drive() {
-        const cached = await get<StoredHardDrive>('hard_drive');
-        const stored_version = await get<string>('hard_drive_seed_version');
+        const read = await read_cached();
+        const cached = usable_cache(read.cached);
+        const stored_version = read.version;
         let hard_drive = cached;
         if (cached == null || shouldReseed(stored_version)) {
             try {
@@ -215,6 +264,8 @@
             }
         }
         if (hard_drive == null) throw new Error('VFS seed unavailable');
+        // the cached half is already normalised by `usable_cache`; this covers
+        // a freshly fetched seed and the merged result
         migrate_files_format(hard_drive);
         hardDrive.set(hard_drive);
     }
@@ -285,7 +336,6 @@
             iframe.style.inset = '0';
             iframe.src = url;
             iframe.onload = () => {
-                console.log('loaded ', url);
                 iframe.remove();
             };
             parent.appendChild(iframe);
@@ -335,7 +385,14 @@
     }
 </script>
 
-<div class="absolute inset-0 bg-black overflow-hidden text-slate-100">
+<!-- `data-boot-skippable` mirrors `core_ready`: the point from which a click
+     or keypress actually skips the wait. It is the honest readiness signal for
+     anything driving the boot — without it a caller can only guess and retry. -->
+<div
+    id="boot-screen"
+    data-boot-skippable={core_ready ? 'true' : 'false'}
+    class="absolute inset-0 bg-black overflow-hidden text-slate-100"
+>
     <div
         class="absolute top-[50%] -translate-y-[50%] left-[50%] -translate-x-[50%] animate-fadein flex flex-col items-center"
     >

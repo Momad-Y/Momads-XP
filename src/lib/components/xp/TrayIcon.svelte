@@ -4,9 +4,7 @@
     export let tooltip_message: string | undefined = undefined;
     export let icon: string;
 
-    export let on_click: (e: MouseEvent) => void = () => {
-        console.log('on click');
-    };
+    export let on_click: (e: MouseEvent) => void = () => {};
 </script>
 
 <div

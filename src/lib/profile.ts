@@ -75,6 +75,98 @@ export interface LanguageEntry {
     level: string;
 }
 
+export interface SystemPropertiesGeneral {
+    system: string[];
+    computer: string[];
+    footer: string;
+}
+
+export interface SystemPropertiesComputerName {
+    intro: string;
+    descriptionLabel: string;
+    description: string;
+    fullNameLabel: string;
+    fullName: string;
+    workgroupLabel: string;
+    workgroup: string;
+    note: string;
+}
+
+export interface SystemPropertiesHardware {
+    intro: string;
+    devices: string[];
+    problemDevices: string[];
+    note: string;
+}
+
+export interface SystemPropertiesAdvancedSection {
+    title: string;
+    note: string;
+}
+
+export interface SystemPropertiesAdvanced {
+    intro: string;
+    sections: SystemPropertiesAdvancedSection[];
+}
+
+/** A titled block of plain lines — used by the XP option dialogs' General tabs. */
+export interface OptionsSection {
+    title: string;
+    lines: string[];
+}
+
+export interface FolderOptionsGeneral {
+    sections: OptionsSection[];
+    note: string;
+}
+
+export interface OptionsSettingsList {
+    title: string;
+    settings: string[];
+    note: string;
+}
+
+export interface FileTypeEntry {
+    ext: string;
+    desc: string;
+}
+
+export interface FolderOptionsFileTypes {
+    title: string;
+    types: FileTypeEntry[];
+    note: string;
+}
+
+export interface ProfileFolderOptions {
+    general: FolderOptionsGeneral;
+    view: OptionsSettingsList;
+    fileTypes: FolderOptionsFileTypes;
+}
+
+export interface InternetOptionsGeneral {
+    sections: OptionsSection[];
+    note: string;
+}
+
+export interface InternetOptionsSecurity {
+    title: string;
+    zones: string[];
+    note: string;
+}
+
+export interface ProfileInternetOptions {
+    general: InternetOptionsGeneral;
+    security: InternetOptionsSecurity;
+    advanced: OptionsSettingsList;
+}
+
+export interface ProfileSystemProperties {
+    general: SystemPropertiesGeneral;
+    computerName: SystemPropertiesComputerName;
+    hardware: SystemPropertiesHardware;
+    advanced: SystemPropertiesAdvanced;
+}
+
 export interface Profile {
     meta: ProfileMeta;
     about: ProfileAbout;
@@ -86,6 +178,9 @@ export interface Profile {
     certifications: Certification[];
     projects: Project[];
     languages: LanguageEntry[];
+    systemProperties: ProfileSystemProperties;
+    folderOptions: ProfileFolderOptions;
+    internetOptions: ProfileInternetOptions;
 }
 
 function is_record(value: unknown): value is Record<string, unknown> {

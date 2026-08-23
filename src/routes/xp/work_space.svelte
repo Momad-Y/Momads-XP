@@ -1,7 +1,9 @@
 <script lang="ts">
-    import { onMount, onDestroy, mount } from 'svelte';
+    import { onMount, onDestroy, mount, tick } from 'svelte';
+    import { get } from 'svelte/store';
     import Wallpaper from './wallpaper.svelte';
     import { queueProgram, runningPrograms } from '../../lib/store';
+    import { HOMEPAGE } from '../../lib/search';
     import short from 'short-uuid';
     import DesktopFolder from './desktop_folder.svelte';
     import * as finder from '../../lib/finder';
@@ -29,9 +31,48 @@
 
     onDestroy(() => {});
 
+    /**
+     * XP's property sheets are single-instance: invoking Folder Options (etc.)
+     * again raises the open one rather than stacking a second copy with its own
+     * taskbar button (red-team M6).
+     */
+    const singleton_programs = [
+        './programs/system_properties.svelte',
+        './programs/folder_options.svelte',
+        './programs/internet_options.svelte',
+        './programs/organize_favorites.svelte',
+    ];
+
+    function focus_existing(path: string | undefined): boolean {
+        if (path == null || !singleton_programs.includes(path)) return false;
+        const open = get(runningPrograms).find(
+            (p) => p.options.exec_path === path,
+        );
+        if (open == null) return false;
+        // Deferred a tick: the click that re-invoked us also focuses the window
+        // it came from, and `Window.focus()` no-ops when it sees its own
+        // z-index already equal to the store's — so raising in the same tick
+        // leaves the two tied and the sheet buried.
+        void tick().then(() => {
+            open.window?.restore(); // restore() focuses too
+        });
+        return true;
+    }
+
     async function launch(program: ProgramLaunchRequest) {
-        const { fs_item, exe_item, copying_obj, target_folder_id, path } =
-            program;
+        const {
+            fs_item,
+            exe_item,
+            copying_obj,
+            target_folder_id,
+            path,
+            source,
+        } = program;
+
+        if (focus_existing(path)) {
+            queueProgram.set(null);
+            return;
+        }
 
         if (path == './programs/my_computer.svelte') {
             const Program = (await import('./programs/my_computer.svelte'))
@@ -192,6 +233,84 @@
             runningPrograms.update((values) => {
                 return [...values, program];
             });
+        } else if (path == './programs/source_viewer.svelte') {
+            const Program = (await import('./programs/source_viewer.svelte'))
+                .default;
+            const program: ProgramInstance = mount(Program, {
+                target: node_ref,
+                props: {
+                    id: short.generate(),
+                    source,
+                    exec_path: path,
+                    get_self: () => program,
+                },
+            });
+            //add to program tray
+            runningPrograms.update((values) => {
+                return [...values, program];
+            });
+        } else if (path == './programs/organize_favorites.svelte') {
+            const Program = (
+                await import('./programs/organize_favorites.svelte')
+            ).default;
+            const program: ProgramInstance = mount(Program, {
+                target: node_ref,
+                props: {
+                    id: short.generate(),
+                    exec_path: path,
+                    get_self: () => program,
+                },
+            });
+            //add to program tray
+            runningPrograms.update((values) => {
+                return [...values, program];
+            });
+        } else if (path == './programs/add_to_favorites.svelte') {
+            const Program = (await import('./programs/add_to_favorites.svelte'))
+                .default;
+            const program: ProgramInstance = mount(Program, {
+                target: node_ref,
+                props: {
+                    id: short.generate(),
+                    fs_item,
+                    exec_path: path,
+                    get_self: () => program,
+                },
+            });
+            //add to program tray
+            runningPrograms.update((values) => {
+                return [...values, program];
+            });
+        } else if (path == './programs/folder_options.svelte') {
+            const Program = (await import('./programs/folder_options.svelte'))
+                .default;
+            const program: ProgramInstance = mount(Program, {
+                target: node_ref,
+                props: {
+                    id: short.generate(),
+                    exec_path: path,
+                    get_self: () => program,
+                },
+            });
+            //add to program tray
+            runningPrograms.update((values) => {
+                return [...values, program];
+            });
+        } else if (path == './programs/internet_options.svelte') {
+            const Program = (await import('./programs/internet_options.svelte'))
+                .default;
+            const program: ProgramInstance = mount(Program, {
+                target: node_ref,
+                props: {
+                    id: short.generate(),
+                    exec_path: path,
+                    get_self: () => program,
+                },
+            });
+            //add to program tray
+            runningPrograms.update((values) => {
+                return [...values, program];
+            });
         } else if (path == './programs/system_properties.svelte') {
             const Program = (
                 await import('./programs/system_properties.svelte')
@@ -305,7 +424,7 @@
     }
 
     function get_url(item: Partial<VfsItem> | undefined) {
-        if (item == null) return 'https://wiby.me/';
+        if (item == null) return HOMEPAGE;
 
         if (item.storage_type == 'local') {
             return finder.to_url(item.id);

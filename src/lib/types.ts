@@ -103,6 +103,8 @@ export interface ProgramLaunchRequest {
      */
     exe_item?: Partial<VfsItem>;
     webapp?: unknown;
+    /** Page markup for source_viewer (IE's View > Source). */
+    source?: { url: string; text: string };
     copying_obj?: CopyTree;
     target_folder_id?: string;
 }
@@ -180,7 +182,8 @@ export type MountedComponent = Record<string, unknown>;
 /** One button of a Dialog.svelte prompt. */
 export interface DialogButton {
     name: string;
-    action: (event: MouseEvent) => void;
+    /** The event is optional: Escape invokes Cancel with no click behind it. */
+    action: (event?: MouseEvent) => void;
     focus?: boolean;
 }
 
@@ -189,6 +192,31 @@ export interface MenuBarEntry {
     name: string;
     /** Groups of dropdown entries; groups render separated by rules. */
     items?: MenuItem[][];
+}
+
+/**
+ * viewer.svelte's public API (`accessors={true}`), used by my_computer.svelte's
+ * File menu. Mirrors the WindowController pattern: an explicit interface rather
+ * than the component type, so calls are typed instead of `any`.
+ */
+export interface ViewerController {
+    rename: () => void;
+    /** Opens an item the way a double-click does (resolves .lnk, launches). */
+    open_item: (item_id: string) => void;
+    /** View > Refresh / F5: re-reads and re-sorts the current folder. */
+    refresh: () => void;
+}
+
+/**
+ * One stop on an Explorer window's navigation trail — shared by the
+ * Back/Forward dropdowns, the Go To menu and the History Explorer Bar, which
+ * all walk the same `history` array.
+ */
+export interface HistoryEntry {
+    label: string;
+    /** Index into the window's `history` array. */
+    idx: number;
+    icon: string;
 }
 
 /** Originator for folder-scoped menus (Desktop, FSVoid): the folder's VFS id. */
@@ -212,6 +240,14 @@ export interface FSItemOriginator {
     open: (id: string) => void;
     rename: () => void;
     my_computer_instance?: MyComputerInstance;
+    /**
+     * The ids the surface that opened this menu is showing. `selectingItems`
+     * is ONE global store shared by the desktop and every Explorer window, so
+     * destructive actions must narrow to this or they act on another
+     * surface's selection. Absent means "unknown" — callers fail closed onto
+     * `item` alone rather than trusting the raw store.
+     */
+    visible_ids?: string[];
     /** Read by CMFSItem but never populated by current callers. */
     type?: string;
 }

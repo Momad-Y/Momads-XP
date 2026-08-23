@@ -7,17 +7,25 @@
         favorites,
         add_favorite,
         remove_favorite,
+        is_shell_favorite,
+        favorite_icon,
     } from '../../../lib/favorites';
-    import { runningPrograms, zIndex, queueProgram } from '../../../lib/store';
+    import {
+        runningPrograms,
+        zIndex,
+        queueProgram,
+        hardDrive,
+    } from '../../../lib/store';
     import Menu from '../../../lib/components/xp/Menu.svelte';
     import RButton from '../../../lib/components/xp/RButton.svelte';
     import ProgressBar from '../../../lib/components/xp/ProgressBar.svelte';
-    import buildUrl from 'build-url';
     import isURL from 'is-valid-http-url';
     import * as fs from '../../../lib/fs';
     import { desktop_folder } from '../../../lib/system';
     import * as utils from '../../../lib/utils';
     import * as finder from '../../../lib/finder';
+    import { push_entry, replace_entry } from '../../../lib/nav_history';
+    import { HOMEPAGE, search_url } from '../../../lib/search';
     import { required } from '../../../lib/types';
     import type {
         MenuBarEntry,
@@ -38,7 +46,7 @@
     // narrows `export let` props to their default in top-level flow (Svelte
     // injects the real prop value before this code runs)
     const initial_url = url as string | null | undefined;
-    const homepage = initial_url ? initial_url : 'https://wiby.me/';
+    const homepage = initial_url ? initial_url : HOMEPAGE;
 
     let nav_history = [homepage];
     let page_index = 0;
@@ -90,6 +98,60 @@
         });
     }
 
+    /**
+     * Opens a file-system favourite in Explorer. A folder opens as itself; a
+     * file opens its parent folder, which is the closest thing a browser can
+     * usefully do with one.
+     */
+    function open_shell_favorite(fs_id: string | undefined) {
+        if (fs_id == null || fs_id === '') return;
+        const item = $hardDrive?.[fs_id];
+        const target = item?.type === 'file' ? item.parent : fs_id;
+        queueProgram.set({
+            path: './programs/my_computer.svelte',
+            fs_item: { id: target ?? fs_id },
+        });
+    }
+
+    /**
+     * XP's View > Source opens the page's markup in Notepad. Where the source
+     * is fetched from depends on the page: an app-owned page is same-origin, a
+     * local file is already a blob, and an external page comes back through the
+     * proxy's `raw=1` mode — which returns the ORIGINAL bytes rather than the
+     * rewritten copy the frame renders.
+     */
+    function source_url_for(target: string): string | null {
+        if (/^[A-Z]:\\/.test(target)) return real_url ?? null; // local blob
+        if (target.startsWith('/')) return target; // app-owned page
+        if (/^https?:\/\//i.test(target)) {
+            return `/api/browse?url=${encodeURIComponent(target)}&raw=1`;
+        }
+        return null;
+    }
+
+    async function view_source() {
+        const target = address_text;
+        const src = source_url_for(target);
+        if (src == null) {
+            window?.show_toast({
+                message: 'The source of this page is not available.',
+            });
+            return;
+        }
+        try {
+            const res = await fetch(src);
+            const text = await res.text();
+            queueProgram.set({
+                path: './programs/source_viewer.svelte',
+                source: { url: target, text },
+            });
+        } catch {
+            window?.show_toast({
+                message: 'The source of this page could not be loaded.',
+            });
+        }
+    }
+
     function hostname_of(u: string) {
         try {
             return new URL(u).hostname;
@@ -107,9 +169,11 @@
     // ── Navigation ──────────────────────────────────────────
 
     async function load_page(nav_url?: string) {
-        loading = true;
         let u = nav_url ?? address_input.value;
+        // validate BEFORE showing the throbber: an empty address bar used to
+        // return here with `loading` already true, spinning forever
         if (!u || u.trim() === '') return;
+        loading = true;
 
         if (/^[A-Z]:\\/.test(u)) {
             // local file — pass through
@@ -118,16 +182,18 @@
         } else if (!u.startsWith('https://') && !u.startsWith('http://')) {
             u = 'https://' + u;
             if (!isURL(u)) {
-                u = buildUrl('https://bing.com', {
-                    path: 'search',
-                    queryParams: { q: (nav_url ?? address_input.value).trim() },
-                });
+                // not a URL at all — search for what was typed
+                const searched = search_url(nav_url ?? address_input.value);
+                if (searched == null) return;
+                u = searched;
             }
         }
 
-        // Truncate forward history, push new entry
-        nav_history = [...nav_history.slice(0, page_index + 1), u];
-        page_index = nav_history.length - 1;
+        // Truncate forward history and append — unless this IS the page on
+        // screen, which reloads in place (see src/lib/nav_history.ts).
+        const next = push_entry({ entries: nav_history, index: page_index }, u);
+        nav_history = [...next.entries];
+        page_index = next.index;
         address_text = u;
         await resolve_url(u);
     }
@@ -141,9 +207,21 @@
         await resolve_url(u);
     }
 
+    /**
+     * Bumped by every navigation so a slow resolution cannot land after a
+     * newer one. `to_real_url` awaits IndexedDB for a local file, so clicking
+     * a local .html favourite and then immediately pressing Back used to end
+     * with the favourite on screen and the address bar showing the page you
+     * had gone back to.
+     */
+    let nav_seq = 0;
+
     async function resolve_url(u: string) {
+        const seq = ++nav_seq;
         real_url = null; // reset so Svelte always re-mounts the iframe, even if URL is unchanged
-        real_url = await to_real_url(u);
+        const resolved = await to_real_url(u);
+        if (seq !== nav_seq) return; // a newer navigation overtook this one
+        real_url = resolved;
     }
 
     function back() {
@@ -186,8 +264,14 @@
     function refresh() {
         loading = true;
         const src = real_url;
+        const seq = ++nav_seq;
         real_url = null;
         setTimeout(() => {
+            // the same guard resolve_url carries: without it, a refresh
+            // started within 50ms of a navigation restored the OLD url over
+            // the new one, so the address bar and history said one page while
+            // the frame showed another
+            if (seq !== nav_seq) return;
             real_url = src;
         }, 50);
     }
@@ -196,8 +280,85 @@
         void load_page(homepage);
     }
 
+    /**
+     * An app-owned page (`/help.html`, …) is same-origin and authored by us, so
+     * the iframe may read it. A LOCAL file is served from a `blob:` URL, which
+     * inherits our origin — granting that same-origin access would hand a
+     * user-dropped .html our localStorage and the whole VFS, which is exactly
+     * what the sandbox is there to prevent. External https pages are
+     * cross-origin regardless, so the flag would buy nothing.
+     */
+    /**
+     * Is this URL one of OUR pages, safe to run with our origin?
+     *
+     * A string prefix test was not enough: `/api/./browse?url=…` and
+     * `//host/api/browse?url=…` both satisfy `startsWith('/')` while failing
+     * `startsWith('/api/browse')`, and both resolve in the browser back to the
+     * proxy — which would have handed third-party HTML our origin, our
+     * localStorage, the whole VFS and a valid Origin for /api/email.
+     *
+     * Resolving against our own origin first removes the whole class: `.`/`..`
+     * segments collapse, a protocol-relative URL reveals its real host, and
+     * anything that is not literally same-origin fails the host check.
+     */
+    function is_app_owned(url: string | null | undefined): boolean {
+        if (url == null || !url.startsWith('/')) return false;
+        try {
+            const resolved = new URL(url, globalThis.location.origin);
+            if (resolved.origin !== globalThis.location.origin) return false;
+            return !resolved.pathname.startsWith('/api/');
+        } catch {
+            return false;
+        }
+    }
+
+    // CRITICAL: /api/browse serves EXTERNAL pages from our own path. It must
+    // never be treated as app-owned — granting it same-origin would hand any
+    // website on the internet our localStorage and the whole VFS. Proxied
+    // pages stay on an opaque origin and report navigation over postMessage.
+    //
+    // `allow-popups-to-escape-sandbox` is NOT granted to proxied content: an
+    // escaped popup is a fully unsandboxed top-level document, which is exactly
+    // what untrusted HTML must not be able to open.
+    $: iframe_sandbox = is_app_owned(real_url)
+        ? 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-same-origin'
+        : 'allow-scripts allow-forms allow-popups';
+
+    /**
+     * Follow navigation that happened INSIDE the frame (clicking a link on the
+     * page) so the address bar, the Back/Forward dropdowns and Create Shortcut
+     * describe where the user actually is. Only possible for app-owned pages:
+     * for an external site the browser refuses to tell us the URL, and no
+     * amount of code changes that.
+     */
+    function sync_url_from_iframe() {
+        let href: string | null;
+        try {
+            href = iframe?.contentWindow?.location.href ?? null;
+        } catch {
+            return; // cross-origin — unknowable by design
+        }
+        if (href == null || href === 'about:blank') return;
+        const origin = globalThis.location.origin;
+        const seen = href.startsWith(origin) ? href.slice(origin.length) : href;
+        if (seen === nav_history[page_index]) return;
+        // PUSH, not replace: same-origin pages carry no injected reporter, so
+        // this is the only way an in-page link click (help.html -> #legal) gets
+        // recorded, and that IS a new step. Redirects of app-owned pages do not
+        // happen; the proxied case, which does redirect, is handled in
+        // on_frame_message where the requested URL is known.
+        const next = push_entry(
+            { entries: nav_history, index: page_index },
+            seen,
+        );
+        nav_history = [...next.entries];
+        page_index = next.index;
+        address_text = seen;
+    }
+
     function iframe_loaded() {
         loading = false;
+        sync_url_from_iframe();
         // Update window title (works for same-origin pages only)
         try {
             const t = iframe?.contentDocument?.title;
@@ -221,11 +382,9 @@
     }
 
     function do_search() {
-        if (!search_query.trim()) return;
-        void load_page(
-            'https://bing.com/search?q=' +
-                encodeURIComponent(search_query.trim()),
-        );
+        const url = search_url(search_query);
+        if (url == null) return;
+        void load_page(url);
         sidebar_mode = null;
         search_query = '';
     }
@@ -238,6 +397,10 @@
     // ── Keyboard shortcuts ───────────────────────────────────
 
     function on_keydown(e: KeyboardEvent) {
+        // Focused window only — every other keyboard surface in the app checks
+        // this and IE did not, so Ctrl+L in Contact Me yanked focus into a
+        // buried IE window, and Alt+arrows / F5 fired in EVERY open IE at once.
+        if (window?.z_index !== $zIndex) return;
         if (e.key === 'F5') {
             e.preventDefault();
             refresh();
@@ -269,7 +432,112 @@
             );
             return URL.createObjectURL(file);
         }
+        // External pages go through our proxy so the frame is served from our
+        // origin with a navigation reporter injected — that is what lets the
+        // address bar, history, shortcuts and favourites follow the user.
+        // The frame is still sandboxed WITHOUT allow-same-origin, so the page
+        // runs on an opaque origin and cannot touch our storage.
+        if (
+            target_url.startsWith('http://') ||
+            target_url.startsWith('https://')
+        ) {
+            return `/api/browse?url=${encodeURIComponent(target_url)}`;
+        }
         return target_url;
+    }
+
+    /**
+     * Do two URLs belong to the same site?
+     *
+     * Compared on the last two labels rather than a full public-suffix list —
+     * that would mean shipping the PSL to the client for one check. The
+     * consequence is that `a.co.uk` and `b.co.uk` count as the same site, which
+     * is wrong but harmless here: the worst case is that the address bar
+     * follows a redirect it should have ignored, never that it shows a
+     * completely unrelated origin.
+     */
+    function same_site(a: string, b: string): boolean {
+        try {
+            const host_a = new URL(a).hostname.toLowerCase().split('.');
+            const host_b = new URL(b).hostname.toLowerCase().split('.');
+            return host_a.slice(-2).join('.') === host_b.slice(-2).join('.');
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * Navigation reported by the proxy's injected script. The page is untrusted,
+     * so only http(s) URLs of sane length are accepted, and only from our own
+     * frame.
+     */
+    function on_frame_message(event: MessageEvent) {
+        if (iframe?.contentWindow == null) return;
+        if (event.source !== iframe.contentWindow) return;
+        const data: unknown = event.data;
+        if (typeof data !== 'object' || data === null) return;
+        if (!('__momadxp' in data) || data.__momadxp !== 1) return;
+        if (!('url' in data) || !('type' in data)) return;
+        const reported: unknown = data.url;
+        const kind: unknown = data.type;
+        if (typeof reported !== 'string' || reported.length > 2048) return;
+        if (!/^https?:\/\//i.test(reported)) return;
+
+        if (kind === 'navigate') {
+            void load_page(reported); // the user clicked a link inside the page
+        } else if (kind === 'navigated') {
+            // A proxied page announces itself once it loads, which is how a
+            // REDIRECT gets recorded. Two rules matter here, and getting either
+            // wrong breaks the Back button.
+            const intended = nav_history[page_index];
+            if (typeof intended !== 'string') return;
+            // we are no longer showing an external page at all
+            if (!/^https?:\/\//i.test(intended)) return;
+
+            // RULE 1 — the announcement must be about the page we asked for.
+            // The frame reports what the proxy REQUESTED alongside where it
+            // landed; without that, a slow page finishing after the user has
+            // moved on is indistinguishable from a redirect of the current
+            // one, and would rewrite the wrong history entry.
+            const requested: unknown =
+                'requested' in data ? data.requested : undefined;
+            if (typeof requested !== 'string' || requested !== intended) return;
+            // belt and braces: the frame must still point where we intend
+            if (
+                real_url == null ||
+                !real_url.includes(encodeURIComponent(intended))
+            ) {
+                return;
+            }
+            if (reported === address_text) return;
+
+            // RULE 1b — a redirect may only move WITHIN the same site.
+            // `requested` is not a secret: the page can read its own
+            // location.search and recover it, so the guard above proves only
+            // that the message came from a page we asked for — not that the
+            // announced URL is honest. Without this a proxied page announced
+            // `https://www.paypal.com/signin` while its own HTML stayed on
+            // screen, and Add to Favorites / Create Shortcut then persisted
+            // that lie into localStorage and the VFS.
+            //
+            // A genuine redirect (google.com -> www.google.com, http -> https)
+            // stays within its registrable domain; a cross-site one keeps
+            // showing what the user asked for, which is the safe direction.
+            if (!same_site(intended, reported)) return;
+
+            // RULE 2 — a redirect REPLACES the current entry, it does not add
+            // one. Appending made Back unusable on any redirecting site: going
+            // back landed on the URL that redirects, which redirected again and
+            // re-appended the destination, so the user never left the page.
+            // (google.com -> www.google.com is the everyday case.)
+            const next = replace_entry(
+                { entries: nav_history, index: page_index },
+                reported,
+            );
+            nav_history = [...next.entries];
+            page_index = next.index;
+            address_text = reported;
+        }
     }
 
     export function destroy() {
@@ -331,7 +599,14 @@
                     { name: 'Stop', action: stop },
                     { name: 'Refresh', action: refresh },
                 ],
-                [{ name: 'Source', disabled: true, action: () => {} }],
+                [
+                    {
+                        name: 'Source',
+                        action: () => {
+                            void view_source();
+                        },
+                    },
+                ],
             ],
         },
         {
@@ -342,15 +617,27 @@
                     {
                         name: 'Organize Favorites',
                         action: () => {
-                            toggle_sidebar('favorites');
+                            queueProgram.set({
+                                path: './programs/organize_favorites.svelte',
+                            });
                         },
                     },
                 ],
                 ...$favorites.map((fav) => [
                     {
                         name: fav.name,
-                        icon: '/images/xp/icons/URL.png',
-                        action: () => load_page(fav.url),
+                        icon: favorite_icon(fav, $hardDrive),
+                        action: () => {
+                            // Shell favourites belong to Explorer, not IE. A
+                            // folder opens directly; a FILE opens the folder
+                            // that contains it, since a browser window has no
+                            // sensible way to present an arbitrary local file.
+                            if (is_shell_favorite(fav)) {
+                                open_shell_favorite(fav.fs_id);
+                            } else {
+                                void load_page(fav.url);
+                            }
+                        },
                     },
                 ]),
             ],
@@ -361,8 +648,11 @@
                 [
                     {
                         name: 'Internet Options...',
-                        disabled: true,
-                        action: () => {},
+                        action: () => {
+                            queueProgram.set({
+                                path: './programs/internet_options.svelte',
+                            });
+                        },
                     },
                 ],
             ],
@@ -391,7 +681,7 @@
     ];
 </script>
 
-<svelte:window on:keydown={on_keydown} />
+<svelte:window on:keydown={on_keydown} on:message={on_frame_message} />
 
 <Window {options} bind:this={window} on_click_close={destroy}>
     <div
@@ -402,7 +692,7 @@
         <div
             class="shrink-0 w-full border-b border-stone-300 flex flex-row items-center justify-between"
         >
-            <Menu {menu}></Menu>
+            <Menu {menu} focused={window?.z_index === $zIndex}></Menu>
             <div
                 class="w-[40px] h-full bg-slate-50 flex items-center justify-center overflow-hidden"
             >
@@ -686,12 +976,30 @@
                                         <div
                                             class="flex items-center group hover:bg-blue-600 px-1 py-[3px] cursor-pointer"
                                             on:click={() => {
-                                                void load_page(fav.url);
+                                                // the SAME branch the Favorites
+                                                // menu uses. Calling load_page
+                                                // unconditionally sent a folder
+                                                // favourite (C:\Experience) down
+                                                // the URL path, where get_file on
+                                                // a folder threw inside an
+                                                // unawaited promise and left the
+                                                // window on a blank frame with
+                                                // the throbber stuck on.
+                                                if (is_shell_favorite(fav)) {
+                                                    open_shell_favorite(
+                                                        fav.fs_id,
+                                                    );
+                                                } else {
+                                                    void load_page(fav.url);
+                                                }
                                                 sidebar_mode = null;
                                             }}
                                         >
                                             <img
-                                                src="/images/xp/icons/URL.png"
+                                                src={favorite_icon(
+                                                    fav,
+                                                    $hardDrive,
+                                                )}
                                                 class="w-[14px] h-[14px] mr-1 shrink-0"
                                                 alt=""
                                             />
@@ -789,7 +1097,7 @@
                         src={real_url}
                         on:load={iframe_loaded}
                         frameborder="0"
-                        sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"
+                        sandbox={iframe_sandbox}
                         referrerpolicy="no-referrer"
                     >
                     </iframe>

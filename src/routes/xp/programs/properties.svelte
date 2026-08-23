@@ -1,15 +1,16 @@
 <svelte:options accessors={true} />
 
 <script lang="ts">
+    import { folder_size } from '../../../lib/fs_size';
+    import { type_label, date_label } from '../../../lib/details_columns';
+    import { file_icon_url } from '../../../lib/file_icon';
     import Window from '../../../lib/components/xp/Window.svelte';
     import Button from '../../../lib/components/xp/Button.svelte';
     import Tab from '../../../lib/components/xp/Tab.svelte';
     import CheckBox from '../../../lib/components/xp/CheckBox.svelte';
     import { onMount, unmount } from 'svelte';
     import { runningPrograms, hardDrive } from '../../../lib/store';
-    import { icons } from '../../../lib/system';
     import * as utils from '../../../lib/utils';
-    import _ from 'lodash';
     import * as finder from '../../../lib/finder';
     import { required } from '../../../lib/types';
     import type {
@@ -26,27 +27,43 @@
     export let fs_item: VfsItem | undefined = undefined;
     export let exec_path: string;
 
-    /** Fail-fast lookup mirroring the untyped base's direct dereferences. */
-    function drive_item(item_id: string): VfsItem {
-        return required($hardDrive?.[item_id], 'fs item ' + item_id);
-    }
-
     // widened back from the `undefined` initializer: eslint's TS service
     // narrows `export let` props to their default in top-level flow (Svelte
     // injects the real prop value before this code runs)
     const initial_item = fs_item as VfsItem | undefined;
 
+    /**
+     * Count children by kind, SKIPPING ids that no longer resolve.
+     *
+     * `drive_item` is a throwing lookup and this runs over a SNAPSHOT's
+     * children during mount, so deleting a file from another window while this
+     * menu was open threw out of `launch()` before `queueProgram.set(null)`:
+     * no Properties window, no error, and a wait cursor stuck over the whole
+     * desktop until the next successful launch. folder_size, create_shortcut
+     * and the viewer all filter dangling ids for exactly this reason.
+     */
+    function contains_label(children: string[]): string {
+        const drive = $hardDrive ?? {};
+        let files = 0;
+        let folders = 0;
+        for (const child_id of children) {
+            const child = drive[child_id];
+            if (child == null) continue;
+            if (child.type === 'file') files++;
+            else folders++;
+        }
+        return `${String(files)} Files, ${String(folders)} Folders`;
+    }
+
     const details: [string, string | null][] =
         initial_item == null
             ? []
             : [
-                  [
-                      'Type',
-                      initial_item.type
-                          .split('_')
-                          .map((el) => _.upperFirst(el))
-                          .join(' '),
-                  ],
+                  // One definition of the Type cell, shared with the Details
+                  // column: this said "Folder"/"Removable Storage" where the
+                  // column said "File Folder"/"Removable Disk", so two views of
+                  // one item disagreed.
+                  ['Type', type_label(initial_item)],
                   ['Location', finder.to_url(initial_item.id)],
 
                   ...(initial_item.type == 'file'
@@ -62,7 +79,10 @@
                             [
                                 'Size',
                                 utils.formatBytes(
-                                    size_cal(initial_item.id) * 1024,
+                                    folder_size(
+                                        $hardDrive ?? {},
+                                        initial_item.id,
+                                    ) * 1024,
                                 ),
                             ] satisfies [string, string],
                         ]),
@@ -84,7 +104,11 @@
                                 'Size on disk',
                                 utils.formatBytes(
                                     Math.ceil(
-                                        (size_cal(initial_item.id) * 1024) /
+                                        (folder_size(
+                                            $hardDrive ?? {},
+                                            initial_item.id,
+                                        ) *
+                                            1024) /
                                             4096,
                                     ) * 4096,
                                 ),
@@ -96,22 +120,18 @@
                       : [
                             [
                                 'Contains',
-                                `${String(initial_item.children.filter((el) => drive_item(el).type == 'file').length)} Files, ${String(initial_item.children.filter((el) => drive_item(el).type == 'folder').length)} Folders`,
+                                contains_label(initial_item.children),
                             ] satisfies [string, string],
                         ]),
-                  [
-                      'Date Created',
-                      utils.timestamp_to_readable(initial_item.date_created),
-                  ],
-                  [
-                      'Last Modified',
-                      utils.timestamp_to_readable(initial_item.date_modified),
-                  ],
+                  // date_label, not timestamp_to_readable: the latter is
+                  // `date.toString()`, which printed the raw
+                  // "Sun Aug 16 2026 15:04:11 GMT+0400 (…)" and varies by
+                  // timezone.
+                  ['Date Created', date_label(initial_item.date_created)],
+                  ['Last Modified', date_label(initial_item.date_modified)],
               ];
 
-    onMount(() => {
-        console.log(fs_item);
-    });
+    onMount(() => {});
 
     export function destroy() {
         runningPrograms.update((programs) =>
@@ -133,34 +153,6 @@
         minimize_btn: false,
         exec_path,
     };
-
-    function size_cal(item_id: string): number {
-        console.log(item_id);
-        let total_size = _.sum(
-            drive_item(item_id)
-                .children.map((el) => drive_item(el))
-                .filter((el) => el.type == 'file')
-                .map((el) => el.size),
-        );
-
-        const folders = drive_item(item_id).children.filter(
-            (el) => drive_item(el).type == 'folder',
-        );
-        for (const folder of folders) {
-            total_size += size_cal(folder);
-        }
-        return total_size;
-    }
-
-    function file_icon(item: VfsItem) {
-        if (item.icon != null) {
-            return `url(${item.icon})`;
-        }
-        if (icons[item.ext] != null) {
-            return `url(/images/xp/icons/${icons[item.ext] ?? ''})`;
-        }
-        return null;
-    }
 </script>
 
 <Window {options} bind:this={window} on_click_close={destroy}>
@@ -184,7 +176,7 @@
                     {#if fs_item?.type == 'file'}
                         <div
                             class="w-[50px] h-[50px] shrink-0 bg-[url(/images/xp/icons/Default.png)] bg-contain bg-no-repeat"
-                            style:background-image={file_icon(fs_item)}
+                            style:background-image={file_icon_url(fs_item)}
                         ></div>
                     {:else}
                         <div

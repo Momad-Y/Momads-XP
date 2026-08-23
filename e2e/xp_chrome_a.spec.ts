@@ -1,8 +1,10 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { bootToDesktop } from './helpers';
+import { stubBrowse } from './stub_browse';
 
 async function openMyComputer(page: Page) {
+    await stubBrowse(page);
     await bootToDesktop(page);
     await page.locator('#work-space p', { hasText: 'My Computer' }).dblclick();
     await expect(page.locator('#work-space .window').first()).toBeVisible();
@@ -19,6 +21,17 @@ test('View System Information opens the funny System Properties', async ({
     });
     await expect(sys.getByText('Mohamed Abdelnasser')).toBeVisible();
     await expect(sys.getByText(/raw ambition/)).toBeVisible();
+
+    // the other three tabs are implemented too (profile-driven funny content)
+    await sys.getByText('Computer Name', { exact: true }).click();
+    await expect(sys.getByText('momad-xp.local')).toBeVisible();
+    await sys.getByText('Hardware', { exact: true }).click();
+    await expect(
+        sys.getByText('Caffeine Intake Controller (USB, always-on)'),
+    ).toBeVisible();
+    await sys.getByText('Advanced', { exact: true }).click();
+    await expect(sys.getByText('User Profiles')).toBeVisible();
+
     await sys.getByText('OK', { exact: true }).click();
     await expect(sys).toBeHidden();
 });
@@ -53,7 +66,110 @@ test('Create Shortcut makes a working .lnk that opens its target', async ({
     });
 });
 
+test('File menu > Create Shortcut works in Explorer once an item is selected', async ({
+    page,
+}) => {
+    await openMyComputer(page);
+    const win = page.locator('#work-space .window').first();
+    await win.getByText('Local Disk (C:)').dblclick();
+    await win.locator('.dialog').getByText('OK').click();
+    await page.waitForTimeout(450);
+    await win.locator('.fs-item', { hasText: 'Experience' }).first().dblclick();
+    await page.waitForTimeout(450);
+
+    // select an entry, then use the File menu (not the right-click menu)
+    const entry = win
+        .locator('.fs-item', { hasText: 'Printerpix — AI Engineer.txt' })
+        .first();
+    await entry.click();
+    await win.locator('.toolbar-menu').getByText('File').click();
+    await win.getByText('Create Shortcut', { exact: true }).click();
+
+    await expect(
+        win.getByText('Shortcut to Printerpix — AI Engineer.lnk'),
+    ).toBeVisible({ timeout: 15000 });
+});
+
+test('Explorer File menu greys selection-only actions, like XP', async ({
+    page,
+}) => {
+    await openMyComputer(page);
+    const win = page.locator('#work-space .window').first();
+    await win.getByText('Local Disk (C:)').dblclick();
+    await win.locator('.dialog').getByText('OK').click();
+    await page.waitForTimeout(450);
+    await win.locator('.fs-item', { hasText: 'Experience' }).first().dblclick();
+    await page.waitForTimeout(450);
+
+    const row = (name: string) =>
+        win
+            .locator('p', { hasText: new RegExp(`^${name}$`) })
+            .first()
+            .locator('..');
+
+    await win.locator('.toolbar-menu').getByText('File').click();
+    // The menu must actually be OPEN: toHaveClass does not imply visibility, so
+    // without this guard every assertion below passes with the menu shut.
+    await expect(row('Open')).toBeVisible();
+    // real XP greys the selection-driven verbs when nothing is selected
+    for (const name of ['Open', 'Create Shortcut', 'Delete', 'Rename']) {
+        await expect(row(name)).toHaveClass(/text-slate-400/);
+    }
+    // …while New/Properties/Close stay live
+    for (const name of ['New', 'Properties', 'Close']) {
+        await expect(row(name)).not.toHaveClass(/text-slate-400/);
+    }
+
+    // New ▸ opens its flyout and creates a real file
+    await win.locator('p', { hasText: /^New$/ }).first().hover();
+    await expect(win.getByText('Text Document')).toBeVisible();
+    await win.getByText('Text Document').click();
+    await expect(win.getByText('New Text Document.txt')).toBeVisible({
+        timeout: 15000,
+    });
+});
+
+test('Explorer Tools > Folder Options opens', async ({ page }) => {
+    await stubBrowse(page);
+    await bootToDesktop(page);
+    await page.locator('#work-space p', { hasText: 'My Computer' }).dblclick();
+    const win = page.locator('#work-space .window').first();
+    await win.locator('.toolbar-menu').getByText('Tools').click();
+    await win.getByText('Folder Options...', { exact: true }).click();
+    // .last(): the Explorer window also contains the text "Folder Options..."
+    const dlg = page
+        .locator('#work-space .window', { hasText: 'Folder Options' })
+        .last();
+    await expect(dlg.getByText(/defaults were never that good/)).toBeVisible({
+        timeout: 15000,
+    });
+    await dlg.getByText('View', { exact: true }).click();
+    await expect(dlg.getByText(/checked in spirit/)).toBeVisible();
+    await dlg.getByText('File Types', { exact: true }).click();
+    await expect(dlg.getByText(/Paint's finest hour/)).toBeVisible();
+});
+
+test('IE Tools > Internet Options opens', async ({ page }) => {
+    await stubBrowse(page);
+    await bootToDesktop(page);
+    await page
+        .locator('#work-space p', { hasText: 'Internet Explorer' })
+        .dblclick();
+    const ie = page.locator('#work-space .window').first();
+    await ie.locator('.toolbar-menu').getByText('Tools').click();
+    await ie.getByText('Internet Options...', { exact: true }).click();
+    const dlg = page
+        .locator('#work-space .window', { hasText: 'Internet Options' })
+        .last();
+    await expect(dlg.getByText(/about:momad/)).toBeVisible({ timeout: 15000 });
+    await dlg.getByText('Security', { exact: true }).click();
+    await expect(dlg.getByText(/autoplays sound/)).toBeVisible();
+    await dlg.getByText('Advanced', { exact: true }).click();
+    await expect(dlg.getByText(/careful tinkering/)).toBeVisible();
+});
+
 test('IE Mail button opens Contact Me', async ({ page }) => {
+    await stubBrowse(page);
     await bootToDesktop(page);
     await page
         .locator('#work-space p', { hasText: 'Internet Explorer' })

@@ -8,11 +8,6 @@
 
     function on_rightclick(ev: { x: number; y: number }) {
         contextMenu.set(null);
-        console.log(program);
-        console.log({
-            maximized: program.window?.maximized,
-            minimized: program.window?.minimized,
-        });
         contextMenu.set({
             x: ev.x,
             y: ev.y,
@@ -28,7 +23,6 @@
     function on_click() {
         if (!program.window?.minimized) {
             if (program.window?.z_index == $zIndex) {
-                console.log('minimize');
                 program.window.on_click_minimize();
             } else {
                 program.window?.focus();

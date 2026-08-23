@@ -3,6 +3,7 @@ import {
     clipboard,
     selectingItems,
     wallpaper,
+    hardDrive,
 } from '../../../store';
 import {
     recycle_bin_id,
@@ -16,7 +17,13 @@ import { get } from 'svelte/store';
 import * as fs from '../../../fs';
 import short from 'short-uuid';
 import { saveAs } from 'file-saver';
+import {
+    plan_delete,
+    delete_prompt_icon,
+    delete_prompt_message,
+} from '../../../delete_prompt';
 import { required } from '../../../types';
+import { scoped_ids } from '../../../selection';
 import type { ContextMenuSpec, FSItemOriginator } from '../../../types';
 
 export const make = ({
@@ -25,6 +32,17 @@ export const make = ({
     type: string;
     originator: FSItemOriginator;
 }): ContextMenuSpec => {
+    /**
+     * What this menu is allowed to touch. `selectingItems` is ONE global store
+     * shared by the desktop and every Explorer window, so acting on it raw
+     * deleted/moved items belonging to another surface — whose highlight is
+     * focus-gated and therefore invisible. Falls back to the right-clicked
+     * item alone when the opener did not tell us what it is showing.
+     */
+    const in_scope = (): string[] =>
+        scoped_ids(get(selectingItems), originator.visible_ids, [
+            originator.item.id,
+        ]);
     //originator: a wrapped fs item, i.e, file, folder, drive
     // {item: item, open: fn(), my_computer_instance: obj})
 
@@ -177,9 +195,9 @@ export const make = ({
                     : [
                           {
                               name: 'Cut',
-                              disabled: get(selectingItems).length == 0,
+                              disabled: in_scope().length == 0,
                               action: () => {
-                                  fs.cut();
+                                  fs.cut(in_scope());
                               },
                           },
                       ]),
@@ -189,9 +207,9 @@ export const make = ({
                     : [
                           {
                               name: 'Copy',
-                              disabled: get(selectingItems).length == 0,
+                              disabled: in_scope().length == 0,
                               action: () => {
-                                  fs.copy();
+                                  fs.copy(in_scope());
                               },
                           },
                       ]),
@@ -235,55 +253,46 @@ export const make = ({
                           {
                               name: 'Delete',
                               action: () => {
-                                  const items = [...get(selectingItems)];
-                                  console.log(items);
+                                  const data = get(hardDrive) ?? {};
+                                  // One shared, unit-tested decision (see
+                                  // src/lib/delete_prompt.ts). This used to
+                                  // apply ONE recycle-vs-permanent verdict to
+                                  // the whole batch and skip no protected
+                                  // items, so a selection spanning the Recycle
+                                  // Bin and the desktop destroyed the live file
+                                  // outright.
+                                  const plan = plan_delete(
+                                      in_scope(),
+                                      (id) => data[id],
+                                      (id) => protected_items.includes(id),
+                                      recycle_bin_id,
+                                  );
+                                  if (plan.ids.length === 0) return;
 
                                   const yes_action = () => {
-                                      if (
-                                          originator.item.parent ==
-                                          recycle_bin_id
-                                      ) {
-                                          for (const id of items) {
-                                              fs.del_fs(id);
-                                          }
-                                      } else {
-                                          for (const id of items) {
+                                      for (const id of plan.ids) {
+                                          // Re-check per item at CONFIRM time,
+                                          // like my_computer.delete_selected
+                                          // does. The plan is frozen when the
+                                          // menu opens and executed when OK is
+                                          // clicked, so another window can
+                                          // delete the item in between —
+                                          // clone_fs/del_fs then `required()`
+                                          // it and THROW, which pre-empted
+                                          // dialog.destroy() and left the
+                                          // confirmation stuck on screen.
+                                          if (get(hardDrive)?.[id] == null)
+                                              continue;
+                                          if (!plan.permanent_ids.has(id)) {
                                               fs.clone_fs(
                                                   id,
                                                   recycle_bin_id,
                                                   null,
                                               );
-                                              fs.del_fs(id);
                                           }
+                                          fs.del_fs(id);
                                       }
                                   };
-                                  const filename =
-                                      originator.item.name.length > 70
-                                          ? originator.item.name.slice(0, 70) +
-                                            '...'
-                                          : originator.item.name;
-
-                                  let message: string;
-                                  let plural = '';
-                                  if (items.length == 1) {
-                                      plural = '';
-                                  } else if (items.length == 2) {
-                                      plural = ' and 1 other item';
-                                  } else if (items.length > 2) {
-                                      plural = ` and ${String(items.length - 1)} other items`;
-                                  }
-                                  if (
-                                      originator.item.parent == recycle_bin_id
-                                  ) {
-                                      message = `Do you want to permanently delete ${filename}${plural}? This action can't be undone?`;
-                                  } else {
-                                      message = `Do you want to move ${filename}${plural} to the Recycle Bin?`;
-                                  }
-
-                                  const icon =
-                                      originator.item.parent == recycle_bin_id
-                                          ? '/images/xp/icons/DeleteConfirmation.png'
-                                          : '/images/xp/icons/RecycleBinempty.png';
 
                                   void confirm_delete({
                                       node_ref:
@@ -291,8 +300,14 @@ export const make = ({
                                               ?.window?.node_ref ||
                                           document.body,
                                       title: 'Confirm Delete File',
-                                      icon,
-                                      message,
+                                      icon: delete_prompt_icon(
+                                          plan.all_permanent,
+                                      ),
+                                      message: delete_prompt_message(
+                                          plan.first_name,
+                                          plan.ids.length,
+                                          plan.all_permanent,
+                                      ),
                                       yes_action: yes_action,
                                       no_action: () => {
                                           /* keep the item */
@@ -366,8 +381,13 @@ async function confirm_delete({
         {
             name: 'OK',
             action: () => {
-                yes_action();
-                dialog.destroy();
+                // destroy() in `finally`: any throw inside yes_action used to
+                // skip it and wedge the confirmation permanently open.
+                try {
+                    yes_action();
+                } finally {
+                    dialog.destroy();
+                }
             },
             focus: true,
         },

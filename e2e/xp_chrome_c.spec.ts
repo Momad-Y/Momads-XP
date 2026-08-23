@@ -11,7 +11,7 @@ async function openMyComputer(page: Page) {
 test('Folders button shows a tree that navigates', async ({ page }) => {
     await openMyComputer(page);
     const win = page.locator('#work-space .window').first();
-    await win.getByText('Folders', { exact: true }).click();
+    await win.locator('[tooltip="Folders"]').first().click();
 
     // root entries in the tree
     const tree = win.locator('div[role="treeitem"]');
@@ -29,16 +29,20 @@ test('Folders button shows a tree that navigates', async ({ page }) => {
 test('Search button finds files by name', async ({ page }) => {
     await openMyComputer(page);
     const win = page.locator('#work-space .window').first();
-    await win.getByText('Search', { exact: true }).click();
+    await win.locator('[tooltip="Search"]').first().click();
 
+    // click before typing: fill() focuses without dispatching a click, so it
+    // can drive a path no user can reach (see e2e/favorites.spec.ts)
+    await win.getByPlaceholder('All or part of a name').click();
     await win.getByPlaceholder('All or part of a name').fill('Resume');
-    // the panel's own Search button (last match; toolbar button is first)
-    await win.getByText('Search', { exact: true }).last().click();
+    // the panel's own Search button, not the toolbar one
+    await win.getByRole('button', { name: 'Search', exact: true }).click();
 
     await expect(win.getByText('Mohamed_Abdelnasser_Resume.pdf')).toBeVisible();
 
     // a nonsense query yields the empty state
+    await win.getByPlaceholder('All or part of a name').click();
     await win.getByPlaceholder('All or part of a name').fill('zzzznope');
-    await win.getByText('Search', { exact: true }).last().click();
+    await win.getByRole('button', { name: 'Search', exact: true }).click();
     await expect(win.getByText('No items match your search.')).toBeVisible();
 });

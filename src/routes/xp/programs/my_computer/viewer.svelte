@@ -1,6 +1,7 @@
 <svelte:options accessors={true} />
 
 <script lang="ts">
+    import { file_icon_url } from '../../../../lib/file_icon';
     import {
         contextMenu,
         selectingItems,
@@ -14,7 +15,6 @@
     import * as utils from '../../../../lib/utils';
     import {
         doctypes,
-        icons,
         my_computer,
         hidden_items,
         recycle_bin_id,
@@ -22,12 +22,22 @@
     } from '../../../../lib/system';
     import * as fs from '../../../../lib/fs';
     const { long_press, double_tap } = utils;
-    import { createEventDispatcher, tick, mount } from 'svelte';
+    import { createEventDispatcher, onDestroy, tick, mount } from 'svelte';
     import { get, set } from 'idb-keyval';
     import { parse_dir } from '../../../../lib/dir_parser';
+    import {
+        column_value,
+        default_details_columns,
+        size_label,
+        type_label,
+        visible_columns,
+    } from '../../../../lib/details_columns';
+    import type { DetailsColumnKey } from '../../../../lib/details_columns';
+    import { scoped_ids } from '../../../../lib/selection';
     import { required } from '../../../../lib/types';
     import { show_no_association_dialog } from '../../../../lib/no_association';
     import type {
+        HardDrive,
         FSItemOriginator,
         MountedComponent,
         MyComputerInstance,
@@ -45,33 +55,50 @@
         'Thumbnails' | 'Tiles' | 'Icons' | 'List' | 'Details' = 'Icons';
 
     // Per-mode layout classes for the item box, icon and label.
+    /**
+     * XP's five layouts, which three of these were not:
+     *  - Thumbnails: big preview, caption BELOW, centred
+     *  - Tiles: 48px icon, name in bold with two subtext lines beside it
+     *  - Icons: 32px icon, caption BELOW in a grid
+     *  - List: small icon, name beside it, flowing down then across
+     *  - Details: small icon, name, then one cell per chosen column
+     * Icons was icon-left/label-right (which is Tiles' shape), Tiles was a
+     * smaller Icons, and the label-below layout XP calls Icons was only
+     * reachable as Thumbnails.
+     */
     $: item_box = {
         Thumbnails: 'w-[120px] flex-col items-center m-2 text-center',
         Tiles: 'w-[220px] flex-row items-center m-1',
-        Icons: 'w-[150px] flex-row items-center m-2',
-        List: 'w-[180px] flex-row items-center mx-2 my-0.5',
-        Details: 'w-full flex-row items-center mx-1 my-0.5',
+        Icons: 'w-[90px] flex-col items-center m-2 text-center',
+        // the wrapper switches to CSS columns for List (see `list_flow`), so
+        // this only has to size the row
+        List: 'w-full flex-row items-center px-2 my-0.5',
+        // px-1, NOT mx-1: the sticky header uses padding, so a margin here made
+        // every right-anchored column sit 8px out of register and pushed the
+        // row past the scroller, giving Details a permanent phantom
+        // horizontal scrollbar.
+        // min-w-full + w-max, NOT w-full: a row pinned to the scroller's
+        // width can never overflow, so every pixel lost to a narrowed window
+        // came out of the only flexible cell — the NAME. At ~490px wide every
+        // filename rendered as a single letter while Size/Type/Date kept full
+        // width. XP keeps column widths and scrolls horizontally instead.
+        Details: 'min-w-full w-max flex-row items-center px-1 my-0.5',
     }[view_mode];
     $: icon_box = {
         Thumbnails: 'w-[80px] h-[80px]',
-        Tiles: 'w-[32px] h-[32px]',
-        Icons: 'w-[50px] h-[50px]',
+        Tiles: 'w-[48px] h-[48px]',
+        Icons: 'w-[32px] h-[32px]',
         List: 'w-[16px] h-[16px]',
         Details: 'w-[16px] h-[16px]',
     }[view_mode];
 
-    function type_label(item: VfsItem): string {
-        if (item.type === 'folder') return 'File Folder';
-        if (item.type === 'drive') return 'Local Disk';
-        if (item.type === 'removable_storage') return 'Removable Disk';
-        return item.ext !== ''
-            ? `${item.ext.slice(1).toUpperCase()} File`
-            : 'File';
-    }
-    function size_label(item: VfsItem): string {
-        if (item.type !== 'file') return '';
-        return `${String(item.size ?? 0)} KB`;
-    }
+    /**
+     * Which Details columns to render (View > Choose Details...). Name is
+     * always shown — it is the item label itself — so only the REST are laid
+     * out as columns beside it.
+     */
+    export let details: readonly DetailsColumnKey[] = default_details_columns;
+    $: extra_columns = visible_columns(details).filter((c) => c.key !== 'name');
 
     /** A point with the optional modifier keys of a (possibly synthetic) click. */
     interface MenuTrigger {
@@ -99,18 +126,81 @@
 
     let sorted_items: VfsItem[] | null;
     $: sorted_items = id ? null : null; //reset sorted_items every time id changes
-    $: if (id !== undefined) {
+    // Clear on EVERY navigation. The old `if (id !== undefined)` guard missed
+    // the My Computer root, whose id is literally `undefined`, so a one-hop
+    // Back left a phantom selection actionable (red-team H3).
+    $: clear_on_navigate(id);
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- the param exists purely so the reactive statement re-runs when `id` changes
+    function clear_on_navigate(_id: string | null | undefined) {
         $selectingItems = [];
     }
+
+    /**
+     * Ids this window is actually showing right now. The File menu filters the
+     * global `selectingItems` through this so it can never act on an item that
+     * lives in another window or on the desktop (red-team CRITICAL).
+     */
+    export let visible_ids: string[] = [];
+    $: visible_ids =
+        id == null ? computer.map((el) => el.id) : items.map((el) => el.id);
     const worker = new Worker(new URL('./sort.js', import.meta.url), {
         type: 'module',
     });
     worker.onmessage = ({ data }: MessageEvent<SortMessage>) => {
         if (data.type == 'sorted' && data.id == id) {
-            console.log('update sorted_items', id);
             sorted_items = data.sorted_items;
         }
     };
+
+    /**
+     * Bumped by `refresh()` so the folder is re-derived even though nothing
+     * about it changed. It rides in the sort hash because the block below only
+     * posts to the worker when `hash !== last_sort_tx_hash` — without the
+     * nonce a Refresh would null `sorted_items`, never re-post, and the folder
+     * would hang on "working on it..." forever. (NOT for sort.js's `cache`:
+     * that object is read but never written.)
+     */
+    let refresh_nonce = 0;
+
+    /**
+     * The My Computer ROOT renders `computer`, not the sorted item list, so
+     * the nonce above — read only inside `if (current_folder)` — never reached
+     * it and Refresh was a live no-op there: precisely the dead-control
+     * problem the View menu work existed to remove. Threading the nonce
+     * through the derivation makes F5 re-enumerate the drives, as XP does.
+     */
+    let root_loading = false;
+
+    /** View > Refresh (and F5): re-read the folder and re-sort it. */
+    export function refresh() {
+        // A rename in flight must be ABANDONED, not committed. Refreshing
+        // tears the item list down, which blurs the rename textarea, and the
+        // blur handler would commit whatever had been typed — the exact trap
+        // Escape was fixed for (red-team M1). F5 is a reflex key, so this was
+        // reachable by accident mid-edit.
+        if (renaming) cancel_renaming();
+        sorted_items = null;
+        refresh_nonce++;
+        if (id == null) {
+            // setTimeout, NOT tick(): tick() resolves inside the same microtask
+            // drain that flushed the write, so no frame could ever be painted
+            // between the two states and Refresh at the root stayed invisible.
+            // A real minimum duration is the only thing that makes the control
+            // observably do something.
+            root_loading = true;
+            if (root_loading_timer != null) clearTimeout(root_loading_timer);
+            root_loading_timer = setTimeout(() => {
+                root_loading = false;
+                root_loading_timer = null;
+            }, 150);
+        }
+    }
+
+    let root_loading_timer: ReturnType<typeof setTimeout> | null = null;
+    onDestroy(() => {
+        if (root_loading_timer != null) clearTimeout(root_loading_timer);
+    });
 
     let last_sort_tx_hash: string | null | undefined;
     $: {
@@ -118,12 +208,12 @@
             const hash_object = {
                 id,
                 items,
+                refresh_nonce,
                 sort_option: current_folder.sort_option,
                 sort_order: current_folder.sort_order,
             };
 
             const hash = hash_sum(hash_object);
-            console.log({ hash });
             if (hash != last_sort_tx_hash) {
                 // eslint-disable-next-line no-useless-assignment -- read on the next run of this reactive block
                 last_sort_tx_hash = hash;
@@ -138,10 +228,18 @@
     $: is_focus = $zIndex == my_computer_instance.window?.z_index;
     // Filter (don't throw) on missing ids: an offline stale cached drive may
     // predate newer seeded entries in the list (Phase 2 red-team M1).
-    const computer = my_computer.flatMap((el) => {
-        const item = $hardDrive?.[el];
-        return item == null ? [] : [item];
-    });
+    // Reactive, not a one-shot const: the root list used to be frozen at mount,
+    // so a drive renamed elsewhere never updated and View > Refresh had nothing
+    // to re-derive here.
+    $: computer = derive_computer($hardDrive, refresh_nonce);
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- both params exist so the reactive statement re-runs when either changes
+    function derive_computer(drive: HardDrive | null, _nonce: number) {
+        return my_computer.flatMap((el) => {
+            const item = drive?.[el];
+            return item == null ? [] : [item];
+        });
+    }
 
     let node_ref: HTMLDivElement;
     $: {
@@ -232,6 +330,7 @@
         const originator: FSItemOriginator = {
             item,
             my_computer_instance,
+            visible_ids,
             open: (item_id: string) => {
                 open(item_id);
             },
@@ -282,7 +381,6 @@
 
         const handlers = doctypes[fs_item.ext.toLowerCase()];
         if (fs_item.type == 'file') {
-            console.log(fs_item);
             if (fs_item.executable) {
                 queueProgram.set({
                     path: fs_item.url,
@@ -305,22 +403,55 @@
         }
     }
 
-    function rename() {
+    /**
+     * The File menu's Open. Routes through THIS function — the one that
+     * resolves .lnk targets, launches executables and dispatches doctypes —
+     * rather than my_computer's navigate-only `open()`, which used to send
+     * Explorer *inside* a file (red-team H1).
+     */
+    export function open_item(item_id: string) {
+        open(item_id);
+    }
+
+    // exported so the Explorer File menu can trigger it too (accessors={true});
+    // requires a selection — callers must gate on $selectingItems
+    export function rename() {
+        // Clear the latch BEFORE arming a new edit. It is only ever cleared
+        // inside end_renaming, and cancelling removes the focused textarea —
+        // which fires no blur in Chromium/WebKit — so one Escape (or one F5,
+        // since refresh() cancels too) left it set and silently discarded the
+        // NEXT rename's commit.
+        rename_cancelled = false;
         renaming = true;
         void tick().then(() => {
-            const item_id = required($selectingItems[0], 'renaming selection');
+            // the SCOPED selection, not $selectingItems[0]: the raw store can
+            // lead with an id belonging to the desktop or another window, and
+            // this then measured the wrong basename — or threw, inside an
+            // unawaited promise, if that id had since been deleted.
+            const item_id = scoped_ids($selectingItems, visible_ids)[0];
+            if (item_id == null) {
+                renaming = false;
+                return;
+            }
             const el = document.querySelector<HTMLTextAreaElement>(
                 `div[fs-id="${item_id}"] textarea`,
             );
-            const end_range = required(
-                $hardDrive?.[item_id],
-                'fs item ' + item_id,
-            ).basename.length;
-            if (el != null) el.setSelectionRange(0, end_range);
+            const end_range = $hardDrive?.[item_id]?.basename.length;
+            if (el != null && end_range != null)
+                el.setSelectionRange(0, end_range);
         });
     }
 
+    let rename_cancelled = false;
+
     function end_renaming(e: Event, item: VfsItem) {
+        // Escape abandoned the edit: swallow the blur that tearing down the
+        // textarea triggers, so the typed value is never committed.
+        if (rename_cancelled) {
+            rename_cancelled = false;
+            renaming = false;
+            return;
+        }
         const target = e.target;
         if (!(target instanceof HTMLTextAreaElement)) return;
         const name = utils.sanitize_filename(target.value);
@@ -357,17 +488,27 @@
         renaming = false;
     }
 
+    /**
+     * XP's Escape during an inline rename ABANDONS the edit. Without this the
+     * textarea's blur handler committed whatever had been typed — and PR #81
+     * taught users that Escape dismisses things, making the muscle memory
+     * destructive on exactly this surface (red-team M1).
+     */
+    function cancel_renaming() {
+        rename_cancelled = true;
+        renaming = false;
+    }
+
     function on_keydown(e: KeyboardEvent) {
         if (my_computer_instance.window?.z_index != $zIndex) return;
         if (renaming) return;
         if (id == null) return;
-        console.log('keyevent in my computer');
 
         if (!(e.ctrlKey || e.metaKey)) return;
         if (e.key == 'c') {
-            fs.copy();
+            fs.copy(visible_ids);
         } else if (e.key == 'x') {
-            fs.cut();
+            fs.cut(visible_ids);
         } else if (e.key == 'v') {
             fs.paste(id);
         } else if (e.key == 'a') {
@@ -392,16 +533,6 @@
 
     function on_drop_over(e: DragEvent) {
         e.preventDefault();
-    }
-
-    function file_icon(item: VfsItem) {
-        if (item.icon != null) {
-            return `url(${item.icon})`;
-        }
-        if (icons[item.ext] != null) {
-            return `url(/images/xp/icons/${icons[item.ext] ?? ''})`;
-        }
-        return null;
     }
 
     async function show_guide() {
@@ -468,8 +599,12 @@
         }
     }}
 >
+    <!-- XP's List view fills the first column top-to-bottom and then wraps to
+         the next column; an inline-flow of inline-blocks reads across the rows
+         instead, which is the wrong order for anyone who used XP -->
     <div
         class="w-full min-h-[90%]"
+        class:columns-[180px]={view_mode === 'List'}
         class:hidden={id == null}
         on:contextmenu|self={show_void_menu}
         on:click|self={() => {
@@ -484,12 +619,19 @@
         {#if sorted_items}
             {#if view_mode === 'Details'}
                 <div
-                    class="flex flex-row items-center border-b border-stone-300 bg-[#f1f0e8] text-[11px] font-bold text-slate-700 px-1 sticky top-0"
+                    class="flex flex-row items-center border-b border-stone-300 bg-[#f1f0e8] text-[11px] font-bold text-slate-700 px-1 sticky top-0 min-w-full w-max"
                 >
                     <span class="w-[16px] shrink-0"></span>
-                    <span class="grow px-1 mx-0.5">Name</span>
-                    <span class="w-[90px] shrink-0">Type</span>
-                    <span class="w-[70px] shrink-0 text-right pr-2">Size</span>
+                    <span class="grow px-1 mx-0.5 min-w-[180px]">Name</span>
+                    {#each extra_columns as col (col.key)}
+                        <span
+                            data-header={col.key}
+                            class="shrink-0 truncate {col.align === 'right'
+                                ? 'text-right pr-2'
+                                : ''}"
+                            style:width="{col.width ?? 90}px">{col.label}</span
+                        >
+                    {/each}
                 </div>
             {/if}
             {#each sorted_items as item (item.id)}
@@ -533,7 +675,7 @@
                     {#if previewable_exts.includes(item.ext)}
                         <div class="{icon_box} shrink-0">
                             <Previewable
-                                default_icon={file_icon(item)}
+                                default_icon={file_icon_url(item)}
                                 fs_id={item.id}
                             ></Previewable>
                         </div>
@@ -543,35 +685,66 @@
                         {item.type == 'folder'
                                 ? 'bg-[url(/images/xp/icons/FolderClosed.png)]'
                                 : 'bg-[url(/images/xp/icons/Default.png)]'} "
-                            style:background-image={file_icon(item)}
+                            style:background-image={file_icon_url(item)}
                         ></div>
                     {/if}
-                    <p
-                        class="px-1 mx-0.5 text-[11px] {view_mode === 'List' ||
-                        view_mode === 'Details'
-                            ? 'truncate grow'
-                            : 'break-words line-clamp-2 text-ellipsis'} leading-tight
-                        {$selectingItems.includes(item.id) && is_focus
-                            ? 'bg-blue-600 text-slate-50'
-                            : ''}"
+                    <!-- a wrapper that disappears (display:contents) in every
+                         mode but Tiles, where XP stacks the name above two
+                         subtext lines beside a 48px icon -->
+                    <div
+                        class={view_mode === 'Tiles'
+                            ? 'flex flex-col min-w-0 grow'
+                            : 'contents'}
                     >
-                        {item.name}
-                    </p>
+                        <p
+                            class="px-1 mx-0.5 text-[11px] {view_mode ===
+                                'List' || view_mode === 'Details'
+                                ? 'truncate grow min-w-[180px]'
+                                : // w-full + min-w-0: Thumbnails is the only
+                                  // column-flex box, so without a width the label
+                                  // sized to max-content and the parent's
+                                  // overflow-hidden sliced a long name at BOTH
+                                  // ends — "med_Abdelnasser_Resun", no ellipsis
+                                  'break-words line-clamp-2 text-ellipsis w-full min-w-0'} leading-tight
+                        {$selectingItems.includes(item.id) && is_focus
+                                ? 'bg-blue-600 text-slate-50'
+                                : ''}"
+                        >
+                            {item.name}
+                        </p>
+                        {#if view_mode === 'Tiles'}
+                            <!-- XP's Tiles puts type and size under the name -->
+                            <span
+                                class="px-1 mx-0.5 text-[11px] text-slate-600 truncate"
+                                >{type_label(item)}</span
+                            >
+                            {#if size_label(item) !== ''}
+                                <span
+                                    class="px-1 mx-0.5 text-[11px] text-slate-600 truncate"
+                                    >{size_label(item)}</span
+                                >
+                            {/if}
+                        {/if}
+                    </div>
                     {#if view_mode === 'Details'}
-                        <span
-                            class="w-[90px] shrink-0 text-[11px] text-slate-600 truncate"
-                            >{type_label(item)}</span
-                        >
-                        <span
-                            class="w-[70px] shrink-0 text-[11px] text-slate-600 text-right pr-2"
-                            >{size_label(item)}</span
-                        >
+                        {#each extra_columns as col (col.key)}
+                            <span
+                                data-cell={col.key}
+                                class="shrink-0 text-[11px] text-slate-600 truncate {col.align ===
+                                'right'
+                                    ? 'text-right pr-2'
+                                    : ''}"
+                                style:width="{col.width ?? 90}px"
+                                >{column_value(item, col.key)}</span
+                            >
+                        {/each}
                     {/if}
                     {#if $selectingItems.includes(item.id) && renaming}
                         <textarea
                             autofocus
                             on:keydown={(e) => {
                                 if (e.key == 'Enter') end_renaming(e, item);
+                                else if (e.key == 'Escape') cancel_renaming();
                             }}
                             on:blur={(e) => {
                                 end_renaming(e, item);
@@ -590,7 +763,15 @@
         {/if}
     </div>
 
-    <div class="w-full" class:hidden={id != null}>
+    {#if id == null && root_loading}
+        <p
+            data-root-loading
+            class="text-center text-sm font-Trebuchet my-2 text-slate-500"
+        >
+            working on it...
+        </p>
+    {/if}
+    <div class="w-full" class:hidden={id != null || root_loading}>
         <p class="ml-2 mt-0.5 font-MSSS text-black text-[11px] font-bold">
             Files Stored on This Computer
         </p>

@@ -215,7 +215,6 @@
 
         translateX = `translateX(${String(tile_center.x - window_center.x)}px)`;
         translateY = `translateY(${String(tile_center.y - window_center.y)}px)`;
-        console.log(`${translateX} ${translateY} scale(0.1)`);
 
         minimized = true;
         loose_focus();
@@ -240,7 +239,6 @@
 
     export function loose_focus() {
         if (z_index == $zIndex) {
-            console.log('loose focus');
             zIndex.update((value) => value + 1);
         }
     }

@@ -1,6 +1,8 @@
 <svelte:options accessors={true} />
 
 <script lang="ts">
+    import { folder_size } from '../../../lib/fs_size';
+    import { type_label } from '../../../lib/details_columns';
     import Window from '../../../lib/components/xp/Window.svelte';
     import Button from '../../../lib/components/xp/Button.svelte';
     import Tab from '../../../lib/components/xp/Tab.svelte';
@@ -9,7 +11,6 @@
     import { runningPrograms, hardDrive } from '../../../lib/store';
     import { icons } from '../../../lib/system';
     import * as utils from '../../../lib/utils';
-    import _ from 'lodash';
     import { required } from '../../../lib/types';
     import type {
         ProgramInstance,
@@ -24,11 +25,6 @@
     export let parentNode: HTMLElement | undefined = undefined;
     export let fs_item: VfsItem | undefined = undefined;
     export let exec_path: string;
-
-    /** Fail-fast lookup mirroring the untyped base's direct dereferences. */
-    function drive_item(item_id: string): VfsItem {
-        return required($hardDrive?.[item_id], 'fs item ' + item_id);
-    }
 
     interface DiskDetails {
         type: string;
@@ -46,9 +42,11 @@
         'disk properties fs item',
     );
     const details: DiskDetails = {
-        type: disk.type == 'drive' ? 'Local Disk' : 'Removable Storage',
+        // shared with the Details column and the file Properties sheet, which
+        // both said "Removable Disk" where this said "Removable Storage"
+        type: type_label(disk),
         format: 'FAT32',
-        used_space: size_cal(disk.id),
+        used_space: folder_size($hardDrive ?? {}, disk.id),
         // The untyped base compared `used_space > details.capacity` before
         // `capacity` had ever been set, so that clamp branch could never fire
         // and the drive's declared capacity always won (bug kept, reported).
@@ -58,7 +56,6 @@
     details.free_space = details.capacity - details.used_space;
 
     onMount(() => {
-        console.log(fs_item);
         draw_chart();
     });
 
@@ -82,24 +79,6 @@
         minimize_btn: false,
         exec_path,
     };
-
-    function size_cal(item_id: string): number {
-        let total_size = _.sum(
-            drive_item(item_id)
-                .children.map((el) => drive_item(el))
-                .filter((el) => el.type == 'file')
-                .map((el) => el.size),
-        );
-
-        const folders = drive_item(item_id).children.filter(
-            (el) => drive_item(el).type == 'folder',
-        );
-
-        for (const folder of folders) {
-            total_size += size_cal(folder);
-        }
-        return total_size;
-    }
 
     function draw_chart() {
         google.charts.load('current', { packages: ['corechart'] });

@@ -1,28 +1,55 @@
 <svelte:options accessors={true} />
 
 <script lang="ts">
+    import { file_icon_url } from '../../../lib/file_icon';
     import Window from '../../../lib/components/xp/Window.svelte';
-    import { unmount } from 'svelte';
+    import { unmount, mount } from 'svelte';
     import {
         runningPrograms,
         hardDrive,
         queueProgram,
+        selectingItems,
+        zIndex,
+        contextMenu,
     } from '../../../lib/store';
-    import { recycle_bin_id, icons } from '../../../lib/system';
+    import { recycle_bin_id, protected_items } from '../../../lib/system';
+    import * as fs from '../../../lib/fs';
+    import {
+        is_permanent_delete,
+        delete_prompt_icon,
+        delete_prompt_message,
+    } from '../../../lib/delete_prompt';
+    import Dialog from '../../../lib/components/xp/Dialog.svelte';
     import Menu from '../../../lib/components/xp/Menu.svelte';
     import RButton from '../../../lib/components/xp/RButton.svelte';
     import Viewer from './my_computer/viewer.svelte';
     import * as finder from '../../../lib/finder';
     import * as utils from '../../../lib/utils';
-    import { favorites } from '../../../lib/favorites';
+    import {
+        favorites,
+        favorite_icon,
+        is_shell_favorite,
+    } from '../../../lib/favorites';
+    import type { Favorite } from '../../../lib/favorites';
+    import { status_info } from '../../../lib/status_bar';
+    import { scoped_ids } from '../../../lib/selection';
+    import { visible_trail } from '../../../lib/history_window';
+    import { default_details_columns } from '../../../lib/details_columns';
+    import type { DetailsColumnKey } from '../../../lib/details_columns';
     import Sidebar from './my_computer/sidebar.svelte';
     import SearchPanel from './my_computer/search_panel.svelte';
     import FoldersTree from './my_computer/folders_tree.svelte';
+    import FavoritesPanel from './my_computer/favorites_panel.svelte';
+    import HistoryPanel from './my_computer/history_panel.svelte';
+    import ChooseDetails from './my_computer/choose_details.svelte';
     import { required } from '../../../lib/types';
     import type {
+        HistoryEntry,
         MenuBarEntry,
         ProgramInstance,
+        MountedComponent,
         VfsItem,
+        ViewerController,
         WindowController,
         WindowOptions,
     } from '../../../lib/types';
@@ -67,7 +94,9 @@
         }
     }
 
-    export let viewer: Viewer | undefined = undefined;
+    export let viewer: ViewerController | undefined = undefined;
+    /** Ids the viewer is currently rendering (bound below). */
+    let viewer_visible_ids: string[] = [];
 
     // File view mode (§ View menu / Views toolbar dropdown)
     type ViewMode = 'Thumbnails' | 'Tiles' | 'Icons' | 'List' | 'Details';
@@ -81,17 +110,379 @@
     ];
     let views_menu = false;
 
+    /**
+     * The My Computer ROOT renders a fixed two-section layout (drives, then
+     * folders) rather than the item grid, so Thumbnails/Tiles/Icons/List/Details
+     * change nothing there. Grey them rather than let the user click an inert
+     * control — every other location, the Recycle Bin included, is a normal
+     * folder and honours them.
+     */
+    $: views_available = current_history_id != null;
+    // never leave the dropdown open on a view that cannot use it
+    $: if (!views_available) views_menu = false;
+
+    // ── View menu chrome (§ Toolbars / Status Bar / Choose Details) ────────
+    // Each toolbar row is toggled independently, exactly as XP's View >
+    // Toolbars submenu does. State is per WINDOW — two Explorers can disagree
+    // about their chrome, which is why none of this lives in a store.
+    let show_standard_buttons = true;
+    let show_address_bar = true;
+    let show_links = false;
+    let show_status_bar = true;
+    /** Which Details columns this window shows (View > Choose Details...). */
+    let details_visible: DetailsColumnKey[] = [...default_details_columns];
+    let show_choose_details = false;
+
+    /** XP's Links toolbar is the web half of the Favorites list. */
+    $: link_favorites = $favorites.filter((fav) => !is_shell_favorite(fav));
+
+    function focused(): boolean {
+        return window?.z_index === $zIndex;
+    }
+
+    /** XP closes an open dropdown on Escape, and refreshes the folder on F5. */
+    function on_keydown(event: KeyboardEvent) {
+        if (!focused()) return; // focused window only
+        if (event.key === 'F5') {
+            event.preventDefault();
+            // A modal owns the keyboard: don't refresh the list underneath it.
+            // Searches the WHOLE document, not this window's subtree: the
+            // no-association dialog mounts into #desktop, so a subtree query
+            // missed it while catching the delete confirmation — two dialogs a
+            // user cannot tell apart behaving differently. And it fails CLOSED
+            // now: `node_ref` is undefined before mount, and `undefined == null`
+            // let the old guard refresh anyway.
+            if (document.querySelector('.dialog') == null) refresh();
+            return;
+        }
+        if (event.key !== 'Escape') return;
+        if ($contextMenu != null) return;
+        if (show_choose_details) {
+            show_choose_details = false;
+            return;
+        }
+        if (views_menu) views_menu = false;
+        // Escape does NOT close the Explorer Bar. That was invented rather
+        // than ported — XP dismisses a bar from its ✕ or by re-toggling
+        // Ctrl+E/I/H — and it cost three defects, because four independent
+        // `svelte:window` listeners each decided in isolation: Escape reached
+        // through an open dialog to close the bar behind it, collapsed the
+        // menu bar and the bar together, and discarded a typed Search query
+        // and its results (both are component-local and die with the panel).
+    }
+
+    // ── File menu ────────────────────────────────────────────
+    // Real XP's Explorer File menu is selection-driven: Open / Create Shortcut
+    // / Delete / Rename grey out together when nothing is selected, which is
+    // what makes the greying read as contextual rather than broken. Actions
+    // reuse the same fs calls as the right-click menu.
+    // `selectingItems` is ONE global store shared by the desktop and every
+    // Explorer window, so it must be filtered to the ids this window is
+    // actually showing. Without this, an Explorer sitting on C:\ would happily
+    // Delete/Rename/Shortcut an item selected on the desktop — which was a
+    // real, reproducible data-loss path (red-team CRITICAL).
+    $: selected_items = scoped_ids($selectingItems, viewer_visible_ids)
+        .map((sid) => $hardDrive?.[sid])
+        .filter((it): it is VfsItem => it != null);
+    $: single_selected = selected_items.length === 1 ? selected_items[0] : null;
+    // eligible for shortcutting: lives in a real folder, isn't already a .lnk
+    $: shortcut_targets = selected_items.filter(
+        (it) =>
+            it.parent != null &&
+            it.parent != recycle_bin_id &&
+            it.ext != '.lnk',
+    );
+    $: deletable = selected_items.filter(
+        (it) => !protected_items.includes(it.id),
+    );
+    $: renamable =
+        single_selected != null &&
+        !protected_items.includes(single_selected.id) &&
+        single_selected.parent != recycle_bin_id
+            ? single_selected
+            : null;
+    // "New ▸" targets the folder we are browsing. Gate on the item actually
+    // being a container: Explorer must never create a child under a FILE node,
+    // which corrupted the persisted tree (red-team H1).
+    $: new_parent =
+        current_history_id != null &&
+        current_history_id != recycle_bin_id &&
+        current_history_item != null &&
+        (current_history_item.type === 'folder' ||
+            current_history_item.type === 'drive' ||
+            current_history_item.type === 'removable_storage')
+            ? current_history_id
+            : null;
+    // Properties falls back to the folder itself, like XP
+    $: properties_target = single_selected ?? current_history_item;
+    /**
+     * Add to Favorites targets whatever is SELECTED — a file just as much as a
+     * folder — and otherwise the folder the window is showing, which is XP's
+     * default. Opening a file favourite launches it in its associated program,
+     * the same as double-clicking would.
+     */
+    $: favorite_target = single_selected ?? current_history_item;
+
+    function make_shortcuts() {
+        for (const it of shortcut_targets) {
+            fs.create_shortcut(
+                it.id,
+                required(it.parent, 'parent of ' + it.id),
+            );
+        }
+    }
+
+    function delete_selected() {
+        const batch = [...deletable];
+        const first = batch[0];
+        if (first == null) return;
+        // Per ITEM, never per batch: collapsing this to one verdict is what
+        // permanently destroyed a live file when a batch spanned the Recycle
+        // Bin and the desktop (red-team CRITICAL). The prompt only claims
+        // permanence when every item is already binned.
+        const all_permanent = batch.every((it) =>
+            is_permanent_delete(it.parent, recycle_bin_id),
+        );
+        // Wording lives in src/lib/delete_prompt.ts (unit-tested).
+        const dialog: MountedComponent = mount(Dialog, {
+            target: window?.node_ref ?? document.body,
+            props: {
+                title: 'Confirm Delete File',
+                icon: delete_prompt_icon(all_permanent),
+                message: delete_prompt_message(
+                    first.name,
+                    batch.length,
+                    all_permanent,
+                ),
+                get_self: () => dialog,
+                buttons: [
+                    {
+                        name: 'OK',
+                        focus: true,
+                        action: () => {
+                            for (const it of batch) {
+                                // re-check per item; a folder deleted earlier
+                                // in this loop may have taken a descendant
+                                // with it, so skip ids that are already gone
+                                if ($hardDrive?.[it.id] == null) continue;
+                                if (
+                                    !is_permanent_delete(
+                                        it.parent,
+                                        recycle_bin_id,
+                                    )
+                                ) {
+                                    fs.clone_fs(it.id, recycle_bin_id, null);
+                                }
+                                fs.del_fs(it.id);
+                            }
+                            void unmount(dialog);
+                        },
+                    },
+                    {
+                        name: 'Cancel',
+                        action: () => {
+                            void unmount(dialog);
+                        },
+                    },
+                ],
+            },
+        });
+    }
+
+    function open_properties() {
+        const target = properties_target;
+        if (target == null) {
+            // My Computer root: XP opens System Properties here (same dialog
+            // as right-clicking My Computer / the sidebar's "View System
+            // Information"), so the root's File menu is never fully dead.
+            queueProgram.set({
+                path: './programs/system_properties.svelte',
+            });
+            return;
+        }
+        queueProgram.set({
+            path:
+                target.type == 'drive' || target.type == 'removable_storage'
+                    ? './programs/disk_properties.svelte'
+                    : './programs/properties.svelte',
+            fs_item: target,
+        });
+    }
+
+    /** XP's File > New ▸ — same entries as the folder-background menu. */
+    $: new_submenu =
+        new_parent == null
+            ? []
+            : [
+                  {
+                      name: 'Folder',
+                      icon: '/images/xp/icons/FolderClosed.png',
+                      action: () => {
+                          void fs.new_fs_item(
+                              'folder',
+                              '',
+                              'New Folder',
+                              new_parent,
+                          );
+                      },
+                  },
+                  {
+                      name: 'Shortcut',
+                      icon: '/images/xp/icons/Shortcutoverlay.png',
+                      disabled: true,
+                  },
+                  {
+                      name: 'Briefcase',
+                      icon: '/images/xp/icons/Briefcase.png',
+                      disabled: true,
+                  },
+                  {
+                      name: 'Bitmap Image',
+                      icon: '/images/xp/icons/Bitmap.png',
+                      action: () => {
+                          void fs.new_fs_item(
+                              'file',
+                              '.bmp',
+                              'New Bitmap Image',
+                              new_parent,
+                          );
+                      },
+                  },
+                  {
+                      name: 'Text Document',
+                      icon: '/images/xp/icons/TXT.png',
+                      action: () => {
+                          void fs.new_fs_item(
+                              'file',
+                              '.txt',
+                              'New Text Document',
+                              new_parent,
+                          );
+                      },
+                  },
+                  {
+                      name: 'Wave Sound',
+                      icon: '/images/xp/icons/WMV.png',
+                      action: () => {
+                          void fs.new_fs_item(
+                              'file',
+                              '.wav',
+                              'New Sound',
+                              new_parent,
+                          );
+                      },
+                  },
+                  {
+                      name: 'Compressed (zipped) Folder',
+                      icon: '/images/xp/icons/Zipfolder.png',
+                      disabled: true,
+                  },
+              ];
+
+    /** XP's View > Explorer Bar submenu, in XP's order. */
+    interface ExplorerBarEntry {
+        name: string;
+        mode: Exclude<LeftPanel, 'tasks'>;
+    }
+    const explorer_bars: ExplorerBarEntry[] = [
+        { name: 'Search', mode: 'search' },
+        { name: 'Favorites', mode: 'favorites' },
+        { name: 'History', mode: 'history' },
+        { name: 'Folders', mode: 'folders' },
+    ];
+
+    /**
+     * The trail, capped so the flyout cannot be clipped out of the window and
+     * always containing the current stop — see src/lib/history_window.ts.
+     */
+    $: go_to_trail = visible_trail(history_entries, page_index);
+
+    /**
+     * View > Go To ▸ — the toolbar's three navigation buttons plus the trail
+     * itself, with the current stop ticked (XP lists visited folders here).
+     */
+    $: go_to_submenu = [
+        { name: 'Back', disabled: page_index === 0, action: back },
+        {
+            name: 'Forward',
+            disabled: page_index === history.length - 1,
+            action: next,
+        },
+        {
+            name: 'Up One Level',
+            disabled: current_history_id == null,
+            action: up,
+        },
+        // Capped: the flyout has no scroll and the window clips it, so an
+        // uncapped trail pushed the oldest stops out of reach after ~8 hops.
+        ...go_to_trail.map((entry) => ({
+            name: entry.label,
+            check: entry.idx === page_index,
+            // via pick_history, NOT an inline `page_index = …`: an assignment
+            // inside a reactive statement makes it a producer of that variable
+            // and the compiler then sees a cycle (url → page_index → url).
+            action: () => {
+                pick_history(entry.idx);
+            },
+        })),
+    ];
+
     $: menu = [
         {
             name: 'File',
             items: [
                 [
                     {
-                        name: 'Create Shortcut',
+                        name: 'Open',
+                        disabled: single_selected == null,
+                        action: () => {
+                            // viewer.open_item, NOT this component's navigate-only
+                            // open() — that sent Explorer *inside* files.
+                            if (single_selected != null)
+                                viewer?.open_item(single_selected.id);
+                        },
+                    },
+                    {
+                        // the Send To targets live on the right-click menu; XP
+                        // shows it here too, inert like our other stubs
+                        name: 'Send To',
                         disabled: true,
+                        items: [],
                     },
                 ],
                 [
+                    {
+                        name: 'New',
+                        disabled: new_submenu.length === 0,
+                        items: new_submenu,
+                    },
+                ],
+                [
+                    {
+                        name: 'Create Shortcut',
+                        disabled: shortcut_targets.length === 0,
+                        action: make_shortcuts,
+                    },
+                    {
+                        name: 'Delete',
+                        disabled: deletable.length === 0,
+                        action: delete_selected,
+                    },
+                    {
+                        name: 'Rename',
+                        disabled: renamable == null,
+                        action: () => {
+                            viewer?.rename();
+                        },
+                    },
+                ],
+                [
+                    {
+                        // never inert: falls back to System Properties at the
+                        // My Computer root, exactly like XP
+                        name: 'Properties',
+                        action: open_properties,
+                    },
                     {
                         name: 'Close',
                         action: () => {
@@ -108,36 +499,74 @@
                 [
                     {
                         name: 'Toolbars',
-                        disabled: true,
+                        items: [
+                            {
+                                name: 'Standard Buttons',
+                                check: show_standard_buttons,
+                                action: () => {
+                                    show_standard_buttons =
+                                        !show_standard_buttons;
+                                },
+                            },
+                            {
+                                name: 'Address Bar',
+                                check: show_address_bar,
+                                action: () => {
+                                    show_address_bar = !show_address_bar;
+                                },
+                            },
+                            {
+                                name: 'Links',
+                                check: show_links,
+                                action: () => {
+                                    show_links = !show_links;
+                                },
+                            },
+                        ],
                     },
                     {
                         name: 'Status Bar',
-                        disabled: true,
+                        check: show_status_bar,
+                        action: () => {
+                            show_status_bar = !show_status_bar;
+                        },
                     },
                     {
                         name: 'Explorer Bar',
-                        disabled: true,
+                        items: explorer_bars.map((bar) => ({
+                            name: bar.name,
+                            check: left_panel === bar.mode,
+                            action: () => {
+                                toggle_panel(bar.mode);
+                            },
+                        })),
                     },
                 ],
                 view_modes.map((m) => ({
                     name: m,
                     check: view_mode === m,
+                    disabled: !views_available,
                     action: () => {
                         view_mode = m;
                     },
                 })),
                 [
                     {
+                        // only the item list has columns; the fixed root layout
+                        // has none, so it greys with the view modes
                         name: 'Choose Details...',
-                        disabled: true,
+                        disabled: !views_available,
+                        action: () => {
+                            show_choose_details = true;
+                        },
                     },
                     {
                         name: 'Go To',
-                        disabled: true,
+                        items: go_to_submenu,
                     },
                     {
                         name: 'Refresh',
-                        disabled: true,
+                        action: refresh,
                     },
                 ],
             ],
@@ -146,24 +575,29 @@
             name: 'Favorites',
             items: [
                 [
-                    // Favorites are web links (shared with IE); a file Explorer
-                    // has no page/URL to favorite, so these are greyed like the
-                    // other inert XP controls. The list below still opens each
-                    // favorite in IE.
+                    // XP keeps ONE Favorites list for Explorer and IE, and
+                    // Explorer favourites the folder you are looking at.
                     {
                         name: 'Add to Favorites...',
-                        disabled: true,
+                        // a selected folder wins over the open one; only the
+                        // bare My Computer root has nothing to offer
+                        disabled: favorite_target == null,
+                        action: add_to_favorites,
                     },
                     {
                         name: 'Organize Favorites',
-                        disabled: true,
+                        action: organize_favorites,
                     },
                 ],
                 $favorites.map((fav) => ({
                     name: fav.name,
-                    icon: '/images/xp/icons/URL.png',
+                    icon: favorite_icon(fav, $hardDrive),
+                    // A shell favourite goes through the viewer's opener, which
+                    // navigates folders and launches files in their associated
+                    // program — the same as double-clicking. Web favourites
+                    // still hand off to IE.
                     action: () => {
-                        open_favorite(fav.url);
+                        open_favorite_entry(fav);
                     },
                 })),
             ],
@@ -188,7 +622,11 @@
                 [
                     {
                         name: 'Folder Options...',
-                        disabled: true,
+                        action: () => {
+                            queueProgram.set({
+                                path: './programs/folder_options.svelte',
+                            });
+                        },
                     },
                 ],
             ],
@@ -224,21 +662,25 @@
 
     $: mc_interface = { window, up, open };
 
+    /** The address bar's <input>, so the Go button can read what was typed. */
+    let address_input: HTMLInputElement | undefined = undefined;
+
+    /**
+     * Navigate to a typed path. Shared by Enter and the Go button — the arrow
+     * was a bare <div> with no handler at all, so it looked live and did
+     * nothing, which is the class of defect this chrome work exists to remove.
+     */
+    function go_to_address(value: string) {
+        const id = finder.to_id(value) ?? finder.to_id_nocase(value);
+        if (id == null) return; // unresolvable path: same as Enter, no-op
+        open(id);
+        address_input?.blur();
+    }
+
     function on_user_input(e: KeyboardEvent) {
         const target = e.target;
         if (!(target instanceof HTMLInputElement)) return;
-        if (e.key == 'Enter') {
-            let id = finder.to_id(target.value);
-
-            if (id == null) {
-                id = finder.to_id_nocase(target.value);
-            }
-            console.log('found id', id);
-            if (id) {
-                open(id);
-                target.blur();
-            }
-        }
+        if (e.key == 'Enter') go_to_address(target.value);
     }
 
     export function destroy() {
@@ -259,24 +701,8 @@
         exec_path,
     };
 
-    function file_icon(item: VfsItem | null | undefined) {
-        if (item == null) return null;
-        if (item.icon != null) {
-            return `url(${item.icon})`;
-        }
-        if (icons[item.ext] != null) {
-            return `url(/images/xp/icons/${icons[item.ext] ?? ''})`;
-        }
-        if (item.id == recycle_bin_id) {
-            return `url(/images/xp/icons/RecycleBinempty.png)`;
-        }
-        return null;
-    }
-
     export function open(fs_id: string | null | undefined) {
         if (fs_id == history[page_index]) return;
-        console.log('open', fs_id);
-        console.log(fs_id == null ? undefined : $hardDrive?.[fs_id]);
         history = [...history.slice(0, page_index + 1), fs_id];
         page_index = history.length - 1;
     }
@@ -289,10 +715,29 @@
         page_index = Math.min(history.length - 1, page_index + 1);
     }
 
-    // Left explorer bar: common tasks (default), search, or folders tree
-    let left_panel: 'tasks' | 'search' | 'folders' = 'tasks';
-    function toggle_panel(mode: 'search' | 'folders') {
+    // Left explorer bar (View > Explorer Bar): common tasks by default, else
+    // one of XP's four bars.
+    type LeftPanel = 'tasks' | 'search' | 'folders' | 'favorites' | 'history';
+    let left_panel: LeftPanel = 'tasks';
+    function toggle_panel(mode: Exclude<LeftPanel, 'tasks'>) {
         left_panel = left_panel === mode ? 'tasks' : mode;
+    }
+
+    /** View > Refresh, and F5. */
+    function refresh() {
+        viewer?.refresh();
+    }
+
+    function close_explorer_bar() {
+        left_panel = 'tasks';
+    }
+
+    function apply_details(next: DetailsColumnKey[]) {
+        details_visible = next;
+    }
+
+    function close_choose_details() {
+        show_choose_details = false;
     }
 
     // Back/Forward history dropdowns
@@ -302,32 +747,72 @@
         const item = $hardDrive?.[id];
         return item?.display_name ?? item?.name ?? 'My Computer';
     }
-    interface HistoryOption {
-        label: string;
-        idx: number;
+    function history_icon(id: string | null | undefined): string {
+        if (id == null) return '/images/xp/icons/MyComputer.png';
+        const item = $hardDrive?.[id];
+        if (item?.icon != null && item.icon !== '') return item.icon;
+        return '/images/xp/icons/FolderClosed.png';
     }
-    $: back_options = history
-        .slice(0, page_index)
-        .map((id, i): HistoryOption => ({ label: history_label(id), idx: i }))
-        .reverse();
-    $: forward_options = history
-        .slice(page_index + 1)
-        .map((id, i): HistoryOption => ({
-            label: history_label(id),
-            idx: page_index + 1 + i,
-        }));
+    /** The whole trail — the Go To menu and the History bar both walk it. */
+    $: history_entries = history.map((hid, i): HistoryEntry => ({
+        label: history_label(hid),
+        idx: i,
+        icon: history_icon(hid),
+    }));
+    $: back_options = history_entries.slice(0, page_index).reverse();
+    $: forward_options = history_entries.slice(page_index + 1);
     function pick_history(idx: number) {
         history_menu = null;
         page_index = idx;
     }
 
+    // ── Status bar ────────────────────────────────────────────────────────
+    // Counts what THIS window is showing. `viewer_visible_ids` is the same
+    // filter the File menu uses, so a selection made in another window or on
+    // the desktop can never be counted here.
+    $: shown_items = viewer_visible_ids
+        .map((vid) => $hardDrive?.[vid])
+        .filter((it): it is VfsItem => it != null);
+    $: status = status_info(shown_items, selected_items);
+
+    /** Opens a favourite the way both Favorites surfaces do. */
+    function open_favorite_entry(fav: Favorite) {
+        if (fav.fs_id == null || fav.fs_id === '') {
+            open_favorite(fav.url);
+            return;
+        }
+        // A favourite outlives its target: deleting to the Recycle Bin mints a
+        // NEW id for the clone and drops the original, and nothing prunes the
+        // Favorites list. `viewer.open_item` resolves through `required()`, so
+        // a stale id THREW out of the click handler. IE degrades to My
+        // Computer here, so Explorer does the same.
+        if ($hardDrive?.[fav.fs_id] == null) {
+            open(null);
+            return;
+        }
+        viewer?.open_item(fav.fs_id);
+    }
+
+    function add_to_favorites() {
+        if (favorite_target == null) return;
+        queueProgram.set({
+            path: './programs/add_to_favorites.svelte',
+            fs_item: favorite_target,
+        });
+    }
+
+    function organize_favorites() {
+        queueProgram.set({ path: './programs/organize_favorites.svelte' });
+    }
+
     export function up() {
-        const current_id = required(history[page_index], 'current folder id');
-        const parent_id = required(
-            $hardDrive?.[current_id],
-            'fs item ' + current_id,
-        ).parent;
-        open(parent_id);
+        // Tolerate a folder that has since been deleted from another window:
+        // the viewer reactively dispatches open(null) in that case, but Up and
+        // Ctrl+ArrowUp could still fire first and `required()` threw out of a
+        // key handler. Going to the root is what XP does at the top anyway.
+        const current_id = history[page_index];
+        if (current_id == null) return; // already at My Computer
+        open($hardDrive?.[current_id]?.parent ?? null);
     }
 
     function open_favorite(url: string) {
@@ -345,6 +830,8 @@
     }
 </script>
 
+<svelte:window on:keydown={on_keydown} />
+
 <Window {options} bind:this={window} on_click_close={destroy}>
     <div
         slot="content"
@@ -353,7 +840,7 @@
         <div
             class="shrink-0 w-full border-b border-stone-300 flex flex-row items-center justify-between"
         >
-            <Menu {menu}></Menu>
+            <Menu {menu} focused={window?.z_index === $zIndex}></Menu>
             <div
                 class="w-[40px] h-full bg-slate-50 flex items-center justify-center"
             >
@@ -364,6 +851,7 @@
         </div>
         <div
             class="shrink-0 flex flex-row items-center border-b border-stone-300"
+            class:hidden={!show_standard_buttons}
         >
             <div class="relative">
                 <RButton
@@ -464,6 +952,7 @@
                 <RButton
                     icon="/images/xp/icons/FolderView-Classic.png"
                     expandable={true}
+                    disabled={!views_available}
                     on_click={() => (views_menu = !views_menu)}
                     on_expand={() => (views_menu = !views_menu)}
                     tooltip_message="Views"
@@ -495,10 +984,12 @@
         </div>
         <div
             class="shrink-0 flex flex-row items-center border-b border-stone-300 text-[11px] items-center"
+            class:hidden={!show_address_bar}
         >
             <span class="px-2 text-slate-800">Address</span>
             <div class="grow h-[25px] relative">
                 <input
+                    bind:this={address_input}
                     class="absolute inset-0 pl-7 outline-none"
                     type="text"
                     on:click={(e) => {
@@ -512,21 +1003,77 @@
                     {history[page_index] == null
                         ? 'bg-[url(/images/xp/icons/MyComputer.png)]'
                         : 'bg-[url(/images/xp/icons/FolderClosed.png)]'} bg-contain"
-                    style:background-image={file_icon(current_history_item)}
+                    style:background-image={file_icon_url(current_history_item)}
                 ></div>
             </div>
-            <div
-                class="w-[30px] h-[20px] bg-[url(/images/xp/icons/Go.png)] bg-center bg-contain bg-no-repeat"
-            ></div>
+            <!-- a <button>, not a <div>: it was unreachable by keyboard and
+                 had no click handler at all -->
+            <button
+                type="button"
+                aria-label="Go"
+                title="Go"
+                class="w-[30px] h-[20px] shrink-0 bg-[url(/images/xp/icons/Go.png)] bg-center bg-contain bg-no-repeat cursor-pointer"
+                on:click={() => {
+                    go_to_address(address_input?.value ?? '');
+                }}
+            ></button>
+        </div>
+
+        <!-- XP's Links toolbar: the web half of the shared Favorites list -->
+        <div
+            class="shrink-0 flex flex-row items-center gap-1 px-2 py-1 border-b border-stone-300 text-[11px] overflow-x-auto"
+            class:hidden={!show_links}
+        >
+            <span class="shrink-0 text-slate-800">Links</span>
+            {#if link_favorites.length === 0}
+                <span class="text-slate-500 italic">no links yet</span>
+            {/if}
+            {#each link_favorites as fav, i (i)}
+                <button
+                    type="button"
+                    class="shrink-0 flex flex-row items-center px-1 hover:bg-blue-100"
+                    on:click={() => {
+                        open_favorite(fav.url);
+                    }}
+                >
+                    <span
+                        class="w-4 h-4 mr-1 bg-contain bg-no-repeat bg-center"
+                        style:background-image="url({favorite_icon(
+                            fav,
+                            $hardDrive,
+                        )})"
+                    ></span>
+                    {fav.name}
+                </button>
+            {/each}
         </div>
 
         <div class="grow flex flex-row overflow-hidden">
             {#if left_panel === 'search'}
-                <SearchPanel my_computer_instance={mc_interface} />
+                <SearchPanel
+                    my_computer_instance={mc_interface}
+                    on_close={close_explorer_bar}
+                />
             {:else if left_panel === 'folders'}
                 <FoldersTree
                     my_computer_instance={mc_interface}
                     current_id={history[page_index]}
+                    on_close={close_explorer_bar}
+                />
+            {:else if left_panel === 'favorites'}
+                <FavoritesPanel
+                    can_add={favorite_target != null}
+                    on_open={open_favorite_entry}
+                    on_add={add_to_favorites}
+                    on_organize={organize_favorites}
+                    on_close={close_explorer_bar}
+                />
+            {:else if left_panel === 'history'}
+                <HistoryPanel
+                    entries={history_entries}
+                    current_idx={page_index}
+                    on_pick={pick_history}
+                    on_close={close_explorer_bar}
                 />
             {:else}
                 <Sidebar
@@ -537,8 +1084,10 @@
             <div class="grow relative bg-blue-100">
                 <Viewer
                     bind:this={viewer}
+                    bind:visible_ids={viewer_visible_ids}
                     id={history[page_index]}
                     {view_mode}
+                    details={details_visible}
                     on:open={(e: CustomEvent<{ id: string | null }>) => {
                         open(e.detail.id);
                     }}
@@ -546,5 +1095,32 @@
                 ></Viewer>
             </div>
         </div>
+
+        <!-- XP's status bar: object count, size, and the security zone -->
+        <div
+            class="shrink-0 flex flex-row items-center border-t border-stone-300 bg-xp-yellow text-[11px] text-slate-800"
+            class:hidden={!show_status_bar}
+        >
+            <span data-status="objects" class="grow px-2 py-0.5 truncate"
+                >{status.objects}</span
+            >
+            <span
+                data-status="size"
+                class="w-[110px] shrink-0 px-2 py-0.5 border-l border-stone-300 truncate"
+                >{status.size}</span
+            >
+            <span
+                class="w-[110px] shrink-0 px-2 py-0.5 border-l border-stone-300 truncate"
+                >My Computer</span
+            >
+        </div>
+
+        {#if show_choose_details}
+            <ChooseDetails
+                visible={details_visible}
+                on_apply={apply_details}
+                on_close={close_choose_details}
+            />
+        {/if}
     </div>
 </Window>

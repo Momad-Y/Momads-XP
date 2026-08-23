@@ -7,6 +7,7 @@ import type {
     ContextMenuSpec,
     FolderOriginator,
     MenuItem,
+    VfsItem,
 } from '../../../types';
 
 export const make = ({
@@ -27,11 +28,15 @@ export const make = ({
         { name: 'Descending', value: SortOrders.DESCENDING },
     ];
 
-    const folder = () =>
-        required(
-            required(get(hardDrive), 'hard drive')[originator.id],
-            `fs item ${originator.id}`,
-        );
+    /**
+     * The folder this menu was opened on, or null if it has since been deleted
+     * from another window. This is evaluated at menu-BUILD time for the Sort By
+     * checkmarks, so a throwing lookup meant right-clicking empty space in a
+     * window whose folder had just been deleted elsewhere produced no menu at
+     * all — the exception escaped while the menu was being constructed.
+     */
+    const folder = (): VfsItem | null =>
+        get(hardDrive)?.[originator.id] ?? null;
 
     return {
         required_width: 180 + 20,
@@ -44,7 +49,7 @@ export const make = ({
                         ...sort_menu_items.map((item): MenuItem => {
                             return {
                                 ...item,
-                                check: item.value == folder().sort_option,
+                                check: item.value == folder()?.sort_option,
                                 action: () => {
                                     hardDrive.update((data) => {
                                         required(
@@ -62,7 +67,7 @@ export const make = ({
                         ...sort_order_menu_items.map((item): MenuItem => {
                             return {
                                 ...item,
-                                check: item.value == folder().sort_order,
+                                check: item.value == folder()?.sort_order,
                                 action: () => {
                                     hardDrive.update((data) => {
                                         required(
@@ -81,7 +86,6 @@ export const make = ({
                 {
                     name: 'Refresh',
                     action: () => {
-                        console.log('refresh');
                         const nodes = document.querySelectorAll('.fs-item');
                         for (const node of nodes) {
                             node.classList.add('animate-blink');
@@ -187,6 +191,7 @@ export const make = ({
                     name: 'Properties',
                     action: () => {
                         const fs_item = folder();
+                        if (fs_item == null) return; // deleted meanwhile
                         if (
                             fs_item.type == 'drive' ||
                             fs_item.type == 'removable_storage'
