@@ -34,6 +34,7 @@
         "postcss-load-config": "^4.0.1",
         "prettier": "^3.9.5",
         "prettier-plugin-svelte": "^4.1.1",
+        "pyodide": "0.28.3",
         "svelte": "^5.0.0",
         "svelte-check": "^4.7.2",
         "svelte-preprocess": "^5.0.0",
