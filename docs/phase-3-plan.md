@@ -1,381 +1,404 @@
-# Phase 3 implementation plan
+# Phase 3 implementation plan (v2)
 
-> Gate 3 of the §11 six-gate workflow. Input: `docs/phase-3-spec.md` (v2) and
-> `docs/phase-3-redteam-spec.md`. Gate 4 red-teams this document before any
-> code is written.
+> Gate 3, **revised after gate 4**. Findings and disposition:
+> `docs/phase-3-redteam-plan.md`. v1 is commit `f74685f`. Spec:
+> `docs/phase-3-spec.md` (v2).
 
-## 0. Spike results — both open questions are now closed
+## 0. What gate 4 changed
 
-The spec left two mechanisms unproven and required they be settled before
-planning. Both were run in real Chromium (Playwright 1.61.1).
+3 CRITICAL, 10 HIGH, nothing rejected. Four structural changes:
 
-### Spike A — does an opaque-origin sandboxed iframe isolate Pyodide? (D-B0)
+1. **The CSP never touches `/*`.** v1 would have blanked production — jQuery,
+   `loadjs`, SvelteKit's inline hydration bootstrap and the `/api/browse`
+   reporter all blocked, invisible to every local gate.
+2. **The jspaint prune is an allowlist, and `sessions.js` stays.** v1 would have
+   deleted Paint's only stylesheet and broken File ▸ New and every image open.
+3. **Two tasks deleted** — the Vite `worker.format` change (no beneficiary after
+   Spike A) and `jsdom` (fails identically to the bug it would test for).
+4. **Reference capture moved to the front** (T0), per exit criterion 5.
 
-`<iframe sandbox="allow-scripts">` (no `allow-same-origin`), probed from inside:
+### Spike results (unchanged from v1, both verified in real Chromium)
 
-| Probe | Result | Meaning |
-| --- | --- | --- |
-| `indexedDB.open()` | **SecurityError — "access to the Indexed Database API is denied in this context"** | The VFS is unreachable. C1's main prize is gone |
-| `fetch()` request headers | **`Origin: null`** | `/api/email`'s origin check rejects it |
-| `new Worker('/w.js')` | **SecurityError — "cannot be accessed from origin `null`"** | Confirms the document's real origin is opaque |
-| `new Worker(blob:…)` | **works** | The fallback mechanism is available |
-| `location.origin` | `"https://example.test"` | **A trap** — it reports the URL's origin while the security origin is opaque. Never verify isolation with this; verify with a capability probe |
-| **Parent event-loop ticks during a 3 s busy loop in the frame** | **21, against ~320 expected** | **The parent IS blocked** |
+**Spike A — Python isolation.** In `<iframe sandbox="allow-scripts">`:
+`indexedDB.open()` throws **SecurityError**; `fetch()` sends **`Origin: null`**;
+`new Worker('/w.js')` throws *"cannot be accessed from origin `null`"*;
+`new Worker(blob:)` **works**; and a 3 s busy loop in the frame let the parent
+tick **21 times against ~320 expected** — so the sandbox gives complete origin
+isolation and **zero thread isolation**. Design: **sandboxed iframe + blob-URL
+worker inside it**. Trap recorded: `location.origin` reports the real origin
+while the security origin is opaque — verify with capability probes only.
 
-**Conclusion: the sandbox alone is not enough.** It delivers the origin
-isolation (C1/C2) completely, and delivers *no* thread isolation — a `while
-True: pass` in a bare sandboxed frame would still freeze the desktop, which is
-the exact failure D-B2 existed to prevent. The spec's written-down fallback is
-therefore the design, not a contingency:
-
-> **sandboxed iframe (origin isolation) + a worker created inside it from a
-> `blob:` URL (thread isolation).** Blob URLs inherit the creating context's
-> opaque origin, so the worker is same-origin with the frame and inherits its
-> powerlessness.
-
-### Spike B — does `sandbox` break Paint? (D-C3)
-
-`paint.svelte` needs `iframe.contentDocument` and `contentWindow.systemHooks`.
-
-| Attribute | `contentDocument` | `systemHooks` |
-| --- | --- | --- |
-| none (today) | ACCESSIBLE | ACCESSIBLE |
-| `sandbox="allow-scripts"` | **null** | **THREW SecurityError** |
-| `sandbox="allow-scripts allow-same-origin"` | ACCESSIBLE | ACCESSIBLE |
-
-**Conclusion:** Paint cannot be origin-isolated while it depends on
-`contentDocument` — `netlify.toml` already documents that dependency. But
-`allow-scripts allow-same-origin` is not a no-op: it still blocks top-level
-navigation, popups, forms, modals, pointer-lock and downloads. So Paint gets
-that attribute, and **the prune (D-C3) remains the actual hardening**, not the
-sandbox.
+**Spike B — Paint sandbox.** `sandbox="allow-scripts"` breaks Paint
+(`contentDocument` null, `systemHooks` SecurityError);
+`allow-scripts allow-same-origin` preserves both while still blocking
+top-navigation, popups, forms and modals. The **prune is the real hardening**.
 
 ---
 
-## 1. Task order and dependencies
-
-Ordering is driven by three hard constraints: config must precede the code that
-depends on it; **the seed-safety fix must precede any seed bump**; and the
-registry must precede the app wiring that uses it.
+## 1. Task graph
 
 ```
-T1 config ──┬─> T5 terminal core ──┬─> T6 CMD ──┐
-            │                      └─> T8 Python REPL
-            └─> T7 python sandbox host ──────────┘
-T2 jspaint hardening        (independent)
-T3 seed safety ─> T9 music assets + seed ─> T10 Music Player
-T4 app registry ─> (T6, T8, T10 wiring)
-T11 Paint verification   (after T2)
-T12 parity references + visual loop   (after T6, T8, T10, T11)
-T13 phase guide          (last)
+T0  reference capture ──────────────────────> (T6, T8, T10 visual work)
+T1  root config (CSP path-scoped, pyodide types)
+     ├─ T1a /html/* headers ──> T2
+     └─ T1b pyodide types + version.ts ──> T7
+T2p Paint E2E against the UNPRUNED bundle ──> T2  jspaint prune
+T3  seed safety (carry + tombstones) ──> T9 music assets ──> T10 Music Player
+T4a registry type + launch() fallthrough + finally
+     ├──> T5 terminal core ──> T6 CMD      ──> T4b-cmd
+     │                      └─> T8 Python  ──> T4b-python
+     └──> T7 python sandbox host ──────────────┘
+TD  Dialog.svelte z-index guard
+T11 Paint verification [after T2]
+T12 visual scoring loop [after T6,T8,T10,T11]
+T13 phase guide
 ```
 
-Each task is one `feature/*` branch off `dev` with its own CI-gated PR, per §5.
+**Constraints v1 missed:** T0 → all visual work; T2p → T2; T1a → T2; components
+→ T4b (v1 had this arrow backwards); T8 owns three extra shipped files; TD
+existed nowhere.
+
+**Restated honestly:** T3-before-T9 is *hygiene*, not user protection. §5
+deploys production from `main` only, so users receive both atomically in the
+cutover. **The cutover boundary is what protects them** — nobody should
+parallelise T9 and assume otherwise.
 
 ---
 
-## 2. The tasks
+## 2. Tasks
 
-### T1 — Root config (D-E8, D-B1)
+### T0 — Reference capture *(new, must precede visual work)*
 
-**Files:** `vite.config.js`, `vitest.config.ts`, `package.json`, lockfile,
-`src/lib/python/version.ts` (new), `netlify.toml`.
+Exit criterion 5 requires a named reference per surface **before**
+implementation. `design/research/` has 68 files and **zero** matching
+`wmp|media|term|cmd|python|winamp`. Capture `design/research/ref-wmp9.png` and
+an XP Command Prompt chrome reference. If a reference cannot be obtained, that
+is a decision to take now, not after the skin is built.
 
-1. `vite.config.js` gains `worker: { format: 'es' }`.
-   **Verification is reading the emitted worker file in `build/`, not a green
-   build** — the failure mode is a silent IIFE wrapper that passes every gate
-   and breaks only when deployed. Also re-verify the existing
-   `my_computer/sort.js` worker still functions, since this changes its emitted
-   format too.
-2. `pyodide` added as a **types-only devDependency** pinned to `0.28.3`.
-   `src/lib/python/version.ts` exports `PYODIDE_VERSION`, and a unit test
-   asserts it equals the installed package's version — so a drifted pin is a red
-   test rather than a 404 on the deployed site.
-3. vitest DOM environment: install `jsdom` and set `environment: 'jsdom'` for
-   the terminal tests only (via a docblock), **rather than** excluding files
-   from coverage. Rationale for gate 4 to attack: an exclusion would let the
-   terminal core ship untested while still counting as "80% on changed lines";
-   `jsdom` keeps the gate honest at the cost of one devDependency.
-4. `netlify.toml`: `script-src` / `connect-src` scoped to the Pyodide origin;
-   `Permissions-Policy: camera=(), microphone=(), geolocation=()`;
-   `X-Robots-Tag: noindex` for `/html/*`.
-5. **`npx -y npm@10 install` after every `package.json` edit** (CI runs npm 10;
-   local is npm 11.6.2 / Node 25).
+Also add **pixel-diff tooling**: there is no `toHaveScreenshot`,
+`toMatchSnapshot`, `pixelmatch`, `odiff` or `resemble` anywhere in the repo, and
+§11 forbids eyeballing. A ~20-line `scripts/pixel-diff.mjs` over paired PNGs, or
+the phase guide reports **no number** and says why.
 
-**Tests:** version-pin equality test; a build-output assertion that the emitted
-worker is ESM and that no `.xterm-` rule appears in entry CSS; a check that the
-Rollup "dynamically imported … also statically imported" warning is absent.
+### T1 — Root config
 
-### T2 — jspaint hardening (D-C3) — *independent, ship first*
+**T1a — headers.** The `/*` block in `netlify.toml` is **not touched**. A
+path-scoped block for the sandbox host only, written out in full and
+**re-stating `frame-ancestors 'self'`** (a path-scoped CSP replaces the `/*`
+value, silently dropping the red-team #7 clickjacking defence on exactly the two
+framed pages):
 
-This closes a **live production hole**, verified by probing the deploy:
+```
+[[headers]]
+  for = "/html/python-sandbox.html"
+  [headers.values]
+    Content-Security-Policy = "script-src 'self' blob: 'wasm-unsafe-eval' https://cdn.jsdelivr.net; worker-src blob:; connect-src 'self' https://cdn.jsdelivr.net; frame-ancestors 'self'"
+```
+
+`worker-src blob:` and `'wasm-unsafe-eval'` are load-bearing: `worker-src` falls
+back to `script-src`, so a policy naming only the CDN blocks
+`new Worker(blob:)`, and Chrome blocks `WebAssembly.instantiate` without the
+wasm keyword. Plus `X-Robots-Tag: noindex` and `Permissions-Policy:
+camera=(), microphone=(), geolocation=()` for `/html/*`.
+**Deploy-probe the day it merges** — no local gate applies `netlify.toml`.
+
+**T1b — Pyodide types.** `pyodide@0.28.3` as a **types-only devDependency**
+(`eslint.config.js:29-32` makes `no-unsafe-*` errors, and a CDN `import()` is
+`any`). `src/lib/python/version.ts` exports `PYODIDE_VERSION`; a unit test
+asserts it equals the installed package version, so a drifted pin is a red test
+rather than a 404 on the deploy. **`npx -y npm@10 install`** after the
+`package.json` edit.
+
+**Dropped from v1:** `worker: { format: 'es' }` (Spike A moved the runtime to a
+`static/` page Vite never processes; the only Vite-emitted worker left is
+Explorer's `sort.js`, which works today) and `jsdom` (its
+`getComputedStyle().height` is empty for every element — the exact `NaN`
+condition that makes `fit()` fail silently, so the environment and the bug fail
+identically).
+
+**Build verification** gets a real harness: `scripts/verify-build.mjs` + a CI
+step after the production build (vitest only sees `src/**/*.test.ts` and runs
+*before* `build`, and the Rollup warning goes to stdout that nothing captures).
+It asserts the target files exist first, then: no `.xterm-` rule in entry CSS,
+and no "dynamically imported … also statically imported" warning.
+
+### T2p — Paint E2E *(new, must precede T2)*
+
+There is **no spec that opens Paint** — verified. Write it against the
+**unpruned** bundle and land it green: open from Start menu; **open a seeded
+`.png` from Explorer** (the `open_from_file` path); **File ▸ New**; draw; Save
+As into the VFS; and assert a theme stylesheet actually applied. The first three
+are the paths the prune breaks; without them the prune has no fail-first test.
+
+### T2 — jspaint hardening
+
+Closes a **live production hole**, verified by probing the deploy:
 `/html/jspaint/{index.html,package.json,CNAME,src/imgur.js,CHANGELOG.md}` all
-return 200, and `sessions.js` honours `#load:<url>` — fetching and rendering an
-arbitrary attacker URL on the owner's domain.
+return 200 and `#load:<url>` renders an arbitrary attacker URL on the domain.
 
-**Files:** `scripts/prune-jspaint.sh` (new, committed),
-`static/html/jspaint/index.html`, `src/routes/xp/programs/paint.svelte`,
-`netlify.toml` (in T1).
+**Keep `sessions.js`.** Delete only the hash router (`:505-556` — which *is*
+`#load:`/`#session:`) and the Firebase `MultiUserSession` (`:197-490`), keeping
+`LocalSession` and `new_local_session`. Deleting the file would throw
+`ReferenceError` at `functions.js:805` and `:923` — File ▸ New and every image
+open, including our own `paint.svelte:251` wiring — and would silently kill
+canvas autosave/restore.
 
-1. Prune script removes, with a one-line comment each: the `imgur.js`,
-   `speech-recognition.js` and `sessions.js` script tags; the `#news` block
-   containing 12 `i.postimg.cc` images (`hidden` is `display:none`, which does
-   **not** suppress image fetches, so every Paint open leaks the visitor's IP);
-   and the File ▸ Upload To Imgur / Load From URL menu entries in `src/menus.js`.
-2. Prune the tree to what `index.html` actually loads — drops `package.json`,
-   `CNAME`, `CHANGELOG.md`, `cypress/`, `.map` files.
-3. `paint.svelte` iframe gains `sandbox="allow-scripts allow-same-origin"`
-   (Spike B: preserves `contentDocument`, blocks top-navigation and popups).
+Also remove, each verified safe: the `imgur.js` and `speech-recognition.js`
+script tags (all three speech call sites are guarded at `app.js:614`, `:616`,
+`:968`); **both** Imgur entry points — the File menu item *and* the second one
+at `functions.js:1671-1675` (a live "Upload to Imgur" button in the GIF-export
+window, Ctrl+Shift+G); the `#news` block **together with `index.html:115` and
+`src/test-news.js`** (which dereferences `#news` unguarded at `:12-13` and would
+throw an error dialog on every Paint open).
 
-**Tests:** an e2e asserting Paint still opens, draws and Saves As after the
-prune; a test asserting `#load:` no longer resolves; a build-output assertion
-that the pruned files are absent from `build/`.
-**Risk:** the prune breaks jspaint in a way e2e cannot see. Mitigation: the
-script is a diff of removals only, each reviewable, and Paint's existing e2e
-plus a manual draw/save pass on the deploy preview.
+**Tree prune is an explicit allowlist**, never "what index.html loads" — that
+phrasing would delete `styles/themes/classic.css`, which `index.html` references
+**zero** times and `paint.svelte:241` asks for by name, plus cursors, help,
+`audio/chord.wav`, the GIF/PDF workers and 26 localizations, all built by
+runtime string construction. Delete only: `package.json`, `package-lock.json`,
+`CNAME`, `CHANGELOG.md`, `CONTRIBUTING.md`, `README.md`, `TODO.md`, `cypress/`,
+`cypress.json`, `jsconfig.json`, `.eslintrc.js`, `.travis.yml`, `.github/`,
+`test-news-newer.html`, `lib/tracky-mouse/`, `src/electron-main.js`, `*.map`.
 
-### T3 — Seed safety (D-D3) — **must land before T9**
+`sandbox="allow-scripts allow-same-origin"` on the frame. It silently disables
+`saveAs` downloads (`app.js:261`, `:326`, `:331`), `alert()` and
+`target="_blank"` — enumerated in the prune script's comments and the phase
+guide; `allow-downloads` considered.
+**Disclosed, not removed:** About Paint fetches `https://jspaint.app`
+(`functions.js:1372-1376`).
 
-Today `merge_on_reseed` carries only ids *absent* from the new seed
-(`seed.ts:48`) and rebuilds from `{ ...seed }` (`seed.ts:65`), so every seed item
-is replaced wholesale. Provenance carries user-*authored items*; it does nothing
-for user *modifications to seed items*. Production went live 2026-08-23, so the
-Phase 3 bump is the **first against real user data**.
+### T3 — Seed safety *(must precede T9)*
 
-**Files:** `src/lib/seed.ts`, `src/lib/seed.test.ts`.
+`seed.ts:65` is `{ ...seed }`, so every seed id is replaced wholesale; carry is
+only for ids *absent* from the new seed. Production went live 2026-08-23, so
+this is the first bump against real user data.
 
-Carry forward onto surviving seed items: `desktop_css_transform` (written by
-`desktop_folder.svelte:158` onto the five desktop `.exe` items), `sort_option`,
-`sort_order`, and `parent` when it equals the Recycle Bin id.
+**Carry onto surviving seed items:** `desktop_css_transform`; `sort_option`;
+`sort_order`; **`name` + `basename` + `ext`** as one unit (renames — v1 omitted
+these despite D-D3's own prose naming them, and the five desktop `.exe`s, 11
+wallpapers and the résumé PDF are all unprotected); **`date_modified`** on seed
+folders (`fs.ts:113-116` etc., a rendered Details column).
 
-**Tests:** one per carried field, each written to **fail first** — revert the
-carry and watch it go red. This is non-negotiable: three shipped occasions of
-tests that could not fail.
-**Open for gate 4:** is the carried-field list complete, or is there a sixth
-user-owned field on seed items?
+**Dropped: the `parent === recycle_bin` carry.** Verified dead — recycling is
+`clone_fs` + `del_fs` (`CMFSItem.ts:286-293`), `clone_fs` mints a **new id**
+(`fs.ts:243`) and `del_fs` removes the original (`fs.ts:119-125`), so no cached
+item ever holds a seed id with a bin parent. Written literally it would also
+corrupt the tree, since folders render from `parent.children` (`seed.ts:36-37`).
+**Replaced by a tombstone set**: the real shipped bug is that a bin clone is
+carried while `{...seed}` restores the original, so the visitor gets the file
+**twice** — except the five desktop `.exe`s, whose clones are
+`fake && executable` and are dropped by `is_stale_placeholder` while the icon
+returns. Suppress seed ids the visitor deleted.
 
-### T4 — App registry (D-E1, §6.3)
+**Decide and record:** `url` + `storage_type` on a seed file rewritten by
+`save_file` (`fs.ts:486-494`, reachable from `paint.svelte:289`) — reverting it
+also orphans the idb blob forever, since `free_blob` only runs from `del_fs`,
+which is quota pressure on the origin holding the VFS. And removal of seed
+children from a seed folder's `children` (`seed.ts:74-82` handles additions
+only).
 
-**Files:** `src/lib/app_registry.ts` (new), `src/lib/app_registry.test.ts`,
-`src/routes/xp/work_space.svelte`.
+**Tests:** one per carried field, each **written to fail first** — revert the
+carry, watch it go red.
 
-`AppDefinition` per §6.3 (`id`, `title`, `icon`, `defaultSize`, `minSize`,
-lazy `component`, `singleton`, `startMenu`). The three new apps register here;
-the existing 20 branches are untouched (full migration is Phase 6). `launch()`
-falls through to the registry, and its currently-absent `else` throws in dev and
-logs in production — today a mistyped path is a **silent no-op**.
+### T4a — Registry foundation
 
-**Tests:** registry shape; every registered id resolves to a component;
-the fallthrough throws on an unknown path.
+`src/lib/app_registry.ts`: the `AppDefinition` type, **zero app rows**, plus
+`launch()`'s fallthrough. v1's single T4 was unmergeable — it registered three
+components that do not exist, which `svelte-check` treats as an error, making
+its own "every id resolves" test either red or vacuous.
 
-### T5 — Shared terminal core (D-B3, D-A2, D-A9, D-E11)
+The registry is a **translation layer with an explicit mapping table**, because
+none of §6.3's field names exist in the code: `types.ts:116-140` has
+`min_width`/`min_height`/`width`/`height`, no `minSize`, no `defaultSize`, and
+**no `singleton` field at all** — `singleton` today is the path-string list at
+`work_space.svelte:39-44`. Mapping: `defaultSize → options.width/height`,
+`minSize → min_width/min_height`, `singleton → focus_existing`,
+`taskbar → runningPrograms.update` (four existing branches omit it). Options
+**merge** (`{...component_defaults, ...registry_overrides}`), never replace —
+components declare `export let options: WindowOptions = {…}`, so a replacing
+registry silently drops title, icon, `min_width` and `resizable`.
 
-**Files:** `src/lib/term/terminal.ts`, `readline.ts`, `theme.ts`, `ansi.ts`
-+ tests.
+`focus_existing` reads the registry, or `singleton` is a field that type-checks
+and does nothing. And the fallthrough uses
+**`try { … } finally { queueProgram.set(null) }`** — verified that
+`queueProgram.set(null)` is the *last statement* of `launch()`
+(`work_space.svelte:423`), so a bare throw strands `$queueProgram` non-null and
+leaves the entire desktop on `cursor: wait`; `:26` calls `void launch(...)`, so
+the rejection is unhandled too.
 
-- xterm construction, XP theme (D-V2: `#000000` bg, `#c0c0c0` fg, `#00ff00`
-  prompt, 16-colour ANSI), font stack per D-V1.
-- **Readline**: cursor, backspace, ←/→, Home/End, ↑/↓ history — and
-  **bracketed-paste decoding (`ESC[200~`/`ESC[201~`)**, which v1 budgeted
-  nothing for and which corrupts every multi-line paste if missed.
-- **Sizing (D-A9)**: explicit container height, a `ResizeObserver` driving
-  `fit()`, first `fit()` deferred one frame past the window's open transition.
-  There is currently **zero `ResizeObserver` in `src/`** and `FitAddon.fit()`
-  returns *silently* when the parent's computed height is `auto` — the symptom
-  is a terminal frozen at 80×24 with no console error.
-- **One `disposed` flag** gating the animation loop, the runtime message handler
-  and every write path (D-A5), with teardown tearing down the runtime.
-- **Keyboard (D-E11)**: bound on the xterm textarea only, never `svelte:window`,
-  never `stopPropagation` at window level.
+**Tests:** launching a registered singleton twice yields one window; an unknown
+path throws **and** clears the store.
 
-**Tests (jsdom):** readline edits incl. bracketed paste; disposed-flag gating;
-theme/font constants. `terminal.open()` needs a DOM — this is what T1.3 buys.
+### T5 — Shared terminal core
 
-### T6 — CMD (D-A1…A8, D-V1, D-V2)
+`src/lib/term/{readline,ansi,theme}.ts` — **pure, no DOM**. Readline with
+cursor, backspace, ←/→, Home/End, ↑/↓ history and **bracketed-paste decoding
+(`ESC[200~`/`ESC[201~`)**, without which every multi-line paste corrupts the
+buffer. One `disposed` flag gating the animation loop, the runtime message
+handler and every write path.
 
-**Files:** `src/lib/cmd/registry.ts`, `commands/*.ts`, `format.ts` + tests;
-`src/routes/xp/programs/cmd.svelte`.
+The xterm seam (construct, `open`, `ResizeObserver` → `fit`) lives **in the
+`.svelte` component**, which is coverage-exempt — the logic that can be tested
+is tested, and the part that needs a browser is verified by E2E asserting
+`fit()` yields >80 cols at 1280×800. There is currently **zero `ResizeObserver`
+in `src/`** and `fit()` returns *silently* when the parent's computed height is
+`auto`, so the container gets an explicit height and the first `fit()` is
+deferred a frame past the window's open transition.
 
-Pure `(args, profile) => string[]` commands. Data sources per the **corrected**
-D-A4 table — `profile.meta` for contact/whoami, not `profile.about`, which holds
-only `bio`. `whoami` is `profile.meta.shortName.toLowerCase()`, derived, because
-§3.2 requires all output to come from JSON.
+Keyboard is bound on the xterm textarea only — never `svelte:window`, never
+`stopPropagation` at window level.
 
-- Unknown command: **bash's `foo: command not found`**, case-sensitive
-  (D-A8 reversed — §3.2 says "bash emulation, **not Windows cmd**" in bold).
-- **Banner (D-A6):** third line becomes `Type 'about' to start, or 'projects' to
-  see what I have built.` §3.2 gains a note that the filesystem line returns in
-  Phase 6. Without this the app's first screen advertises `ls`, which answers
-  "not available yet".
-- `ls`/`cd`/`cat`/`pwd` are known commands answering `not available yet`.
-- Easter eggs cancellable on any key, torn down on unmount.
+### TD — `Dialog.svelte` z-index guard *(new; D-E11 was orphaned)*
 
-**Tests:** one per command against a fixture profile; unknown-command wording;
-egg cancellation across two back-to-back runs.
+`Dialog.svelte:53-70` binds `svelte:window on:keydown` and ranks only against
+other `.dialog` nodes, never checking whether the focused window is its own — so
+Escape typed at a REPL prompt cancels a background Explorer's dialog. Add the
+same z-index guard every other keydown consumer already has, with its own test.
 
-### T7 — Python sandbox host (D-B0)
+### T6 — CMD
 
-**Files:** `static/html/python-sandbox.html` (new, thin bootstrap),
-`src/lib/python/protocol.ts` (new, typed messages) + tests,
-`src/lib/python/client.ts` (parent side) + tests.
+Pure `(args, profile) => string[]` commands. Data per the corrected D-A4 table —
+`profile.meta` for contact/whoami, **not** `profile.about`, which holds only
+`bio`. `whoami` is `profile.meta.shortName.toLowerCase()`, derived. Note
+`about.bio` is an **array of paragraphs**, not a string.
 
-Architecture, settled by Spike A:
+Bash-style `foo: command not found`, case-sensitive (§3.2: "bash emulation,
+**not Windows cmd**"). Banner's third line becomes `Type 'about' to start, or
+'projects' to see what I have built.` — v1's mandated text advertised `ls`,
+which answers "not available yet". `ls`/`cd`/`cat`/`pwd` are known commands
+saying so. Eggs cancellable, torn down on unmount.
+
+**Also owns:** `start_menu.svelte`'s Command Prompt entry.
+
+### T7 — Python sandbox host
 
 ```
 parent (our origin)
-  └─ <iframe sandbox="allow-scripts">  ← opaque origin: no IndexedDB, Origin: null
-        └─ Worker(blob: URL)           ← thread isolation; loads Pyodide from CDN
+  └─ <iframe sandbox="allow-scripts">   ← opaque origin: no IndexedDB, Origin: null
+        └─ Worker(blob: URL)            ← thread isolation; loads Pyodide from CDN
 ```
 
-The host page is a **thin bootstrap only**; the protocol, readline and
-formatters live in tested `src/` modules on the parent side, because `static/`
-is outside lint, tests and coverage.
+**The driver source is named**, not left implicit:
+`src/lib/python/worker_source.ts` exports a template string (linted, typed,
+unit-testable) that the static host page inlines — v1's "thin bootstrap only"
+was false under Spike A's architecture, and `static/` is outside ESLint,
+prettier and coverage.
 
-Protocol: typed request/response messages (`eval`, `stdout`, `stderr`, `result`,
-`error`, `ready`, `progress`). Streaming, not batched. `PyodideConsole` for
-continuation (verified: returns `incomplete`/`complete`/`syntax-error`).
+Also specified: the parent **must** validate `event.source ===
+iframe.contentWindow` and `event.origin === 'null'`, because the opaque origin
+forces `postMessage(msg, '*')`; the ready/timeout handshake; and **one frame per
+REPL window** (D-E12 makes Python a singleton, so this is one frame).
 
-**Tests:** protocol encode/decode and exhaustive message-kind handling; client
-state machine incl. the failure path.
-**Verification that isolation actually holds** (exit criterion 2): an e2e that
-runs Python attempting `indexedDB.open` and `fetch('/api/browse')` and asserts
-both fail.
+**Isolation E2E — rewritten.** v1's version was vacuous three ways: the hermetic
+suite substitutes a *stub* runtime that cannot execute `js.fetch`; `/api/*` does
+not run under `vite preview` at all, so "the fetch failed" is true regardless;
+and if the runtime never loads, "no VFS data appeared" passes. Instead probe the
+frame directly — `page.frames()` + `frame.evaluate()`: `indexedDB.open` must
+throw **`SecurityError`**, `new Worker('/w.js')` must throw, and `Origin: null`
+must be observed on a **real intercepted request**, so a missing route is a
+failure rather than a pass. Never assert on `location.origin` — Spike A recorded
+that it lies.
 
-### T8 — Python REPL app (D-B1, D-B4, D-B6, D-B7, D-V3)
+### T8 — Python REPL app
 
-**Files:** `src/routes/xp/programs/python.svelte`.
+Title derived from the runtime banner; icon `/images/xp/icons/Python.png`
+(shipped and unused today). Load UX → progress → banner; legible failure.
+Ctrl+C prints `Restarting Python… (session state cleared)` — a restart, not an
+interrupt, since `SharedArrayBuffer` is unavailable. `input()` refuses.
 
-Title derived from the runtime banner (not a literal), icon
-`/images/xp/icons/Python.png` — **already in the shipped icon set and currently
-unused**; the Start Menu passes the generic `ApplicationWindow.png` today.
-Load UX: `Loading Python runtime…` → progress → real banner. Failure prints one
-legible error and leaves the window closable. Ctrl+C terminates and respawns,
-printing `Restarting Python… (session state cleared)` — it is a restart, not an
-interrupt, because `SharedArrayBuffer` is unavailable (verified
-`crossOriginIsolated: false`). `input()` prints a refusal.
+**Also owns, in the same PR** (v1 assigned these to nobody):
+`start_menu.svelte`'s Python entry; **`e2e/shell.spec.ts`** — both its tests use
+the Python placeholder and D-E12's singleton breaks the cascade test's
+`toHaveCount(2)`, so they re-point to a Games placeholder, which must still be
+**rect-less** (`work_space.svelte:394-405` is the only `exec_path`-less branch);
+and **`starting.svelte:34`**'s preload array, which contains neither
+`Python.png` nor `WindowsMediaPlayer9.png`.
 
-**Tests:** e2e against a stubbed runtime (hermetic, per D-B5); a tagged
-`@online` spec excluded from the default run for real execution; a CI check that
-the pinned CDN URL returns 200.
+**Playwright projects made explicit**: `{name:'default', grepInvert:/@online/}`
+and `{name:'online', grep:/@online/}` — the config defines **no** projects
+today, so adding one without constraining the default makes `npx playwright
+test` run both and download ~5 MB from jsDelivr on a 2-core runner. The CDN
+200-check goes in a **scheduled** workflow, not the PR gate, or a jsDelivr
+outage reds `dev`.
 
-### T9 — Music assets + seed (D-D2, D-D3)
-
-**Files:** `scripts/gen-tracks.sh` (new), `static/audio/music/*.mp3`,
-`src/lib/music/manifest.ts` + test, `scripts/vfs-base.json`, regenerated VFS.
+### T9 — Music assets + seed
 
 Tracks are **broadband with real spectral movement** — layered harmonics, a
-percussive transient track, a filtered noise sweep — because three pure tones
-give the analyser a one-spike spectrum and make the visualizer look broken
-(D-D2's coupling to D-D4). `gen-tracks.sh` is **documentation, not a CI gate**
-(ffmpeg is not a declared dependency) — stated explicitly, since every other
-generated artifact here *does* have a freshness gate.
+percussive transient track, a filtered noise sweep — because pure tones give the
+analyser a one-spike spectrum and make the visualizer look broken.
+`gen-tracks.sh` is **documentation, not a CI gate** (ffmpeg is undeclared),
+stated explicitly since every other generated artifact here has a freshness gate.
 
-Seed entries are `storage_type: 'remote'` pointing at the same static URLs, so
-no bytes are duplicated. **`size` is in KB** (`types.ts:35`) — a byte-valued
-entry renders `3,145,728 KB`. Track ids are **permanent**: carried items can
-never be reaped, so a later rename persists in every returning visitor's
-`My Music` forever.
+**SSOT resolved:** the manifest is authoritative and `generate-vfs.ts` mutates
+`My Music`'s children the way it already does for `C_DRIVE` and `DESKTOP` —
+`vfs-base.json` is **not** edited (it already has `My Music` with `children: []`).
+**`size` is hand-written in the manifest in KB** (`types.ts:35`) and *not*
+`statSync`'d: `statSync` would make the mp3 bytes an input to `SEED_VERSION`
+(which hashes the serialized seed), so regenerating a track would silently bump
+the seed — the exact thing T3 exists to make safe. Track ids are **permanent**:
+carried items can never be reaped. `manifest.ts` must compile under the
+freshness gate's standalone `tsc --strict` with no DOM lib.
 
-The manifest is the single source of truth; `generate:vfs` **derives** the seed
-entries from it rather than a second hand-maintained list.
+**KB-vs-adaptive E2E:** one test, one window — View ▸ Details **and** View ▸
+Status Bar, assert `3,072 KB` in a Size cell **and** the adaptive MB total in
+the status bar **in the same block**. Asserting only the Details cell passes on
+a codebase where `size_label` was re-routed through `format_size` — the exact
+"unification" §8 warns about.
 
-**Tests:** manifest validation; a **new e2e for the KB-vs-adaptive divergence** —
-these are the first >1 MB files in a visible folder, so §8's documented
-"impossible" coverage gap is now free to close, and closing it protects
-`size_label` vs `format_size` from the next reader who "unifies" them.
+### T10 — Music Player
 
-### T10 — Music Player (D-D1, D-D4, D-D5, D-D6, D-E12, D-V4)
+WMP 9 chrome against T0's reference. Transport, volume (× `$systemVolume`),
+seek, track list, Canvas visualizer.
 
-**Files:** `src/lib/music/player.ts` (playlist model) + tests,
-`src/routes/xp/programs/music_player.svelte`.
+Three verified footguns: **`createMediaElementSource()` is a permanent one-shot
+binding on the element** — a second call throws `InvalidStateError` even from a
+different context, so play → pause → play throws; cache one node per element in
+a `WeakMap`. **`resume()` synchronously first** inside the click handler
+(`await ctx.resume()` outside a gesture never settles). **A CORS-cross-origin
+element outputs silence** into the graph — so the phase guide's swap-in-your-own
+instruction says *local files only*.
 
-WMP 9 chrome (D-V4). Transport, volume (× `$systemVolume`, per MPC's shipped
-rule), seek, track list, Canvas visualizer.
+The WeakMap test is a **contract test over an injected factory** (same element →
+same node; two elements → two nodes). The `InvalidStateError` it prevents cannot
+be reproduced in CI — headless Chromium also ignores the autoplay policy
+(`new AudioContext().state === "running"`), so both go on the **manual gate-6
+deploy-probe list**.
 
-Three verified footguns, each an explicit wiring step with a test:
-- **`createMediaElementSource()` is a permanent one-shot binding on the
-  element** — a second call throws `InvalidStateError` *even from a different
-  `AudioContext`*. So play → pause → play throws. Cache one node per element in
-  a `WeakMap`.
-- **`resume()` is called synchronously first** inside the click handler;
-  `await ctx.resume()` outside a user gesture **never settles**.
-- **A CORS-cross-origin element outputs silence** into the graph — playback
-  works, the analyser reads zeros. The phase guide's "drop in your own MP3s"
-  instruction must say *local files only*.
+Also: `.mp3` keeps opening MPC, Music Player is the **second** `doctypes` entry;
+fix `CMFSItem.ts:49`'s missing `.toLowerCase()` (instance #8); add the `.mp3`
+row to `profile.json → folderOptions.fileTypes`; `start_menu.svelte` repoint;
+`starting.svelte` preload. **Watch `export let window` shadowing** — every
+program component declares it, and a visualizer reaching for
+`window.requestAnimationFrame` or `devicePixelRatio` gets the prop.
 
-`.mp3` keeps opening MPC; Music Player is the **second** `doctypes['.mp3']`
-entry. Also fix **`CMFSItem.ts:49`**, the only one of five `doctypes` lookups
-missing `.toLowerCase()` — instance #8 of the repo's recurring root cause, made
-user-visible by the second handler. Add the `.mp3` row to
-`profile.json → folderOptions.fileTypes` (asserted by `xp_chrome_a.spec.ts:151`).
+### T11–T13
 
-**Known gate blindness:** headless Chromium ignores the autoplay policy
-(`new AudioContext().state === "running"`), so CI **cannot** catch a regression
-moving context creation back to `onMount`. This becomes a manual gate-6
-deploy-probe line.
-
-### T11 — Paint verification (D-C1, D-C2, D-V5)
-
-Confirm §3.2's tool set and menus after T2's prune; confirm Save As into the
-VFS; screenshot the chrome. **Paint's interior is explicitly not parity-scored**
-— it runs jspaint's `classic.css` (`paint.svelte:241`), which is Win98-ish, and
-pretending to score it produces a fake number. Recorded as a documented
-deviation.
-
-### T12 — Parity references and the visual loop (D-V5, §11)
-
-Capture the references that do not exist today —
-`design/research/ref-wmp9.png` and XP Command Prompt chrome — **before**
-iterating. Then the §11 loop at 1280×800 to ≥95% on: CMD chrome, Python chrome,
-Music Player, Paint chrome.
-
-### T13 — `docs/phase-3-guide.md` (§11 handoff structure)
-
-Ten sections per §11, including: required assets (how to swap the generated
-tracks, **local files only**), the jsDelivr privacy disclosure (~5 MB and the
-visitor's IP/UA per cold open), the Pyodide pin and that **§3.2's "3.13.x" is a
-consequence of pinning 0.28.3** — `latest` is 314.0.5 / Python 3.14.2 — the
-manual deploy-probe lines CI cannot cover, and the two known limitations
-(Paint's unscored interior; ≥1024px touch devices).
+T11 Paint verification after the prune (interior explicitly **not**
+parity-scored — it runs `classic.css`). T12 scoring loop only. T13 the §11
+ten-section guide, carrying: the jsDelivr privacy disclosure, About Paint's
+phone-home, the sandbox-disabled jspaint paths, the Pyodide pin and that
+"3.13.x" is a *consequence* of it, and every manual deploy-probe line.
 
 ---
 
-## 3. Test strategy
+## 3. Tests that must not be able to pass on broken code
 
-- **Unit (vitest)**: every `.ts` module — command registry and formatters,
-  readline, ANSI, protocol, client state machine, playlist model, manifest,
-  seed carry. jsdom only where a DOM is genuinely required (T5).
-- **E2E (Playwright)**: app open/close, command output, REPL shell against a
-  stubbed runtime, isolation assertions, music transport, Paint after prune,
-  the KB-vs-adaptive divergence. Hermetic — no new spec reaches the internet.
-- **`@online` project**: excluded from the default run; real Pyodide execution.
-- **Mutation discipline**: every new test is shown to fail against the un-fixed
-  code before it counts. Three shipped occasions of tests that could not fail.
-- **Before every push**: `npm run check && lint && format:check && vitest
-  --coverage && diff-cover --fail-under 80 && build && playwright test`.
-- **Deploy probe** (the rule that caught two holes nothing else did): after
-  deploy — Python isolation, the emitted worker is ESM, jspaint's pruned paths
-  404, the autoplay path works on a real browser gesture.
+Gate 4 named seven. Each now has a specific fix: the isolation E2E probes the
+frame directly; the seed tests revert real carries; the Paint E2E covers File ▸
+New and open-an-image and asserts a theme loaded; the registry tests assert
+singleton behaviour and store clearing; the KB-vs-adaptive E2E asserts both
+surfaces at once; the build assertions check their target exists first; and the
+WeakMap test is a contract test with the real failure on the manual list.
 
-## 4. Risks
+## 4. Deploy probes (the rule that caught two holes nothing else did)
 
-| Risk | Mitigation |
-| --- | --- |
-| `worker.format` change breaks the shipped `sort.js` worker | Verify by reading emitted output and re-running Explorer sort e2e |
-| jspaint prune breaks Paint invisibly | Removals-only diff; existing e2e + manual draw/save on a deploy preview |
-| Seed carry list incomplete | Gate 4 is asked directly; each field gets a fail-first test |
-| Blob-worker inside a sandboxed frame behaves differently under Netlify's headers | Deploy-probe line; CSP is set in T1 before T7 ships |
-| Playwright interception must be re-proved for the frame+blob-worker context | T7 opens by re-proving it; fallback is a stub-worker build flag |
-| E2E flake budget | New specs use `bootToDesktop`; no new full-boot specs |
-| Pinning 0.28.3 ships two ABI generations behind | Documented as a consequence of §3.2's "3.13.x"; bump is a Phase 6 decision |
+After T1a: the site still loads, `/api/browse` still renders, both CSP headers
+present on `/html/*`. After T2: Paint opens, draws, saves; pruned paths 404.
+After T7/T8: Python runs, no CSP violation in console, isolation holds. After
+T10: play → pause → play, and audio actually plays on a real gesture.
 
-## 5. What gate 4 should attack
+## 5. What gate 6 must re-derive rather than trust
 
-Whether T3's carried-field list is complete. Whether T4's two coexisting wiring
-mechanisms are worse than the if-chain they partially replace. Whether T1.3's
-`jsdom` choice is right versus a coverage exclusion. Whether the T7 architecture
-survives Netlify's CSP and `X-Frame-Options: SAMEORIGIN`. Whether T2's prune is
-reviewable enough to be safe. Whether the ordering has a missed dependency —
-especially anything that bumps the seed before T3 lands. And whether T12's
-parity references can actually be captured, or whether the phase is planning to
-measure against images that will not exist.
+The 12 call sites, from the code. Whether the tombstone set actually suppresses
+resurrected seed items. Whether the prune left any runtime-constructed path
+404ing. And whether the parity numbers are measured or estimated.
