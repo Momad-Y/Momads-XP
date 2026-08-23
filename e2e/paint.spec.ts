@@ -214,3 +214,35 @@ test('Ctrl+Alt+N reaches file_new — the real path to the unguarded new_local_s
     await drawStroke(page, frame);
     expect(await inkedPixels(page)).toBeGreaterThan(0);
 });
+
+test('the #load: hash no longer fetches an arbitrary URL (T2 hardening)', async ({
+    page,
+}) => {
+    // Before the prune this was live ON PRODUCTION: sessions.js parsed
+    // `#load:<url>`, fetched it and rendered it inside a page served from the
+    // owner's own domain — a phishing-grade primitive.
+    //
+    // The test is written so it CANNOT pass just because the page broke:
+    // it asserts jspaint still boots (canvas present) AND that the attacker
+    // URL was never requested. A "did it fail?" assertion alone would go green
+    // on a bundle that no longer loads at all.
+    const attacker = 'https://attacker.example/payload.png';
+    let requested = 0;
+    await page.route('**/attacker.example/**', (route) => {
+        requested++;
+        return route.abort();
+    });
+
+    await page.goto(
+        `/html/jspaint/index.html#load:${encodeURIComponent(attacker)}`,
+    );
+
+    // jspaint must still be alive — this is the half that stops the test being
+    // vacuous.
+    await expect(page.locator('.main-canvas')).toBeAttached({
+        timeout: PAINT_LOAD,
+    });
+    // Give any surviving hash handler time to act before asserting the negative.
+    await page.waitForTimeout(1500);
+    expect(requested).toBe(0);
+});
