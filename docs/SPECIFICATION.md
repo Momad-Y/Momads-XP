@@ -212,12 +212,28 @@ All image paths are defined in the JSON data file under each entry's `images` ar
 - Black background, white/green monospace text
 - Title bar: "momad@xp:~"
 - Functional terminal powered by xterm.js
-- **On startup**, echoes a short intro/help message:
+- **On startup**, echoes a short intro/help message.
+
+    **Phase 3 (shipped):**
+
     ```
     Welcome to Momad's XP Terminal
     Type 'help' to see available commands.
+    Type 'about' to start, or 'projects' to see what I have built.
+    ```
+
+    **Phase 6**, once the filesystem commands below land, restores the original
+    third line:
+
+    ```
     Navigate my portfolio like a filesystem — try 'ls' or 'cd experience'.
     ```
+
+    > The third line is phase-dependent on purpose. `ls` and `cd` are Phase 6
+    > commands (see below), so shipping that line in Phase 3 would have made the
+    > terminal's own first screen advertise two commands that answer
+    > "not available yet". Caught by the Phase 3 gate-2 red team; see
+    > `docs/phase-3-spec.md` D-A6.
 - **Core commands (Phase 3):**
     - `help` — list available commands
     - `about` — print bio
@@ -1198,8 +1214,9 @@ surprised by it:
     - Tools: pencil, brush, eraser, fill, shapes, color picker
     - File menu: New, Save as PNG
 - [ ] Music Player: local bundled tracks with play/pause/next/prev, volume, seek, track list, and Canvas visualizer (§3.2 — the Spotify embed cannot satisfy these; reduced-feature Spotify mode is stretch)
+- [ ] **jspaint hardening** (added to Phase 3 scope by the owner, 2026-08-23). Phase 3 is the phase that blesses the vendored bundle, and gate 2 found live third-party paths on the production domain: `#load:<url>` renders an arbitrary attacker URL, two Imgur upload entry points, a Firebase session channel, 12 third-party image fetches per open, and a frame with no `sandbox`. See `docs/phase-3-plan.md` T2.
 
-**Exit criteria:** All four apps are functional and styled authentically.
+**Exit criteria:** All four apps are functional and styled authentically, and the vendored Paint bundle ships no unreviewed third-party data paths.
 
 ### Phase 4: Games
 
