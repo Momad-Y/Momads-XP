@@ -39,39 +39,40 @@ the outstanding item, and §8 for the rules that came out of red-teaming this wo
 
 ---
 
-## 2. DEPLOY — check this first, the block may have lifted
+## 2. DEPLOY — DONE. Production is current.
 
-Production has been stuck on the **26 Jul** bundle. Netlify's "Momad's team"
-(Free, slug `momady`, site `73331ef4-01f7-4fc4-9848-f22261cc9dab`) returned:
+Deployed 2026-08-23 from `main` after the #106 cutover, plus #108 for the
+cache-key fix. `main` and `dev` are level; the credit block that stopped the
+28/30 July attempts is gone.
 
-> 403 — Account credit usage exceeded — new deploys are blocked until credits
-> are added
+- Production: <https://momad-xp.netlify.app>, bundle `start.BtwIZKON.js`
+  (was `start.2JH2ogIg.js` from 26 Jul)
+- Netlify **auto-builds are OFF** (`stop_builds: true`) alongside
+  `allowed_branches:["main"]` + `skip_prs:true` — every deploy so far has been
+  prebuilt from the CLI (`deploy_source: api`), so this costs no build minutes.
+  Deploy with:
+  `npm run build && npx netlify deploy --prod --dir=build --no-build --site 73331ef4-01f7-4fc4-9848-f22261cc9dab`
+- Reverse with `netlify api updateSite ... {"build_settings":{"stop_builds":false}}`
 
-The user chose to wait until **~10 Aug 2026**. That date has now passed, so:
+**Verified on production, not just locally:** boot -> login -> desktop -> start
+menu -> Explorer C:\ -> Details (`61 KB`, `PDF File`, `9 objects`) -> IE
+rendering the real wiby.me through `/api/browse`, with the iframe sandbox
+reading `allow-scripts allow-forms allow-popups` — no `allow-same-origin`, no
+`allow-popups-to-escape-sandbox`. Every SSRF form returns 400; every forged
+origin returns 403; a legitimate same-origin request returns 200. Security
+headers present.
 
-1. Check <https://app.netlify.com/teams/momady/usage> — did credits reset, or is
-   a payment method still required?
-2. If unblocked, deploy the **prebuilt** output (already logged in via
-   `npx netlify login`):
-   ```
-   npm run build && npx netlify deploy --prod --dir=build --no-build \
-     --site 73331ef4-01f7-4fc4-9848-f22261cc9dab
-   ```
-3. Verify prod: `help.html` → 200, index bundle hash changed from
-   `start.2JH2ogIg.js`, security headers present.
-
-`dev` is **36 commits ahead of `main`** and all of it is unreleased. The user
-chose to hold a single cutover PR (`dev` → `main`) until just before deploying.
-
-Netlify build settings were set to `allowed_branches:["main"]` + `skip_prs:true`
-to stop PR previews burning credits — so **no deploy previews exist**; verify
-locally.
+**Two holes were found by probing the DEPLOYMENT that every local gate missed:**
+`sec-fetch-site: none` was accepted (#105, found on a draft) and the CDN cached
+an authorised response under a URL-only key (#107, found only on production —
+drafts are not cached the same way). Neither the 306 unit tests, the 92 e2e
+tests, nor five red-team lenses caught either. **Probe the running deploy.**
 
 ---
 
 ## 3. WHAT SHIPPED THIS SESSION (all merged to `dev`, none deployed)
 
-PRs #77–#104. Highlights:
+PRs #77–#108. Highlights:
 
 - **System Properties** — profile-driven content, all 4 tabs, dark-text logo.
 - **Explorer File menu** — fleshed out to real XP (Open, Send To, New ▸, Create
@@ -171,7 +172,7 @@ invocations per user action — watch it once deploys resume.
 npm run check        # 0 errors / 128 warnings  (baseline 131 — do not grow)
 npm run lint
 npm run format:check
-npx vitest run       # 303 tests
+npx vitest run       # 306 tests
 npm run build
 npx playwright test  # 92 (CI ~3 min; ~1 local flake per 2-3 runs, see §8)
 ```
