@@ -104,3 +104,28 @@ describe('singleton_paths', () => {
         );
     });
 });
+
+describe('component loaders', () => {
+    it('every registered app has a callable lazy loader', async () => {
+        // Calling it is what proves the specifier is at least syntactically
+        // reachable and the field is a function rather than a value someone
+        // forgot to wrap. RESOLUTION cannot be asserted here: vitest runs in
+        // Node with no Svelte plugin, so importing a `.svelte` module fails by
+        // design — that half is covered by e2e actually opening the app.
+        for (const a of APP_REGISTRY) {
+            const pending = a.component();
+            expect(pending).toBeInstanceOf(Promise);
+            await pending.catch(() => undefined);
+        }
+    });
+
+    it('registers CMD as multi-instance', async () => {
+        // A second terminal is cheap and useful; the Python REPL will be a
+        // singleton because it owns a multi-megabyte runtime. Asserting the
+        // difference keeps `singleton` from silently defaulting either way.
+        const cmd = find_app('./programs/cmd.svelte');
+        expect(cmd).toBeDefined();
+        expect(cmd?.singleton).toBe(false);
+        await Promise.resolve();
+    });
+});
