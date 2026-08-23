@@ -192,6 +192,18 @@ All image paths are defined in the JSON data file under each entry's `images` ar
 - Typing indicator, message bubbles styled to fit within the IE window
 - Stretch: address bar shows "Ask me anything about Mohamed..."
 
+> **Shipped ahead of this (post-Phase-2):** IE is already a WORKING BROWSER, not
+> an empty shell waiting for the chatbot. It renders real external pages through
+> a same-origin proxy (`/api/browse`) with an injected navigation reporter, so
+> the address bar, Back/Forward, history, favourites, shortcuts and View →
+> Source all follow the page. wiby.me is the home page and the search engine.
+>
+> Phase 5 therefore has to decide how the chatbot and the browser SHARE this
+> window rather than assuming an empty content area — and it must not weaken
+> the proxy's security shape (§6.8 and `docs/redteam-post-phase-2.md` §A): the
+> frame is sandboxed WITHOUT `allow-same-origin`, upstream connections are
+> pinned to a verified public address, and only same-origin callers are served.
+
 ### 3.2 Developer / Power User Apps
 
 #### CMD (Terminal)
@@ -1072,7 +1084,17 @@ All personal content lives in a single `src/lib/data/profile.json`. Components r
 
 ## 9. Implementation Phases
 
-### Phase 0: Base Repo Adoption (clone & strip)
+> **Status (2026-08-23).** Phases 0, 1 and 2 are complete and **live in
+> production** at <https://momad-xp.netlify.app>. Phase 3 is next. Ticked boxes
+> below mean shipped and deployed, not merely written.
+>
+> Everything after Phase 2 also went through a five-lens red team — code,
+> security, visual parity, test integrity and persisted state — recorded in
+> `docs/redteam-post-phase-2.md` with what was fixed and what was deliberately
+> left. Read it before changing `/api/browse`, the selection scoping, the
+> re-seed carry rule, or the Details/status-bar formatters.
+
+### Phase 0: Base Repo Adoption (clone & strip) — ✅ COMPLETE
 
 **Goal:** Start from win32.run.cf, prune it to a lean XP shell, and get a skeleton deployed on Netlify.
 
@@ -1087,69 +1109,84 @@ All personal content lives in a single `src/lib/data/profile.json`. Components r
 
 **Tasks:**
 
-- [ ] Clone win32.run.cf into the repo root (fresh copy, no upstream git history)
-- [ ] License reconciliation: add `LICENSE-win32.run` with the upstream MIT copyright + permission notice (required by MIT terms) alongside the project LICENSE
-- [ ] Execute the prune manifest — for every removal, also update `static/json/hard_drive.json` (VFS seed), the hardcoded preload arrays in `starting.svelte` (~170 image paths + `/html/*` iframe preloads), and start-menu/desktop entries:
-    - [ ] `static/html/*` third-party embeds **except `jspaint`** (serves Paint) **and `visualizers`** (96KB, needed by the kept Media Player Classic): koodo (28MB), notepad (26MB ace build), msword (8.4MB), foxit_reader (16MB — replaced by pdfjs-dist), minesweeper embed (licenseless, loads jQuery from CDN)
-    - [ ] Support libs orphaned by those prunes: `static/js/ace.js`, `static/js/mammoth.browser.min.js`, `static/js/libarchive.js` (5MB), vendored `src/lib/libarchive.js` and `src/lib/docx/`
-    - [ ] Rewrite `src/routes/+page.svelte` — it is a hardcoded dynamic-import switch over `boot_manager` and every installation route; after the prune it goes straight to the XP loading screen
-    - [ ] CrazyGames game embeds (~20 entries in `hard_drive.json`) and `static/files/*` demo media
-    - [ ] Programs not in this spec: microsoft_word, koodo, flash_player, winrar, java, photon, xp_tour, app_installer, webapp + the `/api/webapp_info` endpoint (its only consumer is app_installer)
-    - [ ] Win95/DOS installation flows (`src/routes/installation/`) **and** the BIOS/boot-device screen (`boot_manager.svelte`) — remove entirely; the site starts directly at the XP loading screen (§2.1)
-    - [ ] Dead dependencies: @faker-js/faker, docx, vendored libarchive.js (if unused after pruning). NOT dead — keep for now: axios (fetches the VFS seed in kept `starting.svelte`) and build-url (kept `internet_explorer.svelte`); @tailwindcss/line-clamp only removable together with its `tailwind.config.cjs` registration and if the lockfile resolves Tailwind ≥3.3 (details in the Phase 0 design doc)
-- [ ] Swap `@sveltejs/adapter-cloudflare` → `@sveltejs/adapter-netlify`; add `netlify.toml` (build command, publish dir, pinned Node version)
-- [ ] **Full TypeScript conversion**: strict `tsconfig.json` (`strict: true`), convert all `src/**/*.js` to `.ts` and add `lang="ts"` to every component, `svelte-check` passes clean, ESLint `@typescript-eslint/no-explicit-any: error` — no `any` anywhere; evaluate dropping the base's `compilerOptions.compatibility.componentApi: 4` flag (migrate any legacy component-API call sites) as part of the same pass
-- [ ] Add VFS `SEED_VERSION` re-seeding (§6.7) — the base fetches the seed once and never refreshes, so pruned/updated content would otherwise never reach returning visitors
-- [ ] Tooling (base has none): ESLint + Prettier, Vitest, Playwright, husky + lint-staged
-- [ ] CI/CD (§5 CI/CD Pipeline): `.github/workflows/ci.yml` (typecheck, lint, tests, build on every push/PR); connect the repo to Netlify (PR deploy previews, production deploys from `main` only); protect `main` and `dev` behind green CI
-- [ ] Branching model (§5 Branching Model): create `dev` from `main`, make it the local default; all Phase 0 work lands on `feature/*` branches off `dev`; first cutover `dev` → `main` happens at this phase's exit (deploying the skeleton)
-- [ ] Migrate the remaining `public/assets/` production files into `static/assets/` and remove `public/` — avatar, xp-logo, and the about-me / contact-me / my-cv / chess / doom icons (the base's ~560-icon set + sounds + Bliss already cover everything else; those duplicates were moved to `design/asset-pool/`)
-- [ ] Verify: `npm run dev` boots straight to the XP loading screen → desktop; windows open/close/drag/resize; `npm run build` passes; skeleton deployed on Netlify
+- [x] Clone win32.run.cf into the repo root (fresh copy, no upstream git history)
+- [x] License reconciliation: add `LICENSE-win32.run` with the upstream MIT copyright + permission notice (required by MIT terms) alongside the project LICENSE
+- [x] Execute the prune manifest — for every removal, also update `static/json/hard_drive.json` (VFS seed), the hardcoded preload arrays in `starting.svelte` (~170 image paths + `/html/*` iframe preloads), and start-menu/desktop entries:
+    - [x] `static/html/*` third-party embeds **except `jspaint`** (serves Paint) **and `visualizers`** (96KB, needed by the kept Media Player Classic): koodo (28MB), notepad (26MB ace build), msword (8.4MB), foxit_reader (16MB — replaced by pdfjs-dist), minesweeper embed (licenseless, loads jQuery from CDN)
+    - [x] Support libs orphaned by those prunes: `static/js/ace.js`, `static/js/mammoth.browser.min.js`, `static/js/libarchive.js` (5MB), vendored `src/lib/libarchive.js` and `src/lib/docx/`
+    - [x] Rewrite `src/routes/+page.svelte` — it is a hardcoded dynamic-import switch over `boot_manager` and every installation route; after the prune it goes straight to the XP loading screen
+    - [x] CrazyGames game embeds (~20 entries in `hard_drive.json`) and `static/files/*` demo media
+    - [x] Programs not in this spec: microsoft_word, koodo, flash_player, winrar, java, photon, xp_tour, app_installer, webapp + the `/api/webapp_info` endpoint (its only consumer is app_installer)
+    - [x] Win95/DOS installation flows (`src/routes/installation/`) **and** the BIOS/boot-device screen (`boot_manager.svelte`) — remove entirely; the site starts directly at the XP loading screen (§2.1)
+    - [x] Dead dependencies: @faker-js/faker, docx, vendored libarchive.js (if unused after pruning). NOT dead — keep for now: axios (fetches the VFS seed in kept `starting.svelte`) and build-url (kept `internet_explorer.svelte`); @tailwindcss/line-clamp only removable together with its `tailwind.config.cjs` registration and if the lockfile resolves Tailwind ≥3.3 (details in the Phase 0 design doc)
+- [x] Swap `@sveltejs/adapter-cloudflare` → `@sveltejs/adapter-netlify`; add `netlify.toml` (build command, publish dir, pinned Node version)
+- [x] **Full TypeScript conversion**: strict `tsconfig.json` (`strict: true`), convert all `src/**/*.js` to `.ts` and add `lang="ts"` to every component, `svelte-check` passes clean, ESLint `@typescript-eslint/no-explicit-any: error` — no `any` anywhere; evaluate dropping the base's `compilerOptions.compatibility.componentApi: 4` flag (migrate any legacy component-API call sites) as part of the same pass
+    - Two `.js` files remain **by design**, not as leftovers: `src/hooks.server.js` (a 3-line pass-through SvelteKit hook) and `src/routes/xp/programs/my_computer/sort.js` (loaded as a Web Worker via `new Worker(new URL('./sort.js', …))`). `svelte-check` is clean at 0 errors regardless
+- [x] Add VFS `SEED_VERSION` re-seeding (§6.7) — the base fetches the seed once and never refreshes, so pruned/updated content would otherwise never reach returning visitors
+- [x] Tooling (base has none): ESLint + Prettier, Vitest, Playwright, husky + lint-staged
+- [x] CI/CD (§5 CI/CD Pipeline): `.github/workflows/ci.yml` (typecheck, lint, tests, build on every push/PR); connect the repo to Netlify (PR deploy previews, production deploys from `main` only); protect `main` and `dev` behind green CI
+- [x] Branching model (§5 Branching Model): create `dev` from `main`, make it the local default; all Phase 0 work lands on `feature/*` branches off `dev`; first cutover `dev` → `main` happens at this phase's exit (deploying the skeleton)
+- [x] Migrate the remaining `public/assets/` production files into `static/assets/` and remove `public/` — avatar, xp-logo, and the about-me / contact-me / my-cv / chess / doom icons (the base's ~560-icon set + sounds + Bliss already cover everything else; those duplicates were moved to `design/asset-pool/`)
+- [x] Verify: `npm run dev` boots straight to the XP loading screen → desktop; windows open/close/drag/resize; `npm run build` passes; skeleton deployed on Netlify
 
 **Exit criteria:** A lean, MIT-attributed, fully-TypeScript XP shell (~60MB static — jspaint alone is 45MB; optionally slim its dist further) running locally and deployed on Netlify through the CI/CD pipeline. **Explicitly expected broken after pruning:** Notepad, Minesweeper, PDF viewing, Python REPL (all rebuilt in later phases). Working: loading screen → desktop, taskbar, start menu, My Computer, image viewer, Paint (jspaint), Media Player Classic.
 
-### Phase 1: Core XP Shell
+### Phase 1: Core XP Shell — ✅ COMPLETE
 
 **Goal:** Rebranded boot sequence (with the new login screen) + desktop with verified window management + mobile fallback.
 
 > Much of this phase is inherited from the base — the work is verification against §4, rebranding, and the two genuinely new pieces: the **login screen** and the **mobile experience**.
 
-- [ ] Boot sequence: "Momad's XP" loading screen (entry point — rebrand per §2.1) → **Login screen (new — §2.2)** → Welcome (verify §2.3) → Desktop
-- [ ] XP startup sound wired to the Login → Welcome transition
-- [ ] Asset preloading during boot (inherited — preload manifest updated after the Phase 0 prune)
-- [ ] Desktop with Bliss wallpaper (inherited)
-- [ ] Window manager: open, close, focus, minimize, maximize, position, size (inherited — verify each behavior in §4.1, including cascade)
-- [ ] Taskbar with Start button, per-window taskbar items, system tray + clock (inherited — verify §3.6)
-- [ ] Desktop icon grid with double-click to open (inherited — curate to the 5 icons of §3.5 + Recycle Bin)
-- [ ] Start menu restructured per §3.4 (pinned column, All Programs flyout, right column with social links, Shut Down)
-- [ ] Context menu system (inherited — verify desktop/icon menus per §4.2)
-- [ ] XP cursor overrides (verify; add missing cursors from `design/` packs)
-- [ ] Create `src/lib/data/profile.json` with all personal data (source: `docs/Profile.pdf`) and copy the resume PDF into `static/assets/` — the mobile layout below needs both **now**; Phase 2's apps consume the same file
-- [ ] Mobile experience (**new** — base has zero mobile support): portrait layout per §4.6; landscape prompt; >= 1024px full desktop
+- [x] Boot sequence: "Momad's XP" loading screen (entry point — rebrand per §2.1) → **Login screen (new — §2.2)** → Welcome (verify §2.3) → Desktop
+- [x] XP startup sound wired to the Login → Welcome transition
+- [x] Asset preloading during boot (inherited — preload manifest updated after the Phase 0 prune)
+- [x] Desktop with Bliss wallpaper (inherited)
+- [x] Window manager: open, close, focus, minimize, maximize, position, size (inherited — verify each behavior in §4.1, including cascade)
+- [x] Taskbar with Start button, per-window taskbar items, system tray + clock (inherited — verify §3.6)
+- [x] Desktop icon grid with double-click to open (inherited — curate to the 5 icons of §3.5 + Recycle Bin)
+- [x] Start menu restructured per §3.4 (pinned column, All Programs flyout, right column with social links, Shut Down)
+- [x] Context menu system (inherited — verify desktop/icon menus per §4.2)
+- [x] XP cursor overrides (verify; add missing cursors from `design/` packs)
+- [x] Create `src/lib/data/profile.json` with all personal data (source: `docs/Profile.pdf`) and copy the resume PDF into `static/assets/` — the mobile layout below needs both **now**; Phase 2's apps consume the same file
+- [x] Mobile experience (**new** — base has zero mobile support): portrait layout per §4.6; landscape prompt; >= 1024px full desktop
 
 **Exit criteria:** User can boot → login → see desktop → double-click icons to open/close/drag/resize windows → use taskbar and start menu. Unbuilt apps render a placeholder. Mobile visitors see the simplified portfolio.
 
-### Phase 2: Portfolio Content Apps
+### Phase 2: Portfolio Content Apps — ✅ COMPLETE
 
 **Goal:** My Computer, About Me, Contact Me, My CV — the core portfolio experience.
 
-- [ ] Verify/extend `profile.json` (created in Phase 1) — add projects, `images` arrays, and any fields the Phase 2 apps need
-- [ ] Write `scripts/generate-vfs.ts` and wire it into the build: `profile.json` → VFS seed (`hard_drive.json`), with `SEED_VERSION` computed as a content hash of the generated seed (no manual bumping to forget) — §6.7
-- [ ] My Computer: Explorer-style window with folder tree and file/folder view
+- [x] Verify/extend `profile.json` (created in Phase 1) — add projects, `images` arrays, and any fields the Phase 2 apps need
+- [x] Write `scripts/generate-vfs.ts` and wire it into the build: `profile.json` → VFS seed (`hard_drive.json`), with `SEED_VERSION` computed as a content hash of the generated seed (no manual bumping to forget) — §6.7
+- [x] My Computer: Explorer-style window with folder tree and file/folder view
     - Folder structure: Experience, Projects, Education, Skills, Certifications, Awards
     - Clicking items shows detail content sourced from JSON
     - Image/GIF gallery per entry (rendered from `images` array in JSON)
-- [ ] About Me: Explorer window with sidebar navigation, bio content, skills tree
-- [ ] My CV / PDF Viewer: Window rendering the resume PDF via pdfjs-dist (XP chrome, Download button)
-- [ ] Contact Me: Outlook Express-style email form
+- [x] About Me: Explorer window with sidebar navigation, bio content, skills tree
+- [x] My CV / PDF Viewer: Window rendering the resume PDF via pdfjs-dist (XP chrome, Download button)
+- [x] Contact Me: Outlook Express-style email form
     - Netlify Function `/api/email` (SvelteKit endpoint) using Resend
     - Abuse hardening per §6.8 (honeypot, rate limit, payload caps)
     - Form validation, success/error XP dialogs
-- [ ] Ensure all content is driven by `profile.json` — zero hardcoded personal content
+- [x] Ensure all content is driven by `profile.json` — zero hardcoded personal content
 
 **Exit criteria:** Visitor can explore the full portfolio (experience, projects, skills, education, contact) through native-feeling XP applications.
 
-### Phase 3: Developer & Interactive Apps
+**Also shipped after Phase 2 closed, in the same production release** (PRs
+#77–#108) — unplanned XP-fidelity work, recorded here so the next phase is not
+surprised by it:
+
+- Explorer's **File** and **View** menus completed — Toolbars, Status Bar, the
+  four Explorer Bars (Search / Favorites / History / Folders), Choose Details,
+  Go To, Refresh/F5 — plus a working address-bar Go button. No dead controls.
+- **System Properties** (profile-driven, 4 tabs), **Folder Options**,
+  **Internet Options**, and a shared XP `GroupBox` for all three.
+- **Favourites** shared between Explorer and IE, for folders and files.
+- **Internet Explorer became a real browser** — see the note in §3.1.
+- Shared logic extracted and unit-tested: selection scoping, delete planning,
+  nav history, the Details/status-bar formatters, the re-seed carry rule.
+
+### Phase 3: Developer & Interactive Apps — ⬜ NEXT
 
 **Goal:** CMD, Python, Paint, Music Player — the "power user" experience.
 
@@ -1353,6 +1390,10 @@ Since Phase 0 the project **is** a pruned win32.run — so parity means two diff
 5. Do not eyeball it and move on — screenshots are the evidence, and no asking for confirmation mid-loop
 
 ### Completion checklist
+
+> A **per-phase template** — copy it into each phase's handoff and tick it
+> there. It is deliberately left unticked here: it describes what "done" means
+> for whichever phase is in flight, not a one-off list for the project.
 
 - [ ] All six workflow gates passed — spec, plan, and implementation each red-teamed, findings resolved
 - [ ] All exit criteria from §9 for this phase are met
