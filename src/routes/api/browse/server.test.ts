@@ -272,6 +272,22 @@ describe('/api/browse response handling', () => {
         expect(spy).not.toHaveBeenCalled(); // no connection at all
     });
 
+    // The CDN keys on the URL alone unless told otherwise, so a copy fetched
+    // by an authorised request was served to one that would have been refused.
+    it('varies on the headers the origin gate reads, so a cache cannot bypass it', async () => {
+        const res = await GET(make_event('https://example.com/'));
+        const vary = res.headers.get('vary') ?? '';
+        expect(vary).toContain('Sec-Fetch-Site');
+        expect(vary).toContain('Origin');
+    });
+
+    it('varies on the raw=1 response too', async () => {
+        const res = await GET(
+            make_event('https://example.com/', { raw: true }),
+        );
+        expect(res.headers.get('vary')).toContain('Sec-Fetch-Site');
+    });
+
     it('forwards only the allowlisted headers', async () => {
         const res = await GET(make_event('https://example.com/'));
         // an ALLOWLIST now: a denylist let clear-site-data through onto our

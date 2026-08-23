@@ -277,6 +277,8 @@ export const GET: RequestHandler = async (event) => {
                 'content-type': 'text/plain; charset=utf-8',
                 'x-content-type-options': 'nosniff',
                 'cache-control': 'public, max-age=300',
+                // same reason as the document response below
+                vary: 'Sec-Fetch-Site, Origin, Accept-Encoding',
                 'x-robots-tag': 'noindex, nofollow',
             },
         });
@@ -341,7 +343,24 @@ export const GET: RequestHandler = async (event) => {
     headers.delete('content-length');
     // Our own policy for the proxied document: it may render and script, but it
     // is on an opaque origin (iframe sandbox) so it owns nothing of ours.
+    /**
+     * `Vary` on the headers the ORIGIN GATE reads.
+     *
+     * Without it the CDN keys this response on the URL alone, so a copy
+     * fetched by an authorised same-origin request is then served to a request
+     * that would itself have been refused — verified on production, where a
+     * forged `Origin` got a cached 200 while the same URL with a fresh query
+     * string correctly got 403.
+     *
+     * It never leaked anything secret: proxied pages are public and fetched
+     * with no credentials, and an unauthorised caller still cannot cause a NEW
+     * fetch (so no SSRF, and no spend). But it made the endpoint a read-through
+     * relay for anything already visited, which is exactly the property the
+     * gate exists to deny. `Vary` keeps the caching — and its saved
+     * invocations — while putting the gate's inputs in the cache key.
+     */
     headers.set('cache-control', 'public, max-age=300');
+    headers.set('vary', 'Sec-Fetch-Site, Origin, Accept-Encoding');
     headers.set('x-robots-tag', 'noindex, nofollow');
 
     return new Response(body, { status: upstream.status, headers });
