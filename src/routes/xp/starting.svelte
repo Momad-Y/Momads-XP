@@ -61,6 +61,7 @@
         '/images/xp/icons/Back.png',
         '/images/xp/icons/CommandPrompt.png',
         '/images/xp/icons/ControlPanel.png',
+        '/images/xp/icons/Python.png',
         '/images/xp/icons/Default.png',
         '/images/xp/icons/Desktop.png',
         '/images/xp/icons/Email.png',
