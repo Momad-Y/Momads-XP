@@ -26,6 +26,7 @@
  */
 import type { Component } from 'svelte';
 import type { ProgramInstance, VfsItem, WindowOptions } from './types';
+import { TERMINAL_MIN_HEIGHT, TERMINAL_MIN_WIDTH } from './term/theme';
 
 /**
  * The props every program component accepts. Mirrors what the inherited
@@ -80,7 +81,20 @@ export interface AppDefinition {
  * `svelte-check` resolves dynamic import specifiers, so a row for a file that
  * does not exist yet is a build error.
  */
-export const APP_REGISTRY: readonly AppDefinition[] = [];
+export const APP_REGISTRY: readonly AppDefinition[] = [
+    {
+        id: 'cmd',
+        path: './programs/cmd.svelte',
+        title: 'momad@xp:~',
+        icon: '/images/xp/icons/CommandPrompt.png',
+        component: () => import('../routes/xp/programs/cmd.svelte'),
+        default_size: { width: 720, height: 460 },
+        min_size: { width: TERMINAL_MIN_WIDTH, height: TERMINAL_MIN_HEIGHT },
+        // Multi-instance on purpose: a second terminal is cheap and genuinely
+        // useful, unlike the Python REPL which owns a multi-megabyte runtime.
+        singleton: false,
+    },
+];
 
 export function find_app(path: string | undefined): AppDefinition | undefined {
     if (path == null) return undefined;

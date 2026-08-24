@@ -125,10 +125,11 @@
             icon: '/assets/icons/about-me.png',
             path: './programs/about_me.svelte',
         },
-        placeholder_entry(
-            'Command Prompt',
-            '/images/xp/icons/CommandPrompt.png',
-        ),
+        {
+            name: 'Command Prompt',
+            icon: '/images/xp/icons/CommandPrompt.png',
+            path: './programs/cmd.svelte',
+        },
         placeholder_entry('Python', '/images/xp/icons/ApplicationWindow.png'),
         {
             name: 'Paint',

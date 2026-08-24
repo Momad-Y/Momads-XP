@@ -57,3 +57,18 @@ export const XP_CONSOLE_THEME = {
 /** Minimum window size that keeps the ≤72-column formatters from wrapping. */
 export const TERMINAL_MIN_WIDTH = 620;
 export const TERMINAL_MIN_HEIGHT = 380;
+
+/**
+ * The public surface `Terminal.svelte` exposes through `bind:this`.
+ *
+ * Hand-written for the same reason `WindowController` is: ESLint's type
+ * service resolves a bound Svelte component instance as `any`, and
+ * `no-unsafe-call` is an error over `src/`. Typing the binding as this
+ * interface makes every call checked.
+ */
+export interface TerminalHandle {
+    write: (text: string) => void;
+    clear: () => void;
+    focus: () => void;
+    is_disposed: () => boolean;
+}
