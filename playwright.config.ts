@@ -19,6 +19,20 @@ export default defineConfig({
      */
     workers: process.env.CI ? undefined : 4,
     use: { viewport: { width: 1280, height: 800 } },
+    /**
+     * Both projects are declared EXPLICITLY. Declaring only an `online`
+     * project would make a bare `npx playwright test` run every project,
+     * including the one that downloads ~5 MB from jsDelivr on a 2-core CI
+     * runner — breaking the standing rule that no spec in the default suite
+     * reaches the internet.
+     *
+     * `@online` is for real-Pyodide verification and is run deliberately:
+     *     npx playwright test --project=online
+     */
+    projects: [
+        { name: 'default', grepInvert: /@online/ },
+        { name: 'online', grep: /@online/ },
+    ],
     webServer: {
         // CI builds earlier in the pipeline — reuse that build instead of duplicating it
         command: process.env.CI

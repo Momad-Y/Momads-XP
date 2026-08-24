@@ -94,6 +94,22 @@ export const APP_REGISTRY: readonly AppDefinition[] = [
         // useful, unlike the Python REPL which owns a multi-megabyte runtime.
         singleton: false,
     },
+    {
+        id: 'python',
+        path: './programs/python.svelte',
+        title: 'Python',
+        // Python.png ships in the icon set and was unused; the Start Menu
+        // passed the generic ApplicationWindow.png. §3.2 asks for "Python
+        // branding" and the right icon was simply never wired up.
+        icon: '/images/xp/icons/Python.png',
+        component: () => import('../routes/xp/programs/python.svelte'),
+        default_size: { width: 720, height: 460 },
+        min_size: { width: TERMINAL_MIN_WIDTH, height: TERMINAL_MIN_HEIGHT },
+        // SINGLETON, unlike CMD. Each instance owns its own Pyodide runtime:
+        // ~5 MB over the wire plus a full CPython heap, so three Start-Menu
+        // clicks is a tab kill on a mid-range phone.
+        singleton: true,
+    },
 ];
 
 export function find_app(path: string | undefined): AppDefinition | undefined {

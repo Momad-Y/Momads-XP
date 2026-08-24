@@ -2,27 +2,37 @@ import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { bootToDesktop } from './helpers';
 
-// All §3.5 desktop apps are real now — the placeholder tests use the
-// start-menu Python entry (Phase 3), the surviving placeholder target.
-async function openPythonPlaceholder(page: Page) {
+// Phase 3 made CMD and Python real, so the placeholder tests moved to the
+// Games flyout — Minesweeper survives until Phase 4.
+//
+// The target MUST be rect-less for the cascade test below: `work_space`'s
+// placeholder branch is the only one that does not pass `exec_path`, and a
+// window with a persisted rect does not cascade. A real Phase 3 app cannot
+// stand in here for that reason.
+async function openPlaceholder(page: Page) {
     await page.locator('#start-menu-btn').click();
     await page.locator('#start-menu').getByText('All Programs').hover();
     const flyout = page.locator('#all-programs-flyout');
     await expect(flyout).toBeVisible();
-    await flyout.getByText('Python', { exact: true }).click();
+    await flyout.getByText('Games', { exact: true }).hover();
+    // Scoped to the flyout: once a placeholder window is open its TITLE BAR
+    // and taskbar button also read "Minesweeper", so a page-wide locator is a
+    // strict-mode violation on the second call — which is exactly what the
+    // cascade test below does.
+    await flyout.getByText('Minesweeper', { exact: true }).click();
 }
 
-test('Python start-menu entry opens the named placeholder', async ({
+test('a Games start-menu entry opens the named placeholder', async ({
     page,
 }) => {
     await bootToDesktop(page);
-    await openPythonPlaceholder(page);
+    await openPlaceholder(page);
 
     const win = page.locator('#work-space .window').first();
     await expect(win).toBeVisible();
     await expect(
         win.getByText(
-            'Python is under construction — coming in a later phase.',
+            'Minesweeper is under construction — coming in a later phase.',
         ),
     ).toBeVisible();
     await win.getByText('OK').click();
@@ -31,9 +41,9 @@ test('Python start-menu entry opens the named placeholder', async ({
 
 test('two rect-less windows cascade instead of stacking', async ({ page }) => {
     await bootToDesktop(page);
-    await openPythonPlaceholder(page);
+    await openPlaceholder(page);
     await expect(page.locator('#work-space .window')).toHaveCount(1);
-    await openPythonPlaceholder(page);
+    await openPlaceholder(page);
     await expect(page.locator('#work-space .window')).toHaveCount(2);
 
     const first = await page

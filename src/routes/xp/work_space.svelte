@@ -22,6 +22,35 @@
     let node_ref: HTMLDivElement;
     let workSpaceHeight: number;
 
+    /**
+     * DECLARED BEFORE the queueProgram subscription below, and it must stay
+     * there.
+     *
+     * `store.subscribe()` invokes its callback SYNCHRONOUSLY with the current
+     * value, so if a program is already queued when this component
+     * initialises, `launch()` runs during init — before any `const` further
+     * down has been evaluated. `focus_existing()` reads this array, so having
+     * it below produced:
+     *
+     *     ReferenceError: Cannot access 'singleton_programs' before
+     *     initialization
+     *         at focus_existing -> launch_inner -> launch -> subscribe
+     *
+     * A latent trap in the inherited ordering; the registry lookup added
+     * beside it is what made the path reachable.
+     */
+    /**
+     * XP's property sheets are single-instance: invoking Folder Options (etc.)
+     * again raises the open one rather than stacking a second copy with its own
+     * taskbar button (red-team M6).
+     */
+    const singleton_programs = [
+        './programs/system_properties.svelte',
+        './programs/folder_options.svelte',
+        './programs/internet_options.svelte',
+        './programs/organize_favorites.svelte',
+    ];
+
     // eslint-disable-next-line @typescript-eslint/no-unused-vars -- the inherited base never unsubscribes (work_space lives for the whole session); wiring these into onDestroy would be a behavior change
     const unsubscribers = [
         queueProgram.subscribe((program) => {
@@ -35,18 +64,6 @@
     onMount(() => {});
 
     onDestroy(() => {});
-
-    /**
-     * XP's property sheets are single-instance: invoking Folder Options (etc.)
-     * again raises the open one rather than stacking a second copy with its own
-     * taskbar button (red-team M6).
-     */
-    const singleton_programs = [
-        './programs/system_properties.svelte',
-        './programs/folder_options.svelte',
-        './programs/internet_options.svelte',
-        './programs/organize_favorites.svelte',
-    ];
 
     function focus_existing(path: string | undefined): boolean {
         // Registry singletons count too, or `AppDefinition.singleton` would be
@@ -448,9 +465,17 @@
             // test — which is how a mistyped specifier could ship.
             const app = find_app(path);
             if (app == null) {
-                throw new Error(
-                    `no program registered for path: ${String(path)}`,
-                );
+                // A request with NO path is not a typo — several inherited
+                // call sites queue one to hand `fs_item`/`copying_obj` to a
+                // branch above, and the chain has always let those fall
+                // through silently. Preserving that is deliberate: turning it
+                // into a throw broke boot, because `store.subscribe()` fires
+                // synchronously and work_space can initialise with one queued.
+                if (path == null) return;
+                // A path that IS set but matches nothing is the real defect
+                // this branch exists to surface — previously a silent no-op
+                // with no window, no error and no failing test.
+                throw new Error(`no program registered for path: ${path}`);
             }
             const Program = (await app.component()).default;
             const program: ProgramInstance = mount(Program, {
