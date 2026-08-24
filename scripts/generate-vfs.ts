@@ -14,10 +14,12 @@ import { execSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { profile } from '../src/lib/profile';
 import { SEED_EPOCH, build_portfolio } from '../src/lib/vfs_gen/build';
+import { TRACKS } from '../src/lib/music/manifest';
 import type { VfsItem } from '../src/lib/types';
 
 const C_DRIVE = 'cTbkbrM4qjwF3UfmCoFkEK';
 const DESKTOP = 'nt1QdU9Sws26H26UNQZcQU';
+const MY_MUSIC = 'tjhEdnks6c4wPBWcqyoWQz';
 const MY_COMPUTER_EXE = 'sWTYkZhdpSYCmXP7z6459v';
 const IE_EXE = '2jpDfV5KSoYMArQnHgux5S';
 
@@ -97,6 +99,37 @@ if (c_drive == null) throw new Error('C: drive missing from base');
 seed[C_DRIVE] = {
     ...c_drive,
     children: [...c_drive.children, ...built.folder_ids, built.resume_file_id],
+};
+
+// ---- My Music: derived from the track manifest ------------------------
+// The manifest is the single source of truth (src/lib/music/manifest.ts);
+// vfs-base.json ships My Music with `children: []` and is NOT edited. The
+// entries point at the SAME static URLs the player uses, so no bytes are
+// duplicated — only metadata.
+const my_music = seed[MY_MUSIC];
+if (my_music == null) throw new Error('My Music folder missing from base');
+for (const track of TRACKS) {
+    seed[track.id] = {
+        id: track.id,
+        type: 'file',
+        basename: track.title,
+        name: `${track.title}.mp3`,
+        ext: '.mp3',
+        storage_type: 'remote',
+        url: track.url,
+        // KB, per VfsItem.size — a byte value renders as "512,986 KB".
+        size: track.size_kb,
+        parent: MY_MUSIC,
+        children: [],
+        date_created: SEED_EPOCH,
+        date_modified: SEED_EPOCH,
+        sort_option: 0,
+        sort_order: 0,
+    };
+}
+seed[MY_MUSIC] = {
+    ...my_music,
+    children: [...my_music.children, ...TRACKS.map((t) => t.id)],
 };
 
 const desktop = seed[DESKTOP];

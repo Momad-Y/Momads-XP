@@ -388,6 +388,11 @@
                 {
                     "ext": ".wav",
                     "desc": "Wave Sound — the startup chime, probably"
+                },
+                {
+                    "ext": ".mp3",
+
+                    "desc": "MP3 Audio — Media Player, or the fancy one"
                 }
             ],
             "note": "Change and Advanced are disabled. These associations are perfect as-is."

@@ -46,7 +46,13 @@ export const make = ({
     //originator: a wrapped fs item, i.e, file, folder, drive
     // {item: item, open: fn(), my_computer_instance: obj})
 
-    const open_with_handlers = doctypes[originator.item.ext];
+    // `.toLowerCase()` — the sibling call sites (favorites.ts:51,
+    // desktop_folder.svelte:226, viewer.svelte:382, file_icon.ts:23) have
+    // always had it and this one never did. Harmless while .mp3 had a single
+    // handler; the moment a SECOND one exists, an uppercase ".MP3" silently
+    // loses its Open With submenu. Instance #8 of "a rule applied at one call
+    // site while its siblings are left alone".
+    const open_with_handlers = doctypes[originator.item.ext.toLowerCase()];
 
     return {
         required_width: 180 + 20,

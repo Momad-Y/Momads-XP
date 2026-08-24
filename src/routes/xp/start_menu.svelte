@@ -141,11 +141,9 @@
             path: './programs/paint.svelte',
         },
         {
-            // §3.4 label; launches the real inherited MPC — the custom player
-            // arrives in Phase 3 (design decision 7)
             name: 'Music Player',
-            icon: '/images/xp/icons/MPC.png',
-            path: './programs/media_player_classic.svelte',
+            icon: '/images/xp/icons/WindowsMediaPlayer9.png',
+            path: './programs/music_player.svelte',
         },
         {
             name: 'Games',

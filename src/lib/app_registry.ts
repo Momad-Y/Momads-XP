@@ -110,6 +110,19 @@ export const APP_REGISTRY: readonly AppDefinition[] = [
         // clicks is a tab kill on a mid-range phone.
         singleton: true,
     },
+    {
+        id: 'music_player',
+        path: './programs/music_player.svelte',
+        title: 'Windows Media Player',
+        icon: '/images/xp/icons/WindowsMediaPlayer9.png',
+        component: () => import('../routes/xp/programs/music_player.svelte'),
+        default_size: { width: 480, height: 520 },
+        min_size: { width: 400, height: 460 },
+        // SINGLETON: it owns the audio output and the visualiser's
+        // AudioContext. Two copies would talk over each other, and XP's own
+        // Media Player is single-instance.
+        singleton: true,
+    },
 ];
 
 export function find_app(path: string | undefined): AppDefinition | undefined {
