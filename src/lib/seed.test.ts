@@ -437,3 +437,87 @@ describe('merge_on_reseed — degenerate inputs', () => {
         expect(Object.keys(merge_on_reseed({}, seed))).toHaveLength(2);
     });
 });
+
+describe('merge_on_reseed — provenance of copied program items', () => {
+    it('keeps a pasted copy of a seed program', () => {
+        // clone_fs copies the source item WHOLESALE, so duplicating a program
+        // icon produced `storage_type: 'fake'` + `executable: true` — which
+        // looked identical to a pruned-program placeholder, so the merge
+        // deleted the visitor's own file on every re-seed. `authored` is the
+        // recorded provenance that tells them apart.
+        const seed = {
+            root: item({ id: 'root', type: 'folder', children: [] }),
+        };
+        const cached: HardDrive = {
+            root: item({ id: 'root', type: 'folder', children: ['copy'] }),
+            copy: item({
+                id: 'copy',
+                parent: 'root',
+                storage_type: 'fake',
+                executable: true,
+                authored: true,
+            }),
+        };
+        const out = merge_on_reseed(cached, seed);
+        expect(out.copy, 'the visitor’s duplicate was deleted').toBeDefined();
+        expect(out.root?.children).toContain('copy');
+    });
+
+    it('still drops a genuine stale placeholder for a pruned program', () => {
+        // The behaviour `authored` must not weaken: a `fake` + `executable`
+        // item the visitor did NOT create is a program we removed from the
+        // seed, and carrying it forward would resurrect a dead icon.
+        const seed = {
+            root: item({ id: 'root', type: 'folder', children: [] }),
+        };
+        const cached: HardDrive = {
+            root: item({ id: 'root', type: 'folder', children: ['old'] }),
+            old: item({
+                id: 'old',
+                parent: 'root',
+                storage_type: 'fake',
+                executable: true,
+            }),
+        };
+        expect(merge_on_reseed(cached, seed).old).toBeUndefined();
+    });
+});
+
+describe('merge_on_reseed — carried fields are type-checked', () => {
+    const seed_drive = (): HardDrive => ({
+        f: item({
+            id: 'f',
+            name: 'A.txt',
+            basename: 'A',
+            ext: '.txt',
+            sort_option: 0,
+            sort_order: 0,
+            date_modified: 100,
+        }),
+    });
+
+    it('ignores a corrupted value instead of writing it onto the seed item', () => {
+        // Every other step of the boot path validates persisted data; this one
+        // wrote whatever the store held straight onto a fresh seed item and
+        // persisted it, defeating usable_cache's discard-if-malformed
+        // contract rather than being caught by it.
+        const before = snapshot_seed_fields(seed_drive());
+        const cached = seed_drive();
+        const corrupt = cached.f;
+        if (corrupt == null) throw new Error('fixture');
+        // Deliberately wrong types, as a damaged IndexedDB record would hold.
+        Object.assign(corrupt, { name: 42, sort_option: null });
+
+        const out = merge_on_reseed(cached, seed_drive(), before);
+        expect(out.f?.name).toBe('A.txt');
+        expect(out.f?.sort_option).toBe(0);
+    });
+
+    it('still carries a well-typed edit', () => {
+        const before = snapshot_seed_fields(seed_drive());
+        const cached = patch(seed_drive(), 'f', { name: 'Renamed.txt' });
+        expect(merge_on_reseed(cached, seed_drive(), before).f?.name).toBe(
+            'Renamed.txt',
+        );
+    });
+});
