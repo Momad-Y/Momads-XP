@@ -54,8 +54,15 @@ export const XP_CONSOLE_THEME = {
     brightWhite: '#ffffff',
 } as const;
 
-/** Minimum window size that keeps the ≤72-column formatters from wrapping. */
-export const TERMINAL_MIN_WIDTH = 620;
+/**
+ * Minimum window size that keeps the ≤72-column formatters from wrapping.
+ *
+ * 640, not 620. The original figure was eyeballed; `theme.test.ts` now derives
+ * the requirement (0.6 em advance x MAX_COLS x font size, plus chrome) and it
+ * came out at ~629 — so the old value was genuinely a few pixels short and the
+ * widest `skills` lines would have wrapped at the minimum size.
+ */
+export const TERMINAL_MIN_WIDTH = 640;
 export const TERMINAL_MIN_HEIGHT = 380;
 
 /**
@@ -68,7 +75,6 @@ export const TERMINAL_MIN_HEIGHT = 380;
  */
 export interface TerminalHandle {
     write: (text: string) => void;
-    clear: () => void;
     focus: () => void;
     is_disposed: () => boolean;
 }

@@ -415,3 +415,25 @@ describe('snapshot_seed_fields', () => {
         ]);
     });
 });
+
+describe('merge_on_reseed — degenerate inputs', () => {
+    it('wipes the drive when handed an EMPTY cache and a snapshot', () => {
+        // Documents the hazard rather than the desired behaviour: with a
+        // snapshot present, every seed id is "absent from cached", so the
+        // tombstone pass removes all of them. Pre-Phase-3 an empty cache still
+        // yielded the full seed. The guard lives in starting.svelte's
+        // usable_cache(), which now discards a zero-key drive — this test
+        // pins WHY that guard has to exist.
+        const seed = { a: item({ id: 'a' }), b: item({ id: 'b' }) };
+        const snapshot = snapshot_seed_fields(seed);
+        expect(Object.keys(merge_on_reseed({}, seed, snapshot))).toHaveLength(
+            0,
+        );
+    });
+
+    it('still yields the full seed for an empty cache with NO snapshot', () => {
+        // The legacy path, unchanged.
+        const seed = { a: item({ id: 'a' }), b: item({ id: 'b' }) };
+        expect(Object.keys(merge_on_reseed({}, seed))).toHaveLength(2);
+    });
+});

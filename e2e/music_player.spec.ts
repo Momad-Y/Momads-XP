@@ -64,10 +64,18 @@ test('play, pause and play again — the createMediaElementSource trap', async (
     await button.click();
     await expect.poll(async () => button.textContent()).toBe('▶');
 
-    // THE THIRD CLICK IS THE POINT. createMediaElementSource() is a permanent
+    // THE THIRD CLICK IS THE POINT: createMediaElementSource() is a permanent
     // one-shot binding on the ELEMENT, so a naive implementation throws
-    // InvalidStateError here — even from a different AudioContext. The
-    // WeakMap cache in player.ts is what makes this survive.
+    // InvalidStateError here.
+    //
+    // Honest scope note: what actually protects this path today is
+    // ensure_graph()'s `if (analyser == null)` guard, which builds the graph
+    // once per component. The WeakMap in player.ts is a second line of defence
+    // for any future caller that reaches for a source node directly, and its
+    // CONTRACT is unit-tested. This e2e proves the user-visible behaviour, not
+    // which of the two mechanisms delivered it.
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
     await button.click();
     await expect.poll(async () => button.textContent()).toBe('⏸');
 
@@ -75,6 +83,8 @@ test('play, pause and play again — the createMediaElementSource trap', async (
     await expect
         .poll(async () => audio.evaluate((el: HTMLAudioElement) => el.paused))
         .toBe(false);
+    // No InvalidStateError reached the page.
+    expect(errors.filter((e) => e.includes('InvalidStateError'))).toEqual([]);
 });
 
 test('next and previous wrap around the playlist', async ({ page }) => {
@@ -114,11 +124,14 @@ test('the volume slider drives the element, multiplied by the tray volume', asyn
     await openPlayer(page);
 
     await page.getByTestId('volume').fill('0.5');
+    // An EXACT value. `toBeLessThanOrEqual(0.5)` was satisfied by 0, so the
+    // test passed with `effective_volume` returning a constant zero.
+    // systemVolume defaults to 1, so 0.5 x 1 = 0.5.
     await expect
         .poll(async () =>
             page.locator('audio').evaluate((el: HTMLAudioElement) => el.volume),
         )
-        .toBeLessThanOrEqual(0.5);
+        .toBeCloseTo(0.5, 2);
 });
 
 test('is a singleton — it owns the audio output', async ({ page }) => {

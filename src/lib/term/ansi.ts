@@ -10,10 +10,7 @@ export const RESET = `${CSI}0m`;
 export const BOLD = `${CSI}1m`;
 export const DIM = `${CSI}2m`;
 
-export const FG_GREEN = `${CSI}32m`;
 export const FG_BRIGHT_GREEN = `${CSI}92m`;
-export const FG_WHITE = `${CSI}37m`;
-export const FG_BRIGHT_WHITE = `${CSI}97m`;
 export const FG_CYAN = `${CSI}36m`;
 export const FG_YELLOW = `${CSI}33m`;
 export const FG_RED = `${CSI}31m`;

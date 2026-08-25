@@ -17,11 +17,19 @@
     } from '../../../lib/music/player';
     import type {
         ProgramInstance,
+        VfsItem,
         WindowController,
         WindowOptions,
     } from '../../../lib/types';
 
     export let id: string;
+    /**
+     * Set when launched through Explorer's Open With on an .mp3. Without this
+     * the clicked file was discarded and playback always started at TRACKS[0],
+     * which made the second `doctypes['.mp3']` entry — the whole reason the
+     * association was changed — do nothing.
+     */
+    export let fs_item: VfsItem | undefined = undefined;
     export let window: WindowController | undefined = undefined;
     export let get_self: () => ProgramInstance | null = () => null;
     export const parentNode: HTMLElement | undefined = undefined;
@@ -49,7 +57,16 @@
     let audio: HTMLAudioElement | undefined;
     let canvas: HTMLCanvasElement | undefined;
 
-    let index = 0;
+    /** Index of the track a launch payload names, or 0. */
+    function index_for(item: VfsItem | undefined): number {
+        if (item == null) return 0;
+        const found = TRACKS.findIndex(
+            (t) => t.id === item.id || t.url === item.url,
+        );
+        return found >= 0 ? found : 0;
+    }
+
+    let index = index_for(fs_item);
     let paused = true;
     let current_time = 0;
     let duration = TRACKS[0]?.duration_s ?? 0;
@@ -99,7 +116,12 @@
             // is heard ONLY through the graph.
             analyser.connect(ctx.destination);
         }
-        draw();
+        // ONLY start the loop if one is not already running. ensure_graph() is
+        // called from both play and track-select, and draw() re-schedules
+        // itself unconditionally — so every press spawned another rAF chain,
+        // each running getByteFrequencyData plus 28 fillRects per frame, while
+        // onDestroy could cancel only the newest handle.
+        if (frame_id == null) draw();
     }
 
     function draw() {
@@ -167,6 +189,7 @@
         // Stop the loop AND the sound: a window closed mid-playback that keeps
         // its audio element alive is the worst kind of leak — audible.
         if (frame_id != null) cancelAnimationFrame(frame_id);
+        frame_id = undefined;
         audio?.pause();
         void ctx?.close();
     });

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { MAX_COLS } from '../cmd/format';
 import {
     TERMINAL_FONT_FAMILY,
     TERMINAL_FONT_SIZE,
@@ -72,15 +73,26 @@ describe('XP_CONSOLE_THEME', () => {
 });
 
 describe('window sizing', () => {
-    it('is wide enough for the ≤72-column formatters not to wrap', () => {
-        // The command formatters emit lines up to 72 columns. At 14px in a
-        // monospace face a column is ~8px, so 72 columns needs ~576px plus
-        // chrome — anything less and every `skills` listing wraps raggedly.
-        expect(TERMINAL_MIN_WIDTH).toBeGreaterThanOrEqual(600);
-        expect(TERMINAL_FONT_SIZE).toBeGreaterThan(0);
+    /**
+     * Monospace advance width is ~0.6 em for the faces in the stack, so a
+     * column at `size` px is ~0.6 * size wide. Deriving it is the point: the
+     * old test asserted TERMINAL_MIN_WIDTH >= 600 and
+     * TERMINAL_FONT_SIZE > 0 — two constants against two literals, with no
+     * relationship computed. Raising the font to 40px left it green while
+     * 72 columns no longer came close to fitting.
+     */
+    const column_px = (size: number) => size * 0.6;
+    /** Window chrome: borders, padding and the scrollbar gutter. */
+    const CHROME_PX = 24;
+
+    it('fits MAX_COLS columns at the configured font size', () => {
+        const needed = column_px(TERMINAL_FONT_SIZE) * MAX_COLS + CHROME_PX;
+        expect(TERMINAL_MIN_WIDTH).toBeGreaterThanOrEqual(needed);
     });
 
-    it('is tall enough to show a usable number of rows', () => {
-        expect(TERMINAL_MIN_HEIGHT).toBeGreaterThanOrEqual(300);
+    it('fits at least 20 rows at the configured font size', () => {
+        // Line height is ~1.2 em.
+        const needed = TERMINAL_FONT_SIZE * 1.2 * 20;
+        expect(TERMINAL_MIN_HEIGHT).toBeGreaterThanOrEqual(needed);
     });
 });

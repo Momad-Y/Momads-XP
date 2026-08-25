@@ -11,8 +11,10 @@
     import { feed, initial_state } from '../../../lib/term/readline';
     import type { ReadlineState } from '../../../lib/term/readline';
     import {
+        CLEAR_LINE_RIGHT,
         CLEAR_SCREEN,
         colour,
+        CR,
         CRLF,
         FG_BRIGHT_GREEN,
         FG_GREY,
@@ -96,7 +98,7 @@
     function redraw() {
         // \r to column 0, clear right, reprint. Cheaper and steadier than
         // tracking individual cursor moves, and it cannot desynchronise.
-        write('\r\x1b[0K' + PROMPT + state.buffer);
+        write(CR + CLEAR_LINE_RIGHT + PROMPT + state.buffer);
         const back = state.buffer.length - state.cursor;
         if (back > 0) write(`\x1b[${String(back)}D`);
     }

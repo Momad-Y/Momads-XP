@@ -133,17 +133,38 @@ export function find_app(path: string | undefined): AppDefinition | undefined {
 /**
  * Map an `AppDefinition` onto the shape `Window.svelte` actually consumes.
  *
- * For a REGISTERED app this object is the whole truth: registry components
- * deliberately do NOT declare their own `export let options` default, because
- * Svelte replaces a prop wholesale rather than merging it. The inherited
- * if-chain branches are the opposite — their components own `options` — which
- * is exactly why the registry is a separate path and not a rewrite of them.
+ * For a REGISTERED app this object REPLACES the component's own `options`
+ * default wholesale — Svelte does not merge a passed prop with its default.
+ * So everything Window.svelte needs must be produced here. The components do
+ * still declare a default (it is what they use when mounted outside the
+ * registry path), and an earlier version of this comment claimed they did not,
+ * which is what hid the missing `id` from review.
  */
-export function to_window_options(app: AppDefinition): WindowOptions {
+export function to_window_options(
+    app: AppDefinition,
+    /**
+     * The instance id. NOT optional in practice — `Window.svelte` needs it for
+     * three separate behaviours and silently degrades all three without it:
+     *   - `program-id={options.id}` (Window.svelte) is how `click_outside`
+     *     excludes the window's own taskbar tile; absent, clicking that tile
+     *     makes the window lose focus.
+     *   - the minimize animation targets `.program-tile[program-id="…"]`;
+     *     absent, it matches nothing and the window flies to the page centre.
+     *   - `calc_nudges` compares `el.options.id != options.id`; with both
+     *     undefined that is false, so no sibling is found and two windows land
+     *     PIXEL-IDENTICAL instead of cascading.
+     * Measured: two Command Prompts both opened at top:155px left:280px.
+     */
+    id: string,
+): WindowOptions {
     const options: WindowOptions = {
+        id,
         title: app.title,
         icon: app.icon,
         exec_path: app.path,
+        // Registry apps are all resizable; the components declared this in
+        // their own `options` default, which this object replaces wholesale.
+        resizable: true,
     };
     if (app.default_size != null) {
         options.width = app.default_size.width;

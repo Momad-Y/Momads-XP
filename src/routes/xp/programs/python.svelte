@@ -16,7 +16,9 @@
     import { feed, initial_state } from '../../../lib/term/readline';
     import type { ReadlineState } from '../../../lib/term/readline';
     import {
+        CLEAR_LINE_RIGHT,
         colour,
+        CR,
         CRLF,
         FG_GREY,
         FG_RED,
@@ -88,7 +90,7 @@
     }
     function redraw() {
         const p = block.length > 0 ? PS2 : PS1;
-        write('\r\x1b[0K' + p + state.buffer);
+        write(CR + CLEAR_LINE_RIGHT + p + state.buffer);
         const back = state.buffer.length - state.cursor;
         if (back > 0) write(`\x1b[${String(back)}D`);
     }
@@ -142,6 +144,10 @@
             case 'error':
                 ready = false;
                 awaiting = false;
+                // Clear the block too: leaving it non-empty renders a `...`
+                // continuation prompt that can never advance, because submit()
+                // returns early while !ready.
+                block = [];
                 write_lines([
                     '',
                     colour(message.message, FG_YELLOW),
@@ -160,9 +166,17 @@
             prompt();
             return;
         }
+        // ONE LINE, never the joined block. `PyodideConsole.push()` appends to
+        // its OWN buffer and re-joins (console.py: `self.buffer.append(line);
+        // source = "\n".join(self.buffer)`), so sending the accumulated block
+        // double-concatenates it:
+        //   push("def f():")                 -> incomplete, buffer kept
+        //   push("def f():\n    return 41")  -> IndentationError
+        // Every multi-line block was a syntax error and the function was never
+        // defined. `block` is kept ONLY to choose PS1 vs PS2.
         block = [...block, line];
         awaiting = true;
-        client?.exec(block.join('\n'));
+        client?.exec(line);
     }
 
     function on_data(data: string) {

@@ -206,9 +206,6 @@ export const COMMANDS: readonly Command[] = [
     },
 ];
 
-/** Commands the component animates rather than printing. */
-export const ANIMATED_COMMANDS = ['matrix', 'hack'] as const;
-
 export function find_command(name: string): Command | undefined {
     // Case-SENSITIVE, like bash. §3.2 line 1 specifies "bash emulation, not
     // Windows cmd", and the plan's original case-insensitive lookup was a

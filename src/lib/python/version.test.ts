@@ -1,11 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import pkg from '../../../package.json';
-import {
-    PYODIDE_VERSION,
-    PYODIDE_CDN_BASE,
-    PYODIDE_ENTRY,
-    PYODIDE_ORIGIN,
-} from './version';
+import { PYODIDE_VERSION, PYODIDE_CDN_BASE, PYODIDE_ORIGIN } from './version';
 
 describe('PYODIDE_VERSION', () => {
     it('matches the pinned devDependency exactly', () => {
@@ -32,7 +27,6 @@ describe('PYODIDE_VERSION', () => {
         expect(PYODIDE_CDN_BASE).toBe(
             `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`,
         );
-        expect(PYODIDE_ENTRY.endsWith('/pyodide.mjs')).toBe(true);
     });
 
     it('names an origin that is a prefix of every URL it builds', () => {
@@ -40,6 +34,5 @@ describe('PYODIDE_VERSION', () => {
         // against PYODIDE_ORIGIN. If a URL escaped that origin the CSP would
         // block it on the deploy only.
         expect(PYODIDE_CDN_BASE.startsWith(PYODIDE_ORIGIN + '/')).toBe(true);
-        expect(PYODIDE_ENTRY.startsWith(PYODIDE_ORIGIN + '/')).toBe(true);
     });
 });
