@@ -40,7 +40,7 @@
         id,
         exec_path,
         width: 480,
-        height: 520,
+        height: 470,
         min_width: 400,
         min_height: 460,
         resizable: true,

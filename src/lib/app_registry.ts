@@ -116,7 +116,7 @@ export const APP_REGISTRY: readonly AppDefinition[] = [
         title: 'Windows Media Player',
         icon: '/images/xp/icons/WindowsMediaPlayer9.png',
         component: () => import('../routes/xp/programs/music_player.svelte'),
-        default_size: { width: 480, height: 520 },
+        default_size: { width: 480, height: 470 },
         min_size: { width: 400, height: 460 },
         // SINGLETON: it owns the audio output and the visualiser's
         // AudioContext. Two copies would talk over each other, and XP's own

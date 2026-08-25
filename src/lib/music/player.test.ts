@@ -116,14 +116,23 @@ describe('bar_heights', () => {
         for (const v of quiet) expect(v).toBe(0);
     });
 
-    it('samples only the low end of the spectrum', () => {
-        // Real music puts almost all its energy in the low bins, so sampling
-        // linearly across the whole buffer wastes most bars on near-silent
-        // high frequencies and the visualiser looks dead on the right.
-        const data = new Uint8Array(100);
-        data.fill(255, 0, 60); // energy only in the first 60%
-        const bars = bar_heights(data, 6, 0.6);
-        for (const v of bars) expect(v).toBeGreaterThan(0.9);
+    it('spreads low-frequency energy across the whole display', () => {
+        // The failure this fixes: an FFT's bins are LINEAR in frequency while
+        // musical energy sits in the bottom few percent, so a linear mapping
+        // lit ~4 bars of 28 and the widget read as dead. Log spacing must put
+        // that same energy under most of the bars.
+        const data = new Uint8Array(128);
+        data.fill(255, 0, 12); // energy only in the lowest ~9% of bins
+        const bars = bar_heights(data, 16);
+        const lit = bars.filter((v) => v > 0.5).length;
+        expect(lit).toBeGreaterThan(bars.length / 2);
+    });
+
+    it('gives every bar a distinct, non-empty bin range', () => {
+        // Log spacing can collapse adjacent edges to the same index; the
+        // `hi = max(lo + 1, ...)` guard is what stops a bar reading 0 forever.
+        const data = new Uint8Array(256).fill(200);
+        for (const v of bar_heights(data, 32)) expect(v).toBeGreaterThan(0);
     });
 
     it('is empty for no bars or no data', () => {
