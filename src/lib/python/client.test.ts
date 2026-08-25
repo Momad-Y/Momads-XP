@@ -231,15 +231,19 @@ describe('restart fallback', () => {
                 },
             },
         };
-        let load_handler: (() => void) | null = null;
+        // A ref object, not a bare `let`: the handler is written inside one
+        // closure and read in another, and TypeScript narrows a plain
+        // `(() => void) | null` to `never` across that boundary — which CI's
+        // svelte-check rejects as "This expression is not callable".
+        const load = { handler: null as (() => void) | null };
         const frame: SandboxFrame = {
             src: '',
             contentWindow,
             addEventListener: (_t, h) => {
-                load_handler = h;
+                load.handler = h;
             },
             removeEventListener: () => {
-                load_handler = null;
+                load.handler = null;
             },
         };
         const client = create_python_client(frame, {
@@ -249,7 +253,7 @@ describe('restart fallback', () => {
                 removeEventListener: () => undefined,
             },
         });
-        load_handler?.();
+        load.handler?.();
 
         expect(() => {
             client.restart();
