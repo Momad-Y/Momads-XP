@@ -4,6 +4,7 @@
     import Wallpaper from './wallpaper.svelte';
     import { queueProgram, runningPrograms } from '../../lib/store';
     import { HOMEPAGE } from '../../lib/search';
+    import { show_no_association_dialog } from '../../lib/no_association';
     import short from 'short-uuid';
     import DesktopFolder from './desktop_folder.svelte';
     import * as finder from '../../lib/finder';
@@ -93,6 +94,18 @@
         // unhandled, because the subscriber calls `void launch(...)`.
         try {
             await launch_inner(program);
+        } catch (error) {
+            // CAUGHT, not left to reject. The subscriber calls
+            // `void launch(...)`, so a throw here became an unhandled promise
+            // rejection: nothing logged it, nothing showed the visitor
+            // anything, and the guide's claim that this branch "surfaces" a
+            // mistyped path was only true in the sense that it crashed
+            // silently. The realistic trigger is a legacy cached VFS `.exe`
+            // whose `url` no longer resolves.
+            console.error('program launch failed', error);
+            show_no_association_dialog(
+                program.fs_item?.name ?? program.path ?? 'This program',
+            );
         } finally {
             queueProgram.set(null);
         }

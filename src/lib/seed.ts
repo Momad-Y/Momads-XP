@@ -27,6 +27,12 @@ export function shouldReseed(stored: string | null | undefined): boolean {
  * Everything else the visitor has in their drive is theirs.
  */
 function is_stale_placeholder(item: VfsItem): boolean {
+    // Never drop something the visitor made. `clone_fs` stamps `authored` for
+    // exactly this: it copies the source wholesale, so a pasted copy of a seed
+    // program keeps `fake` + `executable: true` and looked identical to a
+    // pruned program. Provenance has to be RECORDED, not inferred — the same
+    // lesson as `storage_type`, one level down.
+    if (item.authored === true) return false;
     return item.storage_type === 'fake' && item.executable === true;
 }
 
@@ -108,6 +114,13 @@ export function snapshot_seed_fields(seed: HardDrive): SeedFieldSnapshot {
  * zero occurrences in `static/json/hard_drive.json`), so its mere presence in
  * the cached drive means the visitor dragged the icon.
  */
+/** The carried fields that must be numbers; the rest are strings. */
+const NUMERIC_FIELDS = new Set<string>([
+    'sort_option',
+    'sort_order',
+    'date_modified',
+]);
+
 function user_edits(
     cached: VfsItem,
     previous: SeedUserFields | undefined,
@@ -117,6 +130,14 @@ function user_edits(
     for (const key of USER_FIELDS) {
         const now = cached[key];
         if (now === undefined) continue;
+        // TYPE-CHECK before carrying. Every other step of the boot path
+        // validates persisted data (migrate_files_format, usable_cache,
+        // parse_from_runtime); this one wrote whatever the store held straight
+        // onto a fresh seed item and persisted it, so a corrupted record
+        // (`name: 42`, `sort_option: null`) defeated usable_cache's
+        // discard-if-malformed contract instead of being caught by it.
+        const expected = NUMERIC_FIELDS.has(key) ? 'number' : 'string';
+        if (typeof now !== expected) continue;
         if (key === 'desktop_css_transform') {
             Object.assign(edits, { [key]: now });
             continue;

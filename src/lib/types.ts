@@ -32,6 +32,17 @@ export interface VfsItem {
     size?: number;
     level?: number;
     executable?: boolean;
+    /**
+     * The VISITOR created this item (a paste, a duplicate, a shortcut) rather
+     * than the seed shipping it.
+     *
+     * Exists because provenance cannot be inferred from `storage_type` +
+     * `executable`: `clone_fs` copies the source item wholesale, so a pasted
+     * copy of a seed program keeps `fake` + `executable: true` and
+     * `is_stale_placeholder` classified it as a pruned program and deleted it
+     * on every re-seed. That is the visitor's own file.
+     */
+    authored?: boolean;
     starting_point?: boolean;
     /** Drive / removable-storage only. */
     display_name?: string;

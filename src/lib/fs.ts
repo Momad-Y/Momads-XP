@@ -237,6 +237,10 @@ export function clone_fs(
     const data = drive_snapshot();
     const obj: VfsItem = {
         ...required(data[obj_current_id], `fs item ${obj_current_id}`),
+        // The COPY is the visitor's, whatever the original was. Without this a
+        // duplicated program icon keeps `fake` + `executable` and the re-seed
+        // merge deletes it as a stale placeholder.
+        authored: true,
     };
 
     if (new_id == null) {
