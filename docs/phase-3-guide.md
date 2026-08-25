@@ -1,9 +1,15 @@
 # Phase 3 guide — Developer & Interactive Apps
 
 Handoff for Phase 3, written to the structure in `SPECIFICATION.md` §11.
-Predecessors: `docs/phase-{0,1,2}-guide.md`. The phase's own gate artefacts are
-`docs/phase-3-spec.md`, `docs/phase-3-redteam-spec.md`, `docs/phase-3-plan.md`
-and `docs/phase-3-redteam-plan.md`.
+Predecessors: `docs/phase-{0,1,2}-guide.md`. The phase's own gate artefacts:
+
+| Gate | File |
+| --- | --- |
+| 1 Spec | `docs/phase-3-spec.md` |
+| 2 Red-team the spec | `docs/phase-3-redteam-spec.md` |
+| 3 Plan | `docs/phase-3-plan.md` |
+| 4 Red-team the plan | `docs/phase-3-redteam-plan.md` |
+| 6 Red-team the implementation | `docs/phase-3-redteam-implementation.md` |
 
 ---
 
