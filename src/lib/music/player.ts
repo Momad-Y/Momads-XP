@@ -98,10 +98,18 @@ export function bar_heights(
     if (bars <= 0 || frequencies.length === 0) return [];
     const usable = Math.max(2, Math.floor(frequencies.length * span));
     const out: number[] = [];
+    // Edges carry FORWARD. Flooring each edge independently left the first
+    // several bars reading the same bin — for the shipped fftSize 256 and 28
+    // bars, bars 0-2 all read [1,2) and bars 3-4 both read [2,3), so the left
+    // of the display moved in lockstep. Carrying `next` guarantees every bar a
+    // distinct, non-empty range and that bin 0 is actually read.
+    let next = 0;
     for (let i = 0; i < bars; i++) {
-        // Log-spaced edges over [1, usable].
-        const lo = Math.floor(usable ** (i / bars));
-        const hi = Math.max(lo + 1, Math.floor(usable ** ((i + 1) / bars)));
+        const lo = next;
+        const ideal = Math.floor(usable ** ((i + 1) / bars));
+        // Leave at least one bin for each remaining bar.
+        const ceiling = usable - (bars - i - 1);
+        const hi = Math.min(Math.max(lo + 1, ideal), Math.max(lo + 1, ceiling));
         let sum = 0;
         let count = 0;
         for (let j = lo; j < hi && j < usable; j++) {
@@ -109,6 +117,7 @@ export function bar_heights(
             count++;
         }
         out.push(count === 0 ? 0 : sum / count / 255);
+        next = hi;
     }
     return out;
 }

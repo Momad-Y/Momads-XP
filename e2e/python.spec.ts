@@ -194,11 +194,116 @@ test('runs real Python end to end @online', async ({ page }) => {
         .poll(async () => page.locator('.xterm-rows').innerText())
         .toContain("Welcome to Momad's XP");
 
-    await page.keyboard.type('2 + 2');
+    // A DISTINCTIVE value, not '4'. A single digit is present in the CPython
+    // banner (build date, version) and in "Welcome to Momad's XP", so
+    // `toContain('4')` passed no matter what the runtime returned.
+    await page.keyboard.type('6 * 7');
     await page.keyboard.press('Enter');
     await expect
         .poll(async () => page.locator('.xterm-rows').innerText(), {
             timeout: 30_000,
         })
-        .toContain('4');
+        .toContain('42');
+});
+
+test('Ctrl+C restarts the interpreter and the prompt comes back @online', async ({
+    page,
+}) => {
+    // THERE WAS NO TEST FOR THIS, which is how it shipped broken.
+    // `restart()` called `location.reload()` on the opaque-origin frame;
+    // `reload` is not cross-origin-accessible, so merely READING it threw
+    // SecurityError, the throw escaped through xterm's onData, and the REPL
+    // was dead forever — "Restarting Python…" and then no prompt. The unit
+    // test could not see it because it injected a `reload: vi.fn()` stub.
+    test.setTimeout(240_000);
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+
+    await bootToDesktop(page);
+    await openPython(page);
+    await expect
+        .poll(async () => page.locator('.xterm-rows').innerText(), {
+            timeout: 120_000,
+        })
+        .toContain('>>>');
+
+    // Define something, then throw the session away.
+    await page.keyboard.type('marker = 123');
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Control+c');
+
+    await expect
+        .poll(async () => page.locator('.xterm-rows').innerText())
+        .toContain('Restarting Python');
+
+    // The interpreter must come BACK, and its state must be GONE.
+    //
+    // NOT `toContain('Python 3.13')` — the FIRST banner is still on screen, so
+    // that assertion is satisfied before the restart even begins. (My own
+    // first draft of this test did exactly that and raced.) Asking the new
+    // interpreter for the old variable proves both halves at once: a NameError
+    // can only come from a live interpreter that no longer has `marker`.
+    await expect
+        .poll(
+            async () => {
+                await page.keyboard.type('marker');
+                await page.keyboard.press('Enter');
+                return page.locator('.xterm-rows').innerText();
+            },
+            { timeout: 150_000, intervals: [5_000] },
+        )
+        .toContain('NameError');
+
+    // And no SecurityError escaped to the page.
+    expect(errors.filter((e) => e.includes('SecurityError'))).toEqual([]);
+});
+
+test('runs a MULTI-LINE block — the continuation path @online', async ({
+    page,
+}) => {
+    // THE TEST WHOSE ABSENCE LET THE BUG SHIP.
+    //
+    // The component used to send the whole accumulated block on every line,
+    // but PyodideConsole.push() appends to its OWN buffer and re-joins
+    // (console.py: `self.buffer.append(line); source = "\n".join(self.buffer)`).
+    // So the second line double-concatenated and every def/if/for raised
+    // IndentationError, and the function was never defined. The only
+    // real-execution test typed `2 + 2`, so nothing saw it.
+    test.setTimeout(180_000);
+    await bootToDesktop(page);
+    await openPython(page);
+    await expect
+        .poll(async () => page.locator('.xterm-rows').innerText(), {
+            timeout: 120_000,
+        })
+        .toContain('>>>');
+
+    await page.keyboard.type('def answer():');
+    await page.keyboard.press('Enter');
+    // The continuation prompt must appear — that is the `incomplete` status
+    // coming back from CPython's own codeop.
+    await expect
+        .poll(async () => page.locator('.xterm-rows').innerText())
+        .toContain('...');
+
+    await page.keyboard.type('    return 6 * 7');
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Enter'); // blank line closes the block
+
+    await page.keyboard.type('answer()');
+    await page.keyboard.press('Enter');
+
+    const screen = await expect
+        .poll(async () => page.locator('.xterm-rows').innerText(), {
+            timeout: 30_000,
+        })
+        .toContain('42');
+    void screen;
+
+    // And no traceback: a broken continuation surfaces as IndentationError or
+    // NameError, both of which would still leave '42' absent — but assert it
+    // explicitly so the failure names itself.
+    const text = await page.locator('.xterm-rows').innerText();
+    expect(text).not.toContain('IndentationError');
+    expect(text).not.toContain('NameError');
 });

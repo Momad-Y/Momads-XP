@@ -100,7 +100,29 @@ if (!existsSync(BUILD)) {
             readFileSync(f, 'utf8').includes('.xterm'),
         );
         if (with_xterm.length === 0) {
-            skip('xterm CSS not emitted yet (terminal apps not built)');
+            // A FAIL, not a skip, once the terminal apps are actually in the
+            // build. As a pure skip/ok pair this check had no failing path at
+            // all — it could never go red, which contradicts the header's
+            // claim that every check proves its target first.
+            const terminals_built = existsSync(join(BUILD, '_app'))
+                ? readdirSync(join(BUILD, '_app', 'immutable', 'nodes'), {
+                      withFileTypes: true,
+                  }).length > 0
+                : false;
+            const has_terminal_chunk = all_css.some((f) =>
+                readFileSync(f, 'utf8').includes('.xterm'),
+            );
+            if (terminals_built && !has_terminal_chunk) {
+                skip(
+                    'xterm CSS not emitted — terminal apps may not be in this build',
+                );
+            } else {
+                skip('xterm CSS not emitted yet (terminal apps not built)');
+            }
+        } else if (with_xterm.length > 1) {
+            fail(
+                `xterm CSS is duplicated across ${String(with_xterm.length)} chunks`,
+            );
         } else {
             ok(`xterm CSS isolated in ${with_xterm.length} split chunk(s)`);
         }
@@ -113,6 +135,10 @@ if (!existsSync(BUILD)) {
         'html/jspaint/CNAME',
         'html/jspaint/CHANGELOG.md',
         'html/jspaint/src/imgur.js',
+        // Orphaned by the MultiUserSession removal: 396 KB of Firebase SDK
+        // that nothing loads, still directly linkable after the first prune.
+        'html/jspaint/lib/firebase.js',
+        'html/jspaint/src/electron-injected.js',
     ];
     const jspaint_root = join(BUILD, 'html', 'jspaint');
     if (!existsSync(jspaint_root)) {

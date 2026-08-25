@@ -128,11 +128,25 @@ describe('bar_heights', () => {
         expect(lit).toBeGreaterThan(bars.length / 2);
     });
 
-    it('gives every bar a distinct, non-empty bin range', () => {
-        // Log spacing can collapse adjacent edges to the same index; the
-        // `hi = max(lo + 1, ...)` guard is what stops a bar reading 0 forever.
-        const data = new Uint8Array(256).fill(200);
-        for (const v of bar_heights(data, 32)) expect(v).toBeGreaterThan(0);
+    it('gives every bar a DISTINCT, non-empty bin range', () => {
+        // The old version only asserted `> 0`, so it passed while the first
+        // five bars all read the same bin and moved in lockstep. A ramp makes
+        // duplicates visible: distinct ranges must produce distinct averages.
+        // Starts at 1, not 0: bin 0 is now genuinely read, so a zero there
+        // would be a correct average rather than the duplicate-bin bug.
+        const data = new Uint8Array(128);
+        for (let i = 0; i < data.length; i++) data[i] = 1 + i;
+        const bars = bar_heights(data, 16);
+        for (const v of bars) expect(v).toBeGreaterThan(0);
+        expect(new Set(bars).size).toBe(bars.length);
+    });
+
+    it('reads bin 0 — the lowest band is not skipped', () => {
+        // `lo` used to start at floor(usable ** 0) === 1, so the very lowest
+        // bin never contributed to any bar.
+        const data = new Uint8Array(64);
+        data[0] = 255; // energy ONLY in bin 0
+        expect(bar_heights(data, 8)[0]).toBeGreaterThan(0);
     });
 
     it('is empty for no bars or no data', () => {

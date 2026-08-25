@@ -52,11 +52,6 @@
         term.write(text);
     }
 
-    export function clear(): void {
-        if (disposed || term == null) return;
-        term.clear();
-    }
-
     export function focus(): void {
         if (disposed || term == null) return;
         term.focus();

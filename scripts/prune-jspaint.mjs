@@ -99,6 +99,13 @@ const DELETE = [
     'test-news-newer.html',
     'lib/tracky-mouse', // webcam + TensorFlow; its script tags are already commented out
     'src/electron-main.js',
+    // Orphaned by the MultiUserSession removal below: 396 KB of Firebase SDK
+    // that index.html never references (only a comment mentions firebase) and
+    // nothing loads at runtime. It stayed directly linkable under /html/ after
+    // the first prune — dead weight and attack surface.
+    'lib/firebase.js',
+    // The injected half of the Electron bridge, orphaned with electron-main.js.
+    'src/electron-injected.js',
     // The three scripts whose capabilities step B removes.
     'src/imgur.js',
     'src/speech-recognition.js',
@@ -286,6 +293,59 @@ menus = cutMenuEntry(
 );
 write('src/menus.js', menus);
 
+// ── E2. functions.js: the About-Paint update check ─────────────────────────
+// The LARGEST third-party path the first prune missed. Help > About Paint
+// AUTOMATICALLY fetches https://jspaint.app, DOMParses the response, and the
+// "What's New?" button APPENDS that remote subtree into the live jspaint
+// document with jQuery — whose .append() extracts and globalEvals any <script>
+// it contains. jspaint runs on our REAL origin (allow-same-origin is required
+// for the Save As bridge), so a compromise of jspaint.app would mean script
+// execution against the VFS, /api/browse and /api/email. It also re-imported
+// the exact i.postimg.cc images the first prune deleted, from the remote copy.
+//
+// The guide previously called this "a Help-menu action, not an automatic
+// fetch". Both halves of that were wrong.
+let functions_pre = read('src/functions.js');
+if (functions_pre.includes('"https://jspaint.app"')) {
+    functions_pre = functions_pre.replace(
+        /const url =\n(?:\s*\/\/.*\n)*\s*"https:\/\/jspaint\.app";/,
+        'const url = null; // update check removed by scripts/prune-jspaint.mjs',
+    );
+    // Guard the fetch so a null url is a no-op rather than a request to "null".
+    functions_pre = functions_pre.replace(
+        'const url = null; // update check removed by scripts/prune-jspaint.mjs\n\tfetch(url)',
+        'const url = null; // update check removed by scripts/prune-jspaint.mjs\n\tif (!url) return;\n\tfetch(url)',
+    );
+    write('src/functions.js', functions_pre);
+    changes.push(
+        'functions.js: About-Paint update check (fetch of jspaint.app)',
+    );
+} else {
+    skipped.push('About-Paint update check (already removed)');
+}
+
+// ── E3. functions.js: third-party CORS relays ──────────────────────────────
+// `#load:` is gone, but load_image_from_uri still fanned out to two public
+// proxies, and TWO other call sites still reach it: the paste handler
+// (app.js — any text/plain or text/uri-list clipboard item) and edit_paste's
+// fallback. So pasting a URL into Paint sent that URL and the visitor's IP to
+// third parties and rendered the result — the same arbitrary-URL-render
+// primitive on a different trigger. jspaint-cors-proxy.herokuapp.com is a free
+// Heroku dyno, i.e. very likely dead and re-registrable.
+let functions_cors = read('src/functions.js');
+if (functions_cors.includes('cors.bridged.cc')) {
+    functions_cors = functions_cors.replace(
+        /const uris_to_try = \(is_download && !is_localhost\) \? \[[\s\S]*?\] : \[uri\];/,
+        'const uris_to_try = [uri]; // third-party CORS relays removed by scripts/prune-jspaint.mjs',
+    );
+    write('src/functions.js', functions_cors);
+    changes.push(
+        'functions.js: cors.bridged.cc / herokuapp / web.archive.org relays',
+    );
+} else {
+    skipped.push('CORS relays (already removed)');
+}
+
 // ── E. functions.js: the SECOND Imgur entry point ──────────────────────────
 // A live "Upload to Imgur" button in the GIF-export window (Ctrl+Shift+G).
 // Missed by the original audit; found at gate 4.
@@ -324,6 +384,36 @@ for (const banned of [
 ]) {
     if (finalHtml.includes(banned))
         die(`index.html still references ${banned}`);
+}
+const finalFunctions = read('src/functions.js');
+// Only NETWORK paths are banned. `jspaint.app` still appears as an <a href>
+// and in a `location.origin` comparison; an inert anchor is not a fetch, and
+// the sandbox blocks target=_blank anyway.
+if (finalFunctions.includes('show_imgur_uploader')) {
+    die('functions.js still references show_imgur_uploader');
+}
+// Assert the CONSTRUCT, not the string: `cors.bridged.cc` also appears in an
+// explanatory comment, and banning the bare substring made this script fail on
+// its own output.
+if (!finalFunctions.includes('const uris_to_try = [uri];')) {
+    die('functions.js still builds a multi-proxy uris_to_try list');
+}
+for (const proxy of [
+    '`https://cors.bridged.cc/',
+    '`https://jspaint-cors-proxy',
+]) {
+    if (finalFunctions.includes(proxy)) {
+        die(`functions.js still interpolates a proxy URL: ${proxy}`);
+    }
+}
+if (
+    /fetch\(\s*url\s*\)/.test(finalFunctions) &&
+    finalFunctions.includes('checking-for-updates')
+) {
+    const at = finalFunctions.indexOf('checking-for-updates');
+    if (!finalFunctions.slice(at, at + 400).includes('const url = null')) {
+        die('functions.js still performs the About-Paint update fetch');
+    }
 }
 const finalSessions = read('src/sessions.js');
 for (const banned of [

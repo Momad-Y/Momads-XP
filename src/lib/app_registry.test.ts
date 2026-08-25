@@ -61,11 +61,14 @@ describe('to_window_options', () => {
                 default_size: { width: 640, height: 480 },
                 min_size: { width: 320, height: 240 },
             }),
+            'inst-1',
         );
         expect(options).toEqual({
+            id: 'inst-1',
             title: 'Demo',
             icon: '/images/xp/icons/Default.png',
             exec_path: './programs/demo.svelte',
+            resizable: true,
             width: 640,
             height: 480,
             min_width: 320,
@@ -73,17 +76,25 @@ describe('to_window_options', () => {
         });
     });
 
+    it('carries the INSTANCE id, which Window.svelte needs for three things', () => {
+        // `program-id` (taskbar focus exclusion), the minimize animation
+        // target, and calc_nudges' sibling comparison. With it undefined, two
+        // windows of the same app land pixel-identical instead of cascading —
+        // measured before this was fixed.
+        expect(to_window_options(app(), 'abc123').id).toBe('abc123');
+    });
+
     it('sets exec_path to the path, never the id', () => {
         // exec_path is the idb key for window-rect persistence. Using `id`
         // here would silently reset every saved rect.
-        const options = to_window_options(app({ id: 'not-a-path' }));
+        const options = to_window_options(app({ id: 'not-a-path' }), 'inst-2');
         expect(options.exec_path).toBe('./programs/demo.svelte');
     });
 
     it('omits size keys entirely when the app declares none', () => {
         // Emitting `width: undefined` would override a component/Window
         // default with undefined rather than leaving it alone.
-        const options = to_window_options(app());
+        const options = to_window_options(app(), 'inst-3');
         expect('width' in options).toBe(false);
         expect('min_width' in options).toBe(false);
     });

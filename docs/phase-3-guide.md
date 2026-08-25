@@ -125,7 +125,9 @@ audio is static.
 
 ## 6. profile.json dependencies
 
-CMD reads, and fails visibly if any is missing:
+CMD reads these. Note there is **no runtime validation** — `profile.ts`
+deliberately declines a schema, so a missing field is a compile error while an
+*empty* array (`social`, `skills`, `bio`) renders as silent blank output:
 
 | Field | Used by |
 | --- | --- |
@@ -169,8 +171,9 @@ cannot be automated here:
 
 - [ ] Site loads; `/api/browse` still renders a page in IE **(CSP regression check)**
 - [ ] `/html/jspaint/package.json` and `/CNAME` return **404**; Paint still opens, draws and saves
-- [ ] Both CSP headers present on `/html/*`, including `frame-ancestors 'self'`
-- [ ] Python reaches `>>>` with **no CSP violation** in the console
+- [ ] **`curl -sI <deploy>/html/python-sandbox.html | grep "default-src 'none'"`** — must match. The earlier probes ("both CSP headers present", "no CSP violation in the console") could not fail: one CSP header is always present, and Pyodide runs *identically* with no policy at all, so a missing CSP made them pass **more** readily
+- [ ] `/html/jspaint/index.html` still has `frame-ancestors 'self'` and `X-Robots-Tag`
+- [ ] Python reaches `>>>`, a multi-line `def` block runs, and Ctrl+C brings the prompt back
 - [ ] Music: **play → pause → play** works (the `createMediaElementSource` trap), and audio is audible on a real gesture
 
 ---
@@ -188,7 +191,10 @@ cannot be automated here:
 - [x] `#load:<url>` no longer fetches
 - [x] Start ▸ **Music Player** plays, pauses, plays again; next/prev wrap; volume and track list work; the visualiser moves
 - [x] `My Music` shows `167/501/455 KB` in Details **and** `1.10 MB` in the status bar of the same window
+- [x] A multi-line `def` block runs and the function is callable (`@online`)
+- [x] Ctrl+C restarts the interpreter, the prompt returns, and session state is gone (`@online`)
 - [x] Escape does not cancel a dialog in an unfocused window
+- [x] Two Command Prompts **cascade** rather than opening pixel-identical
 
 ---
 
@@ -250,9 +256,22 @@ requirement. `latest` is 314.0.5 → Python 3.14.2.
 jQuery UI (the window manager), `loadjs`, SvelteKit's inline hydration
 bootstrap, and the reporter injected into every `/api/browse` response — a
 white screen on the deploy that **no local gate can see**, because
-`vite preview` does not apply the file. The Phase 3 CSP is path-scoped to
-`/html/python-sandbox.html` and re-states `frame-ancestors 'self'`, because a
-path-scoped CSP *replaces* the `/*` value.
+`vite preview` does not apply the file.
+
+**Netlify merges header rules by NAME, and the LAST matching rule wins — not
+the most specific one.** This is not a footnote; it silently disabled the
+phase's headline security control for a while. The sandbox CSP block was
+declared *before* `/html/*`, whose
+`Content-Security-Policy = "frame-ancestors 'self'"` then overwrote the whole
+policy, so the page shipped with no `script-src`, no `worker-src` and no
+`connect-src`. Measured with `netlify dev --dir build`:
+
+```
+before:  Content-Security-Policy: frame-ancestors 'self'
+after:   Content-Security-Policy: default-src 'none'; script-src ...
+```
+
+The sandbox block is therefore **last** in the file, and must stay last.
 
 **`store.subscribe()` fires synchronously.** `work_space` can initialise with a
 program already queued, so anything `launch()` touches must be declared **above**
@@ -268,6 +287,19 @@ gesture **never settles**, so `resume()` is called synchronously first.
 test window-level Escape handling. A terminal-based version of the Dialog
 focus test passed *with the guard removed*.
 
+**`PyodideConsole.push()` keeps its OWN buffer.** Send it ONE line at a time.
+Sending the accumulated block double-concatenates (`self.buffer.append(line);
+source = "\n".join(self.buffer)`), so every `def`/`if`/`for` raised
+`IndentationError` and the function was never defined. It shipped that way
+because the only real-execution test typed `2 + 2`; there is now an `@online`
+test that runs a real `def` block.
+
+**`location.reload()` is not accessible on an opaque-origin frame.** Reading it
+throws `SecurityError`. Use the `href` **setter**, which *is* cross-origin
+permitted. The Ctrl+C restart shipped broken for the same reason the
+continuation bug did — the unit test injected a `reload: vi.fn()` stub and
+measured it, and there was no `@online` test at all. Both now exist.
+
 **`input()` is not supported.** A blocking read across the worker boundary needs
 `SharedArrayBuffer` + COOP/COEP, which §5 records as breaking other embeds
 here. JSPI could do it without cross-origin isolation, but it is experimental
@@ -281,6 +313,16 @@ says `Restarting Python… (session state cleared)`.
 unconditionally — so File ▸ Open never shows it. Asserted by unit test; the
 e2e for it was dropped after the row locator proved unstable across the Details
 re-render (a flaky test is worse than a stated gap).
+
+The player now **honours the file it was opened with** (`fs_item` → matching
+track). Until gate 6 it discarded the payload and always played track 0, which
+made the whole reason for the second `doctypes` entry a no-op.
+
+**Registry apps must receive `options.id`.** `Window.svelte` needs it for three
+separate things — `program-id` (so `click_outside` can exclude the window's own
+taskbar tile), the minimize animation target, and `calc_nudges`' sibling
+comparison. Omitting it silently broke all three for the new apps only, and two
+Command Prompts opened at *identical* coordinates.
 
 **jspaint after the prune.** `sessions.js` is **kept** — it defines
 `window.new_local_session`, called unguarded from `functions.js:805`/`:923`, so
@@ -296,9 +338,21 @@ allow-same-origin` is required (the wrapper reads `contentDocument` and
 `systemHooks`), and it removes top-navigation, popups, forms, modals and
 downloads. So jspaint's own `saveAs` downloads, its `alert()` fallbacks and its
 `target="_blank"` help links are inert. Save As into the VFS is unaffected — it
-goes through our wrapper. **About Paint still fetches `https://jspaint.app`**;
-disclosed rather than removed, since it is a Help-menu action and not an
-automatic fetch.
+goes through our wrapper. **About Paint's update check is REMOVED.** An earlier version of this guide
+called it "a Help-menu action, not an automatic fetch" and disclosed it instead.
+Both halves were wrong: opening About fetched `https://jspaint.app`
+automatically, and the "What's New?" button appended that remote HTML into the
+live jspaint document with jQuery — whose `.append()` extracts and
+`globalEval`s any `<script>` in it, on our real origin. It also re-imported the
+very `i.postimg.cc` images the first prune deleted.
+
+**Two more third-party paths the first prune missed**, both now closed:
+`load_image_from_uri` fanned out to `cors.bridged.cc` and
+`jspaint-cors-proxy.herokuapp.com` (a retired free Heroku dyno, i.e.
+re-registrable) — reachable not via `#load:` but via the **paste handler**, so
+pasting any URL into Paint sent it and the visitor's IP to third parties. And
+396 KB of orphaned Firebase SDK plus `electron-injected.js` were still
+directly linkable under `/html/`.
 
 **Known limitations**
 

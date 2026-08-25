@@ -33,10 +33,16 @@ export const SANDBOX_ATTR = 'allow-scripts';
  * and `.svelte` coverage exemptions do not apply to it.
  */
 export interface SandboxFrame {
+    /** Writable so a failed cross-origin navigation can fall back to it. */
+    src?: string;
     contentWindow:
         | {
               postMessage: (message: unknown, target_origin: string) => void;
-              location: { reload: () => void };
+              /**
+               * `href` only. `reload` is NOT cross-origin-accessible on an
+               * opaque-origin frame — reading it throws SecurityError.
+               */
+              location: { href: string };
           }
         | null
         | undefined;
@@ -166,9 +172,27 @@ export function create_python_client(
             if (disposed) return;
             post({ kind: 'terminate' });
             initialised = false;
-            // Reloading the frame gives a clean host as well as a clean
-            // worker, so a wedged runtime cannot survive a restart.
-            frame.contentWindow?.location.reload();
+            // `location.href = …`, NOT `location.reload()`.
+            //
+            // The frame is opaque-origin, and `reload` is not on Location's
+            // cross-origin property allowlist — merely READING it throws
+            // SecurityError. Measured in real Chromium:
+            //   loc.reload  -> SecurityError: Blocked a frame ... from
+            //                  accessing a cross-origin frame
+            //   loc.href =  -> OK (the setter IS cross-origin-permitted)
+            // The throw escaped uncaught through xterm's onData and left the
+            // REPL permanently dead: "Restarting Python…" and then no prompt,
+            // ever. The unit test could not see it because it injected a
+            // `location: { reload: vi.fn() }` stub.
+            try {
+                if (frame.contentWindow != null) {
+                    frame.contentWindow.location.href = SANDBOX_URL;
+                }
+            } catch {
+                // Last resort: re-assigning src also reloads the frame, and
+                // the host re-announces, so the handshake recovers either way.
+                frame.src = SANDBOX_URL;
+            }
         },
         dispose() {
             disposed = true;

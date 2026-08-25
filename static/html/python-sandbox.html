@@ -25,7 +25,18 @@
     <script>
         (() => {
             'use strict';
+
+            // REFUSE TO RUN IF NOT ACTUALLY SANDBOXED.
+            //
+            // Everything below assumes an opaque origin. If this page is ever
+            // framed by a same-origin page WITHOUT the sandbox attribute — or
+            // opened directly — the worker would run with the real origin's
+            // authority over the VFS and both API endpoints. One line closes
+            // that, and it costs nothing in the intended configuration.
+            if (window.origin !== 'null') return;
+
             let worker = null;
+            let announce = null;
 
             const toParent = (msg) => {
                 // '*' is forced: an opaque origin has no origin to target.
@@ -89,6 +100,11 @@
                     // app says so.
                     worker.terminate();
                     worker = null;
+                    // RE-ARM the handshake. Without this the frame goes silent
+                    // after a Ctrl+C and the only remaining re-init trigger is
+                    // the iframe `load` event — which is exactly the path that
+                    // used to throw.
+                    start_announcing();
                 }
             });
 
@@ -104,13 +120,18 @@
             //
             // Re-announcing until `init` arrives makes the handshake immune to
             // ordering. `init` is idempotent on both sides.
-            const announce = setInterval(() => {
-                if (worker) {
-                    clearInterval(announce);
-                    return;
-                }
-                toParent({ kind: 'loading', detail: 'Sandbox ready' });
-            }, 120);
+            const start_announcing = () => {
+                if (announce) clearInterval(announce);
+                announce = setInterval(() => {
+                    if (worker) {
+                        clearInterval(announce);
+                        announce = null;
+                        return;
+                    }
+                    toParent({ kind: 'loading', detail: 'Sandbox ready' });
+                }, 120);
+            };
+            start_announcing();
             toParent({ kind: 'loading', detail: 'Sandbox ready' });
         })();
     </script>

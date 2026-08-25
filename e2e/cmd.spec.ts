@@ -126,16 +126,19 @@ test('an easter egg can be escaped, twice in a row', async ({ page }) => {
     // deaf, and this repo has a scar from exactly that shape
     // (`rename_cancelled`).
     for (let i = 0; i < 2; i++) {
+        const marker = `escaped-${String(i)}`;
         await run(page, 'matrix');
         await page.waitForTimeout(400);
         await page.keyboard.press('x');
+
+        // A UNIQUE marker, not the prompt. Asserting `toContain('momad@xp:~$')`
+        // was satisfied by the banner's own prompt still in the viewport, so
+        // the test passed even with cancellation disabled entirely — the exact
+        // `rename_cancelled` shape its comment cites.
+        await run(page, `echo ${marker}`);
         await expect
             .poll(async () => screen(page), { timeout: 10_000 })
-            .toContain('momad@xp:~$');
-
-        // The prompt must accept input again after cancelling.
-        await run(page, 'whoami');
-        await expect.poll(async () => screen(page)).toContain('momad');
+            .toContain(marker);
     }
 });
 
@@ -156,4 +159,23 @@ test('two terminals can be open at once', async ({ page }) => {
     await openCmd(page);
     await openCmd(page);
     await expect(page.locator('#work-space .window')).toHaveCount(2);
+    // Count the TERMINALS, not just the windows: openCmd's
+    // `expect(.xterm).toBeVisible()` resolves on the first poll, when only the
+    // first terminal exists, so the second was never waited for or observed.
+    await expect(page.locator('.xterm')).toHaveCount(2, { timeout: 20_000 });
+
+    // And they must CASCADE rather than land pixel-identical. Registry apps
+    // were mounted without `options.id`, so calc_nudges found no sibling and
+    // both windows opened at the same coordinates.
+    const first = await page
+        .locator('#work-space .window')
+        .nth(0)
+        .boundingBox();
+    const second = await page
+        .locator('#work-space .window')
+        .nth(1)
+        .boundingBox();
+    if (!first || !second) throw new Error('window has no bounding box');
+    expect(second.x).not.toBe(first.x);
+    expect(second.y).not.toBe(first.y);
 });

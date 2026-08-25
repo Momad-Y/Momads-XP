@@ -478,10 +478,15 @@
                 throw new Error(`no program registered for path: ${path}`);
             }
             const Program = (await app.component()).default;
+            // ONE id, used for both the component prop and options.id — see
+            // to_window_options(). Generating it twice, or omitting it from
+            // options, silently breaks taskbar focus, the minimize animation
+            // and window cascading.
+            const instance_id = short.generate();
             const program: ProgramInstance = mount(Program, {
                 target: node_ref,
                 props: {
-                    id: short.generate(),
+                    id: instance_id,
                     parentNode: node_ref,
                     fs_item: full_vfs_item(fs_item),
                     exec_path: app.path,
@@ -492,7 +497,7 @@
                     // their own `options` default. (The inherited branches
                     // above are the opposite — their components own it — which
                     // is why this is a separate path rather than a rewrite.)
-                    options: to_window_options(app),
+                    options: to_window_options(app, instance_id),
                 },
             });
             if (app.taskbar !== false) {

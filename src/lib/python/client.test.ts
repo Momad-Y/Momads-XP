@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { create_python_client, SANDBOX_URL } from './client';
 import type { MessageBus, SandboxFrame } from './client';
 import type { FromRuntime } from './protocol';
@@ -11,11 +11,16 @@ type MessageHandler = (event: {
 
 function harness(greeting = '') {
     const posted: unknown[] = [];
+    // `href`, not a `reload` stub. The original test injected
+    // `{ reload: vi.fn() }` and asserted the mock was called — measuring the
+    // stub. In a real opaque-origin frame `location.reload` is not
+    // cross-origin-accessible and merely READING it throws SecurityError, so
+    // the test was green while production was permanently broken.
     const contentWindow = {
         postMessage: (message: unknown) => {
             posted.push(message);
         },
-        location: { reload: vi.fn() },
+        location: { href: '' },
     };
     let load_handler: (() => void) | null = null;
     const frame: SandboxFrame = {
@@ -159,14 +164,16 @@ describe('exec and restart', () => {
         expect(h.posted).toContainEqual({ kind: 'exec', source: '2 + 2' });
     });
 
-    it('restart terminates AND reloads the frame', () => {
-        // Terminating alone leaves the host page wedged; reloading gives a
-        // clean host as well as a clean worker.
+    it('restart terminates AND re-navigates the frame via location.href', () => {
+        // Terminating alone leaves the host page wedged. The navigation must
+        // go through the `href` SETTER, which is the only Location member
+        // permitted cross-origin — `reload()` throws SecurityError on an
+        // opaque-origin frame.
         const h = harness();
         h.fire_load();
         h.client.restart();
         expect(h.posted).toContainEqual({ kind: 'terminate' });
-        expect(h.contentWindow.location.reload).toHaveBeenCalled();
+        expect(h.contentWindow.location.href).toBe(SANDBOX_URL);
     });
 
     it('re-arms the handshake after a restart', () => {
@@ -201,5 +208,52 @@ describe('SANDBOX_URL', () => {
         // It must be served from static/ so Vite never processes it — the host
         // deliberately carries no logic of its own.
         expect(SANDBOX_URL).toBe('/html/python-sandbox.html');
+    });
+});
+
+describe('restart fallback', () => {
+    it('falls back to re-assigning src when the href setter throws', () => {
+        // The href SETTER is cross-origin-permitted, so this should not
+        // happen — but if a browser ever disagrees, a throw here would escape
+        // through xterm's onData and kill the REPL exactly as `reload()` did.
+        // The fallback is the defence, so it needs a test of its own.
+        const posted: unknown[] = [];
+        const contentWindow = {
+            postMessage: (m: unknown) => {
+                posted.push(m);
+            },
+            location: {
+                get href(): string {
+                    return '';
+                },
+                set href(_v: string) {
+                    throw new Error('SecurityError');
+                },
+            },
+        };
+        let load_handler: (() => void) | null = null;
+        const frame: SandboxFrame = {
+            src: '',
+            contentWindow,
+            addEventListener: (_t, h) => {
+                load_handler = h;
+            },
+            removeEventListener: () => {
+                load_handler = null;
+            },
+        };
+        const client = create_python_client(frame, {
+            on_message: () => undefined,
+            bus: {
+                addEventListener: () => undefined,
+                removeEventListener: () => undefined,
+            },
+        });
+        load_handler?.();
+
+        expect(() => {
+            client.restart();
+        }).not.toThrow();
+        expect(frame.src).toBe(SANDBOX_URL);
     });
 });

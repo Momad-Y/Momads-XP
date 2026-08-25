@@ -27,9 +27,6 @@ export const PYODIDE_VERSION = '0.28.3';
 /** jsDelivr requires the `v` prefix — `/pyodide/0.28.3/` is a 404. */
 export const PYODIDE_CDN_BASE = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
 
-/** The ES module entry point. Loaded by the sandboxed host, never by us. */
-export const PYODIDE_ENTRY = `${PYODIDE_CDN_BASE}pyodide.mjs`;
-
 /**
  * The origin the sandbox host is allowed to reach. Must stay in sync with the
  * `connect-src` / `script-src` in `netlify.toml`'s
