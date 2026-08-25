@@ -15,3 +15,74 @@
     Content-Security-Policy = "frame-ancestors 'self'"
     Referrer-Policy = "strict-origin-when-cross-origin"
     X-Content-Type-Options = "nosniff"
+
+# ── Phase 3 (T1a) ─────────────────────────────────────────────────────────────
+# Everything below is PATH-SCOPED. The `/*` block above is deliberately left
+# alone: gate 4 established that adding `script-src` there blanks the whole
+# site. It would block jQuery + jQuery UI (`src/app.html:24,29` — the window
+# manager's drag/resize), `loadjs` (`:206`), the three inline app scripts,
+# SvelteKit's own inline hydration bootstrap, jspaint's 45 script tags, and —
+# worst — the reporter injected into every `/api/browse` response, which is
+# third-party HTML served from OUR origin and so inherits the `/*` header.
+# `session-handoff.md` §5 names that reporter as the shape that must not break.
+#
+# None of the local gates can see this: `vite preview` does not apply this file,
+# so check/lint/vitest/build/playwright all stay green while production is a
+# white screen. Any future change here gets a deploy probe the same day.
+
+
+# The vendored bundles under /html are directly linkable on the production
+# domain (verified: /html/jspaint/index.html returns 200). They are framed by
+# the app, never destinations — keep them out of search results.
+# frame-ancestors is re-stated here for the same reason as above.
+[[headers]]
+  for = "/html/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+    Content-Security-Policy = "frame-ancestors 'self'"
+    X-Frame-Options = "SAMEORIGIN"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    X-Content-Type-Options = "nosniff"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+
+# ── ORDER MATTERS, AND IT IS THE OPPOSITE OF HOW IT READS ───────────────────
+# Netlify merges every matching [[headers]] rule, and for a DUPLICATE header
+# NAME the LAST matching rule wins — NOT the most specific one. This block was
+# originally declared BEFORE `/html/*`, so that rule's
+# `Content-Security-Policy = "frame-ancestors 'self'"` silently overwrote the
+# whole policy below, and the page shipped with no script-src, no worker-src
+# and no connect-src. Verified with `netlify dev --dir build`:
+#
+#   before:  Content-Security-Policy: frame-ancestors 'self'
+#   after:   Content-Security-Policy: default-src 'none'; script-src ...
+#
+# No local gate can see this — `vite preview` does not apply this file — and
+# neither could the original deploy probe: Pyodide runs identically with and
+# without a CSP, so "Python reaches >>> with no CSP violation" passes MORE
+# readily when the policy is missing. The probe now greps for the policy.
+#
+# KEEP THIS BLOCK LAST. Anything appended below that also sets
+# Content-Security-Policy for a matching path silently disables it again.
+# The Pyodide host page. Runs on an OPAQUE origin (sandbox without
+# allow-same-origin), so `'self'` here matches nothing the page loads —
+# the bootstrap is inline and the runtime comes from the CDN.
+#
+# Why each directive is load-bearing:
+#   blob:                worker-src falls back to script-src, and the runtime
+#                        lives in a blob-URL worker (Spike A: a bare sandboxed
+#                        frame gives origin isolation but ZERO thread
+#                        isolation — the parent ticked 21 times against ~320
+#                        expected during a 3s busy loop in the frame).
+#   'wasm-unsafe-eval'   Chrome blocks WebAssembly.instantiate under any
+#                        script-src that lacks it. Pyodide is a wasm runtime.
+#   frame-ancestors      RE-STATED ON PURPOSE. This rule REPLACES the CSP
+#                        header for this path, so omitting it would
+#                        silently drop the red-team #7 clickjacking defence on
+#                        one of only two pages that actually get framed.
+[[headers]]
+  for = "/html/python-sandbox.html"
+  [headers.values]
+    Content-Security-Policy = "default-src 'none'; script-src 'unsafe-inline' blob: 'wasm-unsafe-eval' https://cdn.jsdelivr.net; worker-src blob:; connect-src blob: https://cdn.jsdelivr.net; frame-ancestors 'self'"
+    X-Frame-Options = "SAMEORIGIN"
+    Referrer-Policy = "no-referrer"
+    X-Content-Type-Options = "nosniff"

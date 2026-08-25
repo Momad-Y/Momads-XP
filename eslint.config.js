@@ -67,7 +67,7 @@ export default ts.config(
     },
     // untyped zone: root configs, e2e specs, gen scripts (node context)
     {
-        files: ['*.js', '*.cjs', '*.ts', 'e2e/**', 'gen/**'],
+        files: ['*.js', '*.cjs', '*.ts', 'e2e/**', 'gen/**', 'scripts/**'],
         extends: [ts.configs.disableTypeChecked],
         languageOptions: {
             globals: { console: 'readonly', process: 'readonly' },

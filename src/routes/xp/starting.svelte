@@ -1,7 +1,7 @@
 <script lang="ts">
     import * as utils from '../../lib/utils';
     import { onMount, createEventDispatcher } from 'svelte';
-    import { set, get } from 'idb-keyval';
+    import { set, setMany, get } from 'idb-keyval';
     import axios from 'axios';
     import { hardDrive, wallpaper, contextMenu } from '../../lib/store';
     import { bliss_wallpaper, SortOptions, SortOrders } from '../../lib/system';
@@ -10,7 +10,9 @@
         SEED_VERSION,
         merge_on_reseed,
         shouldReseed,
+        snapshot_seed_fields,
     } from '../../lib/seed';
+    import type { SeedFieldSnapshot } from '../../lib/seed';
     import type {
         ContextMenuRequest,
         LoadPageEvent,
@@ -59,6 +61,8 @@
         '/images/xp/icons/Back.png',
         '/images/xp/icons/CommandPrompt.png',
         '/images/xp/icons/ControlPanel.png',
+        '/images/xp/icons/Python.png',
+        '/images/xp/icons/WindowsMediaPlayer9.png',
         '/images/xp/icons/Default.png',
         '/images/xp/icons/Desktop.png',
         '/images/xp/icons/Email.png',
@@ -187,18 +191,30 @@
     async function read_cached(): Promise<{
         cached: StoredHardDrive | undefined;
         version: string | undefined;
+        seed_fields: SeedFieldSnapshot | undefined;
     }> {
         try {
             return {
                 cached: await get<StoredHardDrive>('hard_drive'),
                 version: await get<string>('hard_drive_seed_version'),
+                // The user-mutable fields of the seed this visitor was GIVEN.
+                // Undefined for drives stored before Phase 3 — the merge then
+                // infers no edits and no deletions, which is exactly the old
+                // behaviour. Guessing without it would delete files.
+                seed_fields: await get<SeedFieldSnapshot>(
+                    'hard_drive_seed_fields',
+                ),
             };
         } catch (error) {
             console.error(
                 'persisted drive unreadable; booting from the seed',
                 error,
             );
-            return { cached: undefined, version: undefined };
+            return {
+                cached: undefined,
+                version: undefined,
+                seed_fields: undefined,
+            };
         }
     }
 
@@ -213,6 +229,18 @@
         cached: StoredHardDrive | undefined,
     ): StoredHardDrive | undefined {
         if (cached == null) return undefined;
+        // An EMPTY object is not a usable drive, and treating it as one became
+        // destructive with the Phase 3 tombstone logic: every seed id is
+        // "absent from cached", so the merge tombstones the entire seed and
+        // persists a drive with zero items. Verified:
+        //   merge_on_reseed({}, seed, snapshot) -> 0 keys
+        //   merge_on_reseed({}, seed)           -> full seed
+        // Pre-T3 a degenerate cache still yielded the full seed; now it must
+        // be discarded outright, which restores that.
+        if (Object.keys(cached).length === 0) {
+            console.error('cached drive is empty; discarding it');
+            return undefined;
+        }
         try {
             migrate_files_format(cached);
             return cached;
@@ -239,7 +267,11 @@
                     // seed updates; on any merge failure fall back to the
                     // plain new seed (never a broken drive).
                     try {
-                        hard_drive = merge_on_reseed(cached, fetched);
+                        hard_drive = merge_on_reseed(
+                            cached,
+                            fetched,
+                            read.seed_fields,
+                        );
                     } catch (merge_error) {
                         console.error(
                             're-seed merge failed; using plain seed',
@@ -248,8 +280,22 @@
                         hard_drive = fetched;
                     }
                 }
-                await set('hard_drive', hard_drive);
-                await set('hard_drive_seed_version', SEED_VERSION);
+                // ONE transaction for all three keys. Written separately, a
+                // quota rejection between them left IndexedDB holding the
+                // merged drive while this session fell back to the OLD one —
+                // which desktop.svelte then persisted back over it. If the
+                // version write had landed first, the visitor would never
+                // re-seed again: frozen on old content under a new stamp.
+                // fs.ts:140 documents that quota rejections have happened here.
+                //
+                // Snapshot the seed AS FETCHED, not the merged drive: the next
+                // re-seed compares the visitor's drive against what the seed
+                // gave them, and merging has already folded their edits in.
+                await setMany([
+                    ['hard_drive', hard_drive],
+                    ['hard_drive_seed_version', SEED_VERSION],
+                    ['hard_drive_seed_fields', snapshot_seed_fields(fetched)],
+                ]);
             } catch (error) {
                 // Re-seed fetch failed (offline / flaky network). A returning
                 // visitor has a perfectly usable cached drive — boot from it

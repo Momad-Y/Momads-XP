@@ -46,7 +46,22 @@ jobs:
                   diff-cover coverage/lcov.info --compare-branch origin/dev --fail-under 80
 
             - name: Production build
-              run: npm run build
+              # `set -o pipefail` is REQUIRED. Actions' default shell is
+              # `bash -e`, and -e does NOT imply pipefail — so without it the
+              # step's exit status is tee's, and a build that fails after
+              # emitting build/index.html passes this gate.
+              shell: bash
+              run: |
+                  set -o pipefail
+                  npm run build 2>&1 | tee /tmp/build.log
+
+            # Assertions no other gate can make: vitest only sees
+            # src/**/*.test.ts and runs BEFORE the build, and Rollup's
+            # code-splitting warning goes to stdout that nothing captured.
+            # Also enforces the T2 jspaint prune (pruned paths absent, and
+            # classic.css — which index.html never references — still present).
+            - name: Verify build output
+              run: node scripts/verify-build.mjs /tmp/build.log
 
             - name: Cache Playwright browsers
               uses: actions/cache@v4

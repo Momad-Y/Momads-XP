@@ -2,6 +2,7 @@
 
 <script lang="ts">
     import { unmount } from 'svelte';
+    import { zIndex } from '../../store';
     import { required } from '../../types';
     import type { DialogButton, MountedComponent } from '../../types';
 
@@ -54,6 +55,40 @@
         if (event.key !== 'Escape' || node_ref == null) return;
         const open_dialogs = [...document.querySelectorAll('.dialog')];
         const mine = stacking_rank(node_ref);
+
+        /**
+         * The dialog's own window must be the FOCUSED one.
+         *
+         * Every other window-level keydown consumer in the app already guards
+         * on `window?.z_index === $zIndex` (system_properties, source_viewer,
+         * folder_options, internet_options, add_to_favorites,
+         * organize_favorites, image_viewer, media_player_classic, viewer,
+         * my_computer, and desktop_folder via `a_window_is_focused`). This
+         * component was the one exception, ranking only against OTHER dialogs
+         * — so it answered a keypress no matter which window had focus.
+         *
+         * The reproduction is TWO WINDOWS, not a terminal. Open a dialog in
+         * one Explorer, focus another window, press Escape: without this guard
+         * the BACKGROUND dialog is cancelled. Verified by mutation — removing
+         * the line turns e2e/dialog_focus.spec.ts red.
+         *
+         * A terminal cannot demonstrate it, which is worth recording because
+         * it was the assumed motivation: xterm consumes Escape on its own
+         * textarea, so the keypress never reaches this window listener. The
+         * terminal-based version of the test passed WITH THE GUARD REMOVED,
+         * i.e. it could not fail.
+         *
+         * session-handoff.md §8 rule 2 names "handlers each deciding in
+         * isolation" as the root cause of three shipped defects; this was the
+         * last consumer still deciding alone.
+         *
+         * MAX_SAFE_INTEGER means the dialog is not inside any window at all
+         * (CMFSItem mounts the desktop's delete confirmation into
+         * document.body, no_association into #desktop). Those are
+         * desktop-level and always eligible — there is no window for them to
+         * be out of focus with.
+         */
+        if (mine !== Number.MAX_SAFE_INTEGER && mine !== $zIndex) return;
         // strictly greater: a tie means two dialogs in the same window, where
         // document order IS the stacking order, so the last one still wins
         if (open_dialogs.some((d) => stacking_rank(d) > mine)) return;

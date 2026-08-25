@@ -125,22 +125,25 @@
             icon: '/assets/icons/about-me.png',
             path: './programs/about_me.svelte',
         },
-        placeholder_entry(
-            'Command Prompt',
-            '/images/xp/icons/CommandPrompt.png',
-        ),
-        placeholder_entry('Python', '/images/xp/icons/ApplicationWindow.png'),
+        {
+            name: 'Command Prompt',
+            icon: '/images/xp/icons/CommandPrompt.png',
+            path: './programs/cmd.svelte',
+        },
+        {
+            name: 'Python',
+            icon: '/images/xp/icons/Python.png',
+            path: './programs/python.svelte',
+        },
         {
             name: 'Paint',
             icon: '/images/xp/icons/Paint.png',
             path: './programs/paint.svelte',
         },
         {
-            // §3.4 label; launches the real inherited MPC — the custom player
-            // arrives in Phase 3 (design decision 7)
             name: 'Music Player',
-            icon: '/images/xp/icons/MPC.png',
-            path: './programs/media_player_classic.svelte',
+            icon: '/images/xp/icons/WindowsMediaPlayer9.png',
+            path: './programs/music_player.svelte',
         },
         {
             name: 'Games',

@@ -1,0 +1,138 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Python runtime</title>
+<!--
+  The isolation host for the Python REPL (Phase 3, spec D-B0).
+
+  This page is loaded into an <iframe sandbox="allow-scripts"> with NO
+  allow-same-origin, so it runs on an OPAQUE origin. That is the entire point:
+  user-typed Python cannot reach the VFS in IndexedDB (SecurityError), cannot
+  present Sec-Fetch-Site: same-origin to /api/browse, and cannot pass
+  /api/email's Origin check — its fetches carry Origin: null, which both
+  endpoints already reject.
+
+  The sandbox alone gives no THREAD isolation (measured: a 3s busy loop here
+  let the parent tick 21 times against ~320 expected), so the runtime lives in
+  a worker. The worker is created from a blob: URL because a same-origin script
+  URL is unreachable from an opaque origin.
+
+  DELIBERATELY THIN. The driver is authored in src/lib/python/worker_source.ts,
+  where it is linted and type-checked, and arrives in the `init` message. Files
+  under static/ are outside ESLint, prettier and coverage, so nothing that can
+  live in src/ lives here.
+-->
+<body>
+    <script>
+        (() => {
+            'use strict';
+
+            // REFUSE TO RUN IF NOT ACTUALLY SANDBOXED.
+            //
+            // Everything below assumes an opaque origin. If this page is ever
+            // framed by a same-origin page WITHOUT the sandbox attribute — or
+            // opened directly — the worker would run with the real origin's
+            // authority over the VFS and both API endpoints. One line closes
+            // that, and it costs nothing in the intended configuration.
+            if (window.origin !== 'null') return;
+
+            let worker = null;
+            let announce = null;
+
+            const toParent = (msg) => {
+                // '*' is forced: an opaque origin has no origin to target.
+                // The PARENT validates event.source identity and
+                // origin === 'null' instead.
+                parent.postMessage(msg, '*');
+            };
+
+            window.addEventListener('message', (event) => {
+                // Only the embedder may drive this frame.
+                if (event.source !== parent) return;
+                const data = event.data || {};
+
+                if (data.kind === 'init') {
+                    if (worker) return;
+                    try {
+                        const blob = new Blob([data.worker_source], {
+                            type: 'text/javascript',
+                        });
+                        // A CLASSIC worker, deliberately. Measured in this
+                        // exact context: a module worker cannot be constructed
+                        // from an opaque origin (blob:null/...) — it fails with
+                        // an opaque error and no message. The driver therefore
+                        // uses importScripts to pull in Pyodide's UMD bundle.
+                        worker = new Worker(URL.createObjectURL(blob));
+                        worker.onmessage = (e) => { toParent(e.data); };
+                        worker.onerror = (e) => {
+                            toParent({
+                                kind: 'error',
+                                message:
+                                    'Python runtime failed to start' +
+                                    (e && e.message ? ': ' + e.message : '.'),
+                            });
+                        };
+                        worker.postMessage({
+                            kind: 'init',
+                            index_url: data.index_url,
+                            greeting: data.greeting,
+                        });
+                    } catch (error) {
+                        toParent({
+                            kind: 'error',
+                            message:
+                                'Python runtime unavailable — ' + String(error),
+                        });
+                    }
+                    return;
+                }
+
+                if (data.kind === 'exec' && worker) {
+                    worker.postMessage(data);
+                    return;
+                }
+
+                if (data.kind === 'terminate' && worker) {
+                    // Ctrl+C. Terminating is the ONLY interrupt available:
+                    // setInterruptBuffer needs SharedArrayBuffer, which needs
+                    // COOP/COEP, which SPECIFICATION.md §5 records as breaking
+                    // other embeds on this site. It is a RESTART, not an
+                    // interrupt — the visitor's variables go with it, and the
+                    // app says so.
+                    worker.terminate();
+                    worker = null;
+                    // RE-ARM the handshake. Without this the frame goes silent
+                    // after a Ctrl+C and the only remaining re-init trigger is
+                    // the iframe `load` event — which is exactly the path that
+                    // used to throw.
+                    start_announcing();
+                }
+            });
+
+            // ANNOUNCE UNTIL HEARD.
+            //
+            // Both sides of this handshake can miss a single shot. The frame
+            // starts loading when the component renders, but the parent only
+            // attaches its listener after xterm has mounted — so one
+            // announcement can arrive before anyone is listening. The parent
+            // cannot detect that either: `frame.contentDocument` is null for a
+            // sandboxed opaque-origin document, so it has no way to see that
+            // the frame is already loaded.
+            //
+            // Re-announcing until `init` arrives makes the handshake immune to
+            // ordering. `init` is idempotent on both sides.
+            const start_announcing = () => {
+                if (announce) clearInterval(announce);
+                announce = setInterval(() => {
+                    if (worker) {
+                        clearInterval(announce);
+                        announce = null;
+                        return;
+                    }
+                    toParent({ kind: 'loading', detail: 'Sandbox ready' });
+                }, 120);
+            };
+            start_announcing();
+            toParent({ kind: 'loading', detail: 'Sandbox ready' });
+        })();
+    </script>
+</body>

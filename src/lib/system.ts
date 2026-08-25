@@ -152,6 +152,11 @@ const paint_program: ProgramDescriptor = {
     icon: '/images/xp/icons/Paint.png',
     name: 'Paint',
 };
+const music_player_program: ProgramDescriptor = {
+    path: './programs/music_player.svelte',
+    icon: '/images/xp/icons/WindowsMediaPlayer9.png',
+    name: 'Windows Media Player',
+};
 const mpc_program: ProgramDescriptor = {
     path: './programs/media_player_classic.svelte',
     icon: '/images/xp/icons/MPC.png',
@@ -166,7 +171,12 @@ const ie_program: ProgramDescriptor = {
 export const doctypes: Record<string, ProgramDescriptor[]> = {
     '.wav': [mpc_program],
     '.mp4': [mpc_program],
-    '.mp3': [mpc_program],
+    // MPC stays the DEFAULT handler: it is the shipped double-click behaviour
+    // for .mp3/.wav/.mp4, and changing it would regress every existing
+    // Explorer double-click. The Music Player is the SECOND entry, which is
+    // what makes it appear in the right-click "Open With" submenu
+    // (CMFSItem renders that only when there are >= 2 handlers).
+    '.mp3': [mpc_program, music_player_program],
     '.webp': [image_viewer],
     '.bmp': [image_viewer, paint_program],
     '.png': [image_viewer, paint_program],

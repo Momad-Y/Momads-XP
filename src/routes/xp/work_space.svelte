@@ -8,6 +8,11 @@
     import DesktopFolder from './desktop_folder.svelte';
     import * as finder from '../../lib/finder';
     import { full_vfs_item } from '../../lib/types';
+    import {
+        find_app,
+        singleton_paths,
+        to_window_options,
+    } from '../../lib/app_registry';
     import type {
         ProgramInstance,
         ProgramLaunchRequest,
@@ -16,6 +21,35 @@
 
     let node_ref: HTMLDivElement;
     let workSpaceHeight: number;
+
+    /**
+     * DECLARED BEFORE the queueProgram subscription below, and it must stay
+     * there.
+     *
+     * `store.subscribe()` invokes its callback SYNCHRONOUSLY with the current
+     * value, so if a program is already queued when this component
+     * initialises, `launch()` runs during init — before any `const` further
+     * down has been evaluated. `focus_existing()` reads this array, so having
+     * it below produced:
+     *
+     *     ReferenceError: Cannot access 'singleton_programs' before
+     *     initialization
+     *         at focus_existing -> launch_inner -> launch -> subscribe
+     *
+     * A latent trap in the inherited ordering; the registry lookup added
+     * beside it is what made the path reachable.
+     */
+    /**
+     * XP's property sheets are single-instance: invoking Folder Options (etc.)
+     * again raises the open one rather than stacking a second copy with its own
+     * taskbar button (red-team M6).
+     */
+    const singleton_programs = [
+        './programs/system_properties.svelte',
+        './programs/folder_options.svelte',
+        './programs/internet_options.svelte',
+        './programs/organize_favorites.svelte',
+    ];
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars -- the inherited base never unsubscribes (work_space lives for the whole session); wiring these into onDestroy would be a behavior change
     const unsubscribers = [
@@ -31,20 +65,12 @@
 
     onDestroy(() => {});
 
-    /**
-     * XP's property sheets are single-instance: invoking Folder Options (etc.)
-     * again raises the open one rather than stacking a second copy with its own
-     * taskbar button (red-team M6).
-     */
-    const singleton_programs = [
-        './programs/system_properties.svelte',
-        './programs/folder_options.svelte',
-        './programs/internet_options.svelte',
-        './programs/organize_favorites.svelte',
-    ];
-
     function focus_existing(path: string | undefined): boolean {
-        if (path == null || !singleton_programs.includes(path)) return false;
+        // Registry singletons count too, or `AppDefinition.singleton` would be
+        // a field that type-checks and does nothing — the exact class of defect
+        // the registry exists to remove.
+        const singletons = [...singleton_programs, ...singleton_paths()];
+        if (path == null || !singletons.includes(path)) return false;
         const open = get(runningPrograms).find(
             (p) => p.options.exec_path === path,
         );
@@ -60,6 +86,19 @@
     }
 
     async function launch(program: ProgramLaunchRequest) {
+        // `finally`, not a trailing statement: `queueProgram.set(null)` used to
+        // be the last line of the function, so ANY throw skipped it. The store
+        // then stayed non-null, `work_space` kept its `waiting` class, and the
+        // whole desktop was stuck on `cursor: wait` — with the rejection
+        // unhandled, because the subscriber calls `void launch(...)`.
+        try {
+            await launch_inner(program);
+        } finally {
+            queueProgram.set(null);
+        }
+    }
+
+    async function launch_inner(program: ProgramLaunchRequest) {
         const {
             fs_item,
             exe_item,
@@ -70,7 +109,6 @@
         } = program;
 
         if (focus_existing(path)) {
-            queueProgram.set(null);
             return;
         }
 
@@ -419,8 +457,53 @@
                     get_self: () => program,
                 },
             });
+        } else {
+            // ── registry fallthrough (SPECIFICATION.md §6.3) ────────────────
+            // Everything above is the inherited if-chain; Phase 3 apps live in
+            // the registry instead. Reaching here with an unregistered path
+            // used to be a SILENT no-op — no window, no error, no failing
+            // test — which is how a mistyped specifier could ship.
+            const app = find_app(path);
+            if (app == null) {
+                // A request with NO path is not a typo — several inherited
+                // call sites queue one to hand `fs_item`/`copying_obj` to a
+                // branch above, and the chain has always let those fall
+                // through silently. Preserving that is deliberate: turning it
+                // into a throw broke boot, because `store.subscribe()` fires
+                // synchronously and work_space can initialise with one queued.
+                if (path == null) return;
+                // A path that IS set but matches nothing is the real defect
+                // this branch exists to surface — previously a silent no-op
+                // with no window, no error and no failing test.
+                throw new Error(`no program registered for path: ${path}`);
+            }
+            const Program = (await app.component()).default;
+            // ONE id, used for both the component prop and options.id — see
+            // to_window_options(). Generating it twice, or omitting it from
+            // options, silently breaks taskbar focus, the minimize animation
+            // and window cascading.
+            const instance_id = short.generate();
+            const program: ProgramInstance = mount(Program, {
+                target: node_ref,
+                props: {
+                    id: instance_id,
+                    parentNode: node_ref,
+                    fs_item: full_vfs_item(fs_item),
+                    exec_path: app.path,
+                    get_self: () => program,
+                    // For a REGISTERED app the registry is the source of
+                    // truth for title/icon/size, so passing this replaces
+                    // nothing: registry components deliberately do not declare
+                    // their own `options` default. (The inherited branches
+                    // above are the opposite — their components own it — which
+                    // is why this is a separate path rather than a rewrite.)
+                    options: to_window_options(app, instance_id),
+                },
+            });
+            if (app.taskbar !== false) {
+                runningPrograms.update((values) => [...values, program]);
+            }
         }
-        queueProgram.set(null);
     }
 
     function get_url(item: Partial<VfsItem> | undefined) {

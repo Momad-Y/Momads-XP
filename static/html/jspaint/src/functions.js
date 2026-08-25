@@ -684,14 +684,7 @@ async function load_image_from_uri(uri) {
 		throw error;
 	}
 
-	const uris_to_try = (is_download && !is_localhost) ? [
-		uri,
-		// work around CORS headers not sent by whatever server
-		`https://cors.bridged.cc/${uri}`,
-		`https://jspaint-cors-proxy.herokuapp.com/${uri}`,
-		// if the image isn't available on the live web, see if it's archived
-		`https://web.archive.org/${uri}`,
-	] : [uri];
+	const uris_to_try = [uri]; // third-party CORS relays removed by scripts/prune-jspaint.mjs
 	const fails = [];
 
 	for (let index_to_try = 0; index_to_try < uris_to_try.length; index_to_try += 1) {
@@ -1367,10 +1360,8 @@ function show_about_paint() {
 
 	$("#checking-for-updates").removeAttr("hidden");
 
-	const url =
-		// ".";
-		// "test-news-newer.html";
-		"https://jspaint.app";
+	const url = null; // update check removed by scripts/prune-jspaint.mjs
+	if (!url) return;
 	fetch(url)
 		.then((response) => response.text())
 		.then((text) => {
@@ -1668,12 +1659,6 @@ function render_history_as_gif() {
 				// revoking on image load(+error) breaks right click > "Save image as" and "Open image in new tab"
 				URL.revokeObjectURL(blob_url);
 			});
-			$win.$Button("Upload to Imgur", () => {
-				$win.close();
-				sanity_check_blob(blob, () => {
-					show_imgur_uploader(blob);
-				});
-			}).focus();
 			$win.$Button(localize("Save"), () => {
 				$win.close();
 				sanity_check_blob(blob, () => {
