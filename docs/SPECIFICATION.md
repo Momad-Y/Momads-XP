@@ -1202,23 +1202,23 @@ surprised by it:
 - Shared logic extracted and unit-tested: selection scoping, delete planning,
   nav history, the Details/status-bar formatters, the re-seed carry rule.
 
-### Phase 3: Developer & Interactive Apps — ⬜ NEXT
+### Phase 3: Developer & Interactive Apps — ✅ COMPLETE
 
 **Goal:** CMD, Python, Paint, Music Player — the "power user" experience.
 
-- [ ] CMD: xterm.js Linux-style terminal with startup intro message and core command set (`help`, `about`, `skills`, `experience`, `whoami`, etc.)
+- [x] CMD: xterm.js Linux-style terminal with startup intro message and core command set (`help`, `about`, `skills`, `experience`, `whoami`, etc.)
     - Command output reads from `profile.json`
     - Easter eggs: `matrix`, `hack`, `sudo`
-- [ ] Python REPL: Pyodide-powered Python 3.13.x interpreter in a terminal window (in-page via pinned CDN — replaces the base's pyodide.org iframe)
-- [ ] Paint: bundled jspaint (kept in Phase 0) wrapped in XP window chrome, or a custom Canvas app
+- [x] Python REPL: Pyodide-powered Python 3.13.x interpreter in a terminal window (in-page via pinned CDN — replaces the base's pyodide.org iframe)
+- [x] Paint: bundled jspaint (kept in Phase 0) wrapped in XP window chrome, or a custom Canvas app
     - Tools: pencil, brush, eraser, fill, shapes, color picker
     - File menu: New, Save as PNG
-- [ ] Music Player: local bundled tracks with play/pause/next/prev, volume, seek, track list, and Canvas visualizer (§3.2 — the Spotify embed cannot satisfy these; reduced-feature Spotify mode is stretch)
-- [ ] **jspaint hardening** (added to Phase 3 scope by the owner, 2026-08-23). Phase 3 is the phase that blesses the vendored bundle, and gate 2 found live third-party paths on the production domain: `#load:<url>` renders an arbitrary attacker URL, two Imgur upload entry points, a Firebase session channel, 12 third-party image fetches per open, and a frame with no `sandbox`. See `docs/phase-3-plan.md` T2.
+- [x] Music Player: local bundled tracks with play/pause/next/prev, volume, seek, track list, and Canvas visualizer (§3.2 — the Spotify embed cannot satisfy these; reduced-feature Spotify mode is stretch)
+- [x] **jspaint hardening** (added to Phase 3 scope by the owner, 2026-08-23). Phase 3 is the phase that blesses the vendored bundle, and gate 2 found live third-party paths on the production domain: `#load:<url>` renders an arbitrary attacker URL, two Imgur upload entry points, a Firebase session channel, 12 third-party image fetches per open, and a frame with no `sandbox`. See `docs/phase-3-plan.md` T2.
 
 **Exit criteria:** All four apps are functional and styled authentically, and the vendored Paint bundle ships no unreviewed third-party data paths.
 
-### Phase 4: Games
+### Phase 4: Games — ⬜ NEXT
 
 **Goal:** Minesweeper, Solitaire, Chess, DOOM.
 

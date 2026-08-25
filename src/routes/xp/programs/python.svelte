@@ -104,7 +104,19 @@
                 return;
             case 'ready':
                 ready = true;
-                write_lines([message.banner.trimEnd(), '']);
+                // SPLIT the banner: it is multi-line, and writing it as one
+                // string leaves bare \n characters in the stream. xterm does
+                // not translate those — a bare \n moves the cursor DOWN
+                // without returning it to column 0, so the second line starts
+                // wherever the first ended and the banner staircases. Caught
+                // on a parity screenshot, which is what the loop is for.
+                write_lines([
+                    ...message.banner
+                        .trimEnd()
+                        .split('\n')
+                        .map((l) => l.trimEnd()),
+                    '',
+                ]);
                 prompt();
                 term?.focus();
                 return;

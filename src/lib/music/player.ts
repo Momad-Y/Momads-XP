@@ -80,24 +80,31 @@ export function create_source_cache<E extends object, N>(
  * Bar heights for the visualiser, from an `AnalyserNode` frequency buffer.
  *
  * Pure so the drawing logic is testable; the component only blits the result.
- * The low end of the spectrum carries almost all the energy in real music, so
- * sampling linearly across the whole buffer wastes most bars on near-silent
- * high frequencies — this walks a fraction of the range instead.
+ *
+ * BINS ARE SPACED LOGARITHMICALLY, which is what a real spectrum analyser
+ * does and what this needed to stop looking broken. An FFT's bins are LINEAR
+ * in frequency, but musical energy is concentrated in the bottom few percent
+ * of the range — so a linear mapping puts everything audible into the first
+ * two or three bars and leaves the rest of the display flat. Measured on the
+ * bundled tracks: linear spacing lit ~4 bars of 28 and the widget read as
+ * dead. Log spacing spreads the same energy across the full width.
  */
 export function bar_heights(
     frequencies: Uint8Array | readonly number[],
     bars: number,
-    /** Fraction of the spectrum to display. */
-    span = 0.6,
+    /** Fraction of the spectrum to display; the top end is mostly silence. */
+    span = 0.7,
 ): number[] {
     if (bars <= 0 || frequencies.length === 0) return [];
-    const usable = Math.max(1, Math.floor(frequencies.length * span));
-    const per_bar = Math.max(1, Math.floor(usable / bars));
+    const usable = Math.max(2, Math.floor(frequencies.length * span));
     const out: number[] = [];
     for (let i = 0; i < bars; i++) {
+        // Log-spaced edges over [1, usable].
+        const lo = Math.floor(usable ** (i / bars));
+        const hi = Math.max(lo + 1, Math.floor(usable ** ((i + 1) / bars)));
         let sum = 0;
         let count = 0;
-        for (let j = i * per_bar; j < (i + 1) * per_bar && j < usable; j++) {
+        for (let j = lo; j < hi && j < usable; j++) {
             sum += frequencies[j] ?? 0;
             count++;
         }
