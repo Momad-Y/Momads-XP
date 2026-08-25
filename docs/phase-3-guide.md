@@ -169,6 +169,43 @@ No new functions, so no new invocation cost. Two things that *are* new:
   in the product does this. Disclose it if a privacy note is ever added.
 - **Deploy size.** `static/` net *shrank*: jspaint 45 MB → 21 MB, audio +1.1 MB.
 
+### Deployed 2026-08-25 — probe results
+
+Cutover PR #126 (`dev` → `main`, 14 commits). Bundle
+`start.Ba7I-aGx.js` → `start.D_H2dTeo.js`. Every probe below was run against
+production, not a draft.
+
+| Probe | Result |
+| --- | --- |
+| Sandbox CSP serves `default-src 'none'` | **PASS** — the full strict policy, i.e. gate 6's CRITICAL 1 is genuinely fixed in production and not just in the file |
+| `/html/jspaint/{package.json,CNAME,CHANGELOG.md,src/imgur.js,lib/firebase.js,src/electron-injected.js}` | **404** — all six |
+| `/html/jspaint/index.html` keeps `frame-ancestors 'self'` + `X-Robots-Tag` | **PASS** |
+| `styles/themes/classic.css` still served | **200** — Paint is styled |
+| `sessions.js` free of `load_from_url_match` / `firebaseio` | **PASS** — the `#load:` primitive is gone from the live domain |
+| About-Paint update fetch neutralised (`const url = null`) | **PASS** |
+| Desktop reached; Python reaches `>>>` | **PASS** |
+| Multi-line `def` block runs and returns 42 | **PASS** — no `IndentationError` |
+| Ctrl+C: second banner appears, `NameError` proves state cleared | **PASS** — no `SecurityError` |
+| Paint opens, `classic.css` has 100 rules applied, drawing inks pixels | **PASS** |
+| Music play → pause → play, `currentTime` advances | **PASS** — no `InvalidStateError` |
+| IE opens `/api/browse`, the proxied page renders | **PASS** |
+| IE frame sandbox has **no** `allow-same-origin` | **PASS** |
+| CSP violations / page errors during all of the above | **none** |
+
+One third-party request appears and is **expected**:
+`https://www.gstatic.com/charts/loader.js`, inherited from the base repo and
+documented at `desktop.svelte:99-106` — the Google Charts loader for
+`disk_properties`, CDN without SRI because it fetches submodules dynamically.
+Not a Phase 3 path.
+
+**A probe bug worth recording.** The first Ctrl+C probe reported FAIL. The
+product was fine; the probe typed into the terminal *during* the restart
+without re-focusing, and used `toContain('Python 3.13')` as its success signal —
+which the FIRST banner already satisfies. Waiting for a *second* banner and
+re-clicking the textarea turned it green. Same failure mode as the tests gate 6
+found: a check whose signal is already present before the thing it measures
+happens.
+
 ### Deploy probes — run these after deploying
 
 The rule that caught two holes nothing else did. `vite preview` does not apply
