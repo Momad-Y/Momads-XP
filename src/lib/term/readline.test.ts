@@ -193,3 +193,24 @@ describe('bracketed paste', () => {
         expect(s.pasting).toBe(false);
     });
 });
+
+describe('Ctrl+D (EOF)', () => {
+    it('emits eof on an EMPTY line', () => {
+        // Both shells and CPython treat this as "close the session".
+        expect(type('\x04').effects).toEqual([{ kind: 'eof' }]);
+    });
+
+    it('does NOT emit eof mid-line, and leaves the buffer intact', () => {
+        // CPython ignores Ctrl+D mid-line rather than deleting forward the way
+        // bash does. Emitting eof here would close the window under someone
+        // who was still typing.
+        const out = type('hello\x04');
+        expect(out.effects).toEqual([{ kind: 'bell' }]);
+        expect(out.state.buffer).toBe('hello');
+    });
+
+    it('emits eof after the line is cleared', () => {
+        const cleared = feed(type('abc').state, '\x7f\x7f\x7f');
+        expect(feed(cleared.state, '\x04').effects).toEqual([{ kind: 'eof' }]);
+    });
+});

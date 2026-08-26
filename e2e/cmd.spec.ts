@@ -179,3 +179,32 @@ test('two terminals can be open at once', async ({ page }) => {
     expect(second.x).not.toBe(first.x);
     expect(second.y).not.toBe(first.y);
 });
+
+test('exit and Ctrl+D each close the terminal', async ({ page }) => {
+    await bootToDesktop(page);
+    await openCmd(page);
+    await expect(page.locator('#work-space .window')).toHaveCount(1);
+
+    await run(page, 'exit');
+    await expect(page.locator('#work-space .window')).toHaveCount(0);
+
+    // Ctrl+D on an EMPTY line does the same, as in any shell.
+    await openCmd(page);
+    await page.locator('.xterm-helper-textarea').click();
+    await page.keyboard.press('Control+d');
+    await expect(page.locator('#work-space .window')).toHaveCount(0);
+});
+
+test('Ctrl+D mid-line does NOT close the terminal', async ({ page }) => {
+    // The other half: CPython and this shell ignore Ctrl+D while there is text
+    // on the line, and closing the window under someone mid-type would be the
+    // worst possible reading of the key.
+    await bootToDesktop(page);
+    await openCmd(page);
+    await page.locator('.xterm-helper-textarea').click();
+    await page.keyboard.type('some text');
+    await page.keyboard.press('Control+d');
+    await page.waitForTimeout(300);
+    await expect(page.locator('#work-space .window')).toHaveCount(1);
+    await expect.poll(async () => screen(page)).toContain('some text');
+});

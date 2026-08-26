@@ -307,3 +307,59 @@ test('runs a MULTI-LINE block — the continuation path @online', async ({
     expect(text).not.toContain('IndentationError');
     expect(text).not.toContain('NameError');
 });
+
+test('exit() closes the window instead of dumping a SystemExit traceback @online', async ({
+    page,
+}) => {
+    // Pyodide has no process to exit, so `exit()` raised SystemExit and dumped
+    // a six-frame traceback through webloop/asyncio/console internals — which
+    // reads as a crash rather than "the interpreter closed".
+    test.setTimeout(180_000);
+    await bootToDesktop(page);
+    await openPython(page);
+    await expect
+        .poll(async () => page.locator('.xterm-rows').innerText(), {
+            timeout: 120_000,
+        })
+        .toContain('>>>');
+
+    await page.keyboard.type('exit()');
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#work-space .window')).toHaveCount(0);
+});
+
+test('Ctrl+C at an IDLE prompt keeps the session @online', async ({ page }) => {
+    // The behaviour this fixes: Ctrl+C used to terminate and respawn the
+    // worker unconditionally, so pressing it out of habit to clear a line
+    // silently destroyed every variable the visitor had defined. CPython
+    // prints KeyboardInterrupt and keeps going.
+    test.setTimeout(180_000);
+    await bootToDesktop(page);
+    await openPython(page);
+    await expect
+        .poll(async () => page.locator('.xterm-rows').innerText(), {
+            timeout: 120_000,
+        })
+        .toContain('>>>');
+
+    await page.keyboard.type('keep_me = 99');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(1_000);
+
+    await page.keyboard.press('Control+c');
+    await expect
+        .poll(async () => page.locator('.xterm-rows').innerText())
+        .toContain('KeyboardInterrupt');
+    // NOT a restart: no second banner.
+    const text = await page.locator('.xterm-rows').innerText();
+    expect(text).not.toContain('Restarting Python');
+
+    // And the variable is still there — the whole point.
+    await page.keyboard.type('keep_me');
+    await page.keyboard.press('Enter');
+    await expect
+        .poll(async () => page.locator('.xterm-rows').innerText(), {
+            timeout: 20_000,
+        })
+        .toContain('99');
+});
