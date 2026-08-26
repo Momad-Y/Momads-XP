@@ -179,6 +179,13 @@ export const COMMANDS: readonly Command[] = [
         run: () => [new Date().toTimeString().split(' ')[0] ?? ''],
     },
     {
+        name: 'exit',
+        summary: 'close the terminal (or Ctrl+D)',
+        // Listed so `help` advertises it, but the window close is handled by
+        // the component — the command layer is pure and owns no window.
+        run: () => [],
+    },
+    {
         name: 'clear',
         summary: 'clear the screen',
         // The screen wipe is an ANSI sequence the component owns; the command

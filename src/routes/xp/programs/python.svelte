@@ -160,8 +160,26 @@
         }
     }
 
+    /**
+     * `exit`, `exit()`, `quit`, `quit()` — with or without the parentheses,
+     * exactly as CPython accepts them.
+     *
+     * Intercepted BEFORE the runtime sees them. Pyodide has no process to
+     * exit, so `exit()` raises SystemExit and dumps a six-frame traceback
+     * through weblooop/asyncio/console internals — which reads as a crash, not
+     * as "the interpreter closed". Closing the window is what the visitor
+     * actually meant.
+     */
+    function is_exit_command(line: string): boolean {
+        return /^\s*(exit|quit)\s*(\(\s*\))?\s*$/.test(line);
+    }
+
     function submit(line: string) {
         write(CRLF);
+        if (is_exit_command(line)) {
+            destroy();
+            return;
+        }
         if (!ready) {
             prompt();
             return;
@@ -189,11 +207,28 @@
                 return;
             }
             if (effect.kind === 'interrupt') {
-                // Terminate-and-respawn is the ONLY interrupt available:
+                write('^C' + CRLF);
+
+                // IDLE: behave like CPython — abandon the current input and
+                // give a fresh prompt. The session SURVIVES.
+                //
+                // The previous version always terminated and respawned the
+                // worker, so pressing Ctrl+C out of habit to clear a line
+                // silently destroyed every variable the visitor had defined.
+                // That is a restart, not an interrupt, and it is not what the
+                // key means anywhere else.
+                if (!awaiting) {
+                    write_lines([colour('KeyboardInterrupt', FG_RED)]);
+                    block = [];
+                    prompt();
+                    return;
+                }
+
+                // BUSY: a running worker cannot be interrupted —
                 // setInterruptBuffer needs SharedArrayBuffer, which needs
                 // COOP/COEP, which §5 records as breaking other embeds here.
-                // It is a RESTART, and saying so is the honest UI.
-                write('^C' + CRLF);
+                // Terminate-and-respawn is the only lever, so say plainly that
+                // it costs the session.
                 write_lines([
                     colour(
                         'Restarting Python… (session state cleared)',
@@ -204,6 +239,13 @@
                 block = [];
                 awaiting = false;
                 client?.restart();
+                return;
+            }
+            if (effect.kind === 'eof') {
+                // Ctrl+D on an empty line closes the interpreter, as it does
+                // in a real terminal.
+                write(CRLF);
+                destroy();
                 return;
             }
             write('\x07'); // the only remaining effect kind
