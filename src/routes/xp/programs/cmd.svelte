@@ -173,6 +173,14 @@
         write(CRLF);
         const name = line.trim().split(/\s+/)[0] ?? '';
 
+        // `exit` closes the terminal, as it does in any shell. Not a registry
+        // command: it acts on the WINDOW rather than producing output, and the
+        // command layer is deliberately pure `(args, profile) => string[]`.
+        if (name === 'exit' || name === 'quit') {
+            destroy();
+            return;
+        }
+
         if (name === 'clear') {
             write(CLEAR_SCREEN);
             prompt();
@@ -211,7 +219,14 @@
                 prompt();
                 return;
             }
-            write('\x07'); // the only remaining effect kind
+            if (effect.kind === 'eof') {
+                // Ctrl+D on an empty line closes the terminal, as it does in
+                // any real shell.
+                write(CRLF);
+                destroy();
+                return;
+            }
+            write('\x07'); // bell — the only remaining effect kind
         }
         redraw();
     }

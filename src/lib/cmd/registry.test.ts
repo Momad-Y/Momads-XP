@@ -210,3 +210,18 @@ describe('the command set matches SPECIFICATION.md §3.2', () => {
         for (const c of COMMANDS) expect(c.summary.length).toBeGreaterThan(0);
     });
 });
+
+describe('exit', () => {
+    it('is listed so help advertises it', () => {
+        // The window close is handled by the component — the command layer is
+        // pure `(args, profile) => string[]` and owns no window — but the
+        // command must still appear in `help`, per §1b's no-dead-entries
+        // standard.
+        expect(find_command('exit')).toBeDefined();
+        expect(plain('help')).toContain('exit');
+    });
+
+    it('produces no output of its own', () => {
+        expect(execute('exit', profile)).toEqual([]);
+    });
+});

@@ -32,7 +32,15 @@ export interface ReadlineState {
 }
 
 export type ReadlineEffect =
-    { kind: 'submit'; line: string } | { kind: 'interrupt' } | { kind: 'bell' };
+    | { kind: 'submit'; line: string }
+    | { kind: 'interrupt' }
+    /**
+     * Ctrl+D on an EMPTY line — end of input. Both real shells and CPython
+     * treat this as "close the session"; on a non-empty line CPython ignores
+     * it entirely, which is why this is only emitted when the buffer is empty.
+     */
+    | { kind: 'eof' }
+    | { kind: 'bell' };
 
 export interface ReadlineResult {
     readonly state: ReadlineState;
@@ -170,6 +178,18 @@ export function feed(state: ReadlineState, data: string): ReadlineResult {
             const result = submit(next);
             next = result.state;
             effects.push(...result.effects);
+            i++;
+            continue;
+        }
+        if (ch === '\x04') {
+            // Ctrl+D. Only meaningful on an empty line; CPython ignores it
+            // mid-line rather than deleting forward the way bash does, and
+            // matching the interpreter is the right call inside a REPL.
+            if (next.buffer.length === 0) {
+                effects.push({ kind: 'eof' });
+            } else {
+                effects.push({ kind: 'bell' });
+            }
             i++;
             continue;
         }
