@@ -5,13 +5,19 @@ import {
     execute,
     find_command,
     parse,
+    with_trailing_blank,
 } from './registry';
 import { strip_ansi } from '../term/ansi';
 import { profile } from '../profile';
 
-/** Output as plain text, so assertions are about content and not colour. */
+/**
+ * Output as plain text, so assertions are about CONTENT and not colour or
+ * spacing. The trailing blank every command now ends with is trimmed here —
+ * spacing has its own dedicated tests below, and leaving it in would make
+ * every content assertion carry a `\n` that says nothing.
+ */
 function plain(input: string): string {
-    return execute(input, profile).map(strip_ansi).join('\n');
+    return execute(input, profile).map(strip_ansi).join('\n').trimEnd();
 }
 
 describe('parse', () => {
@@ -223,5 +229,84 @@ describe('exit', () => {
 
     it('produces no output of its own', () => {
         expect(execute('exit', profile)).toEqual([]);
+    });
+});
+
+describe('output spacing is consistent across commands', () => {
+    /** Commands that produce output and are therefore spaced identically. */
+    const PRINTING = [
+        'help',
+        'about',
+        'skills',
+        'experience',
+        'projects',
+        'contact',
+        'social',
+        'whoami',
+        'uname -a',
+        'date',
+        'time',
+        'sudo',
+    ];
+
+    it('every printing command ends with EXACTLY one blank line', () => {
+        // The reported inconsistency: skills/experience/projects blanked after
+        // every group and so ended with one, while about/contact/social/help
+        // ended flush against the next prompt. Seven call sites each deciding
+        // separately is how it drifted.
+        for (const cmd of PRINTING) {
+            const out = execute(cmd, profile);
+            expect(out.length, `${cmd} printed nothing`).toBeGreaterThan(0);
+            expect(out[out.length - 1], `${cmd} does not end blank`).toBe('');
+            expect(
+                out[out.length - 2],
+                `${cmd} ends with TWO blank lines`,
+            ).not.toBe('');
+        }
+    });
+
+    it('an unknown command is spaced the same way', () => {
+        const out = execute('nope', profile);
+        expect(out[out.length - 1]).toBe('');
+    });
+
+    it('a deferred filesystem command is spaced the same way', () => {
+        const out = execute('ls', profile);
+        expect(out[out.length - 1]).toBe('');
+    });
+
+    it('silent commands stay silent', () => {
+        // A blank line before a freshly cleared screen's prompt would be a
+        // visible artefact.
+        for (const cmd of ['clear', 'matrix', 'hack', 'exit']) {
+            expect(execute(cmd, profile), cmd).toEqual([]);
+        }
+    });
+
+    it('still separates groups with a single blank line', () => {
+        // The trailing blank must not come at the cost of the spacing BETWEEN
+        // entries, which is what made the lists readable.
+        const out = execute('skills', profile).map(strip_ansi);
+        const groups = Object.keys(profile.skills);
+        expect(groups.length).toBeGreaterThan(1);
+        // No two consecutive blanks anywhere.
+        for (let i = 1; i < out.length; i++) {
+            expect(out[i] === '' && out[i - 1] === '').toBe(false);
+        }
+    });
+});
+
+describe('with_trailing_blank', () => {
+    it('collapses several trailing blanks to one', () => {
+        expect(with_trailing_blank(['a', '', '', ''])).toEqual(['a', '']);
+    });
+
+    it('adds one when there is none', () => {
+        expect(with_trailing_blank(['a'])).toEqual(['a', '']);
+    });
+
+    it('leaves empty output empty', () => {
+        expect(with_trailing_blank([])).toEqual([]);
+        expect(with_trailing_blank(['', ''])).toEqual([]);
     });
 });
