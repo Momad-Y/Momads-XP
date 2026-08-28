@@ -20,6 +20,8 @@
     import {
         TERMINAL_FONT_FAMILY,
         TERMINAL_FONT_SIZE,
+        TERMINAL_PADDING_X,
+        TERMINAL_PADDING_Y,
         XP_CONSOLE_THEME,
     } from '../../term/theme';
 
@@ -146,5 +148,18 @@
     resolving to `auto` silently produces NaN and fit() no-ops.
 -->
 <div class="relative grow overflow-hidden bg-black" style:min-height="0">
-    <div bind:this={host} class="absolute inset-0"></div>
+    <!--
+        The gutter is on the HOST, not as padding on the wrapper: an
+        absolutely positioned child fills its containing block's PADDING box,
+        so wrapper padding would not inset it. Insetting the host also means
+        FitAddon measures the already-reduced area, so columns stay correct.
+    -->
+    <div
+        bind:this={host}
+        class="absolute"
+        style:left="{TERMINAL_PADDING_X}px"
+        style:right="{TERMINAL_PADDING_X}px"
+        style:top="{TERMINAL_PADDING_Y}px"
+        style:bottom="{TERMINAL_PADDING_Y}px"
+    ></div>
 </div>
