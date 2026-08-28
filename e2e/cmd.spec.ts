@@ -15,8 +15,18 @@ async function openCmd(page: Page) {
     const flyout = page.locator('#all-programs-flyout');
     await expect(flyout).toBeVisible();
     await flyout.getByText('Command Prompt', { exact: true }).click();
-    // xterm renders into a canvas/rows structure; .xterm-rows is the text layer.
+    // xterm renders into a canvas/rows structure; .xterm-rows is the text
+    // layer. Waiting for `.xterm` to be VISIBLE is not enough: the banner is
+    // written from `on_ready`, which the component defers a frame past the
+    // window's open transition, so a read immediately after this resolved
+    // against an empty terminal on a 2-core CI runner. Wait for actual
+    // CONTENT, which is the thing every caller goes on to assert about.
     await expect(page.locator('.xterm')).toBeVisible({ timeout: 20_000 });
+    await expect
+        .poll(async () => page.locator('.xterm-rows').innerText(), {
+            timeout: 20_000,
+        })
+        .toContain('momad@xp:~$');
 }
 
 /** Everything currently on screen, as plain text. */
@@ -34,8 +44,11 @@ test('opens with the §3.2 banner and a prompt', async ({ page }) => {
     await bootToDesktop(page);
     await openCmd(page);
 
+    await expect
+        .poll(async () => screen(page), { timeout: 20_000 })
+        .toContain("Welcome to Momad's XP Terminal");
+
     const text = await screen(page);
-    expect(text).toContain("Welcome to Momad's XP Terminal");
     expect(text).toContain("Type 'help' to see available commands.");
     expect(text).toContain('momad@xp:~$');
 
