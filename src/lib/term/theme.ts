@@ -55,14 +55,31 @@ export const XP_CONSOLE_THEME = {
 } as const;
 
 /**
+ * Inset between the window's content edge and the first glyph.
+ *
+ * XP's console does not start text flush against the frame — there is a small
+ * gutter, and without it the left column reads as clipped and the right column
+ * touches the scrollbar.
+ *
+ * Applied to the xterm HOST element, not as padding on its parent: an
+ * absolutely positioned child fills its containing block's PADDING BOX, so
+ * padding on the wrapper would not inset it at all. It also has to be a
+ * constant rather than a magic class, because FitAddon derives columns from
+ * the host's computed size — so the gutter directly reduces usable columns and
+ * `TERMINAL_MIN_WIDTH` has to account for it (theme.test.ts derives that).
+ */
+export const TERMINAL_PADDING_X = 8;
+export const TERMINAL_PADDING_Y = 4;
+
+/**
  * Minimum window size that keeps the ≤72-column formatters from wrapping.
  *
- * 640, not 620. The original figure was eyeballed; `theme.test.ts` now derives
- * the requirement (0.6 em advance x MAX_COLS x font size, plus chrome) and it
- * came out at ~629 — so the old value was genuinely a few pixels short and the
- * widest `skills` lines would have wrapped at the minimum size.
+ * Derived, not eyeballed: 0.6 em advance x MAX_COLS x font size, plus the
+ * gutter on both sides, plus window chrome. `theme.test.ts` computes the same
+ * figure and fails if this drops below it — which is how the original 620 was
+ * caught as ~9 px short, and how adding TERMINAL_PADDING_X moved it again.
  */
-export const TERMINAL_MIN_WIDTH = 640;
+export const TERMINAL_MIN_WIDTH = 664;
 export const TERMINAL_MIN_HEIGHT = 380;
 
 /**
