@@ -5,6 +5,8 @@ import {
     TERMINAL_FONT_SIZE,
     TERMINAL_MIN_HEIGHT,
     TERMINAL_MIN_WIDTH,
+    TERMINAL_PADDING_X,
+    TERMINAL_PADDING_Y,
     XP_CONSOLE_THEME,
 } from './theme';
 
@@ -82,17 +84,24 @@ describe('window sizing', () => {
      * 72 columns no longer came close to fitting.
      */
     const column_px = (size: number) => size * 0.6;
-    /** Window chrome: borders, padding and the scrollbar gutter. */
+    /** Window chrome: borders and the scrollbar gutter. */
     const CHROME_PX = 24;
 
-    it('fits MAX_COLS columns at the configured font size', () => {
-        const needed = column_px(TERMINAL_FONT_SIZE) * MAX_COLS + CHROME_PX;
+    it('fits MAX_COLS columns at the configured font size, gutter included', () => {
+        // The gutter is subtracted from usable width before columns are
+        // computed, so it belongs in this sum. Adding TERMINAL_PADDING_X
+        // without raising the minimum would have silently wrapped the widest
+        // `skills` lines at the smallest window size.
+        const needed =
+            column_px(TERMINAL_FONT_SIZE) * MAX_COLS +
+            TERMINAL_PADDING_X * 2 +
+            CHROME_PX;
         expect(TERMINAL_MIN_WIDTH).toBeGreaterThanOrEqual(needed);
     });
 
     it('fits at least 20 rows at the configured font size', () => {
-        // Line height is ~1.2 em.
-        const needed = TERMINAL_FONT_SIZE * 1.2 * 20;
+        // Line height is ~1.2 em, plus the gutter top and bottom.
+        const needed = TERMINAL_FONT_SIZE * 1.2 * 20 + TERMINAL_PADDING_Y * 2;
         expect(TERMINAL_MIN_HEIGHT).toBeGreaterThanOrEqual(needed);
     });
 });
