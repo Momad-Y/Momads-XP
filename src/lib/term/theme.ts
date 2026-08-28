@@ -68,7 +68,7 @@ export const XP_CONSOLE_THEME = {
  * the host's computed size — so the gutter directly reduces usable columns and
  * `TERMINAL_MIN_WIDTH` has to account for it (theme.test.ts derives that).
  */
-export const TERMINAL_PADDING_X = 8;
+export const TERMINAL_PADDING_X = 4;
 export const TERMINAL_PADDING_Y = 4;
 
 /**

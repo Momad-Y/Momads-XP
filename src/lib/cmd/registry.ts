@@ -43,6 +43,11 @@ export const DEFERRED_COMMANDS = ['ls', 'cd', 'pwd', 'cat'] as const;
 const DEFERRED_MESSAGE =
     'not available yet — filesystem navigation lands in a later update';
 
+/** Join blocks with exactly one blank line BETWEEN them, none trailing. */
+function join_blocks(blocks: string[][]): string[] {
+    return blocks.flatMap((block, i) => (i === 0 ? block : [BLANK, ...block]));
+}
+
 function bio_lines(profile: Profile): string[] {
     return profile.about.bio.flatMap((para, i) => [
         ...wrap(para),
@@ -80,35 +85,38 @@ export const COMMANDS: readonly Command[] = [
         name: 'skills',
         summary: 'list skills by area',
         run: (_args, profile) =>
-            Object.entries(profile.skills).flatMap(([group, items]) => [
-                heading(group),
-                ...indent(wrap_items(items, 68)),
-                BLANK,
-            ]),
+            join_blocks(
+                Object.entries(profile.skills).map(([group, items]) => [
+                    heading(group),
+                    ...indent(wrap_items(items, 68)),
+                ]),
+            ),
     },
     {
         name: 'experience',
         summary: 'print experience summary',
         run: (_args, profile) =>
-            profile.experience.flatMap((job) => [
-                heading(`${job.role} @ ${job.company}`),
-                `  ${dim(`${job.period} · ${job.location}`)}`,
-                ...job.description.flatMap((d) => indent(wrap(d, 68))),
-                BLANK,
-            ]),
+            join_blocks(
+                profile.experience.map((job) => [
+                    heading(`${job.role} @ ${job.company}`),
+                    `  ${dim(`${job.period} · ${job.location}`)}`,
+                    ...job.description.flatMap((d) => indent(wrap(d, 68))),
+                ]),
+            ),
     },
     {
         name: 'projects',
         summary: 'list projects',
         run: (_args, profile) =>
-            profile.projects.flatMap((project) => [
-                heading(project.name),
-                ...indent(wrap(project.description, 68)),
-                ...indent(
-                    wrap_items(project.tech, 68, ' · ').map((l) => dim(l)),
-                ),
-                BLANK,
-            ]),
+            join_blocks(
+                profile.projects.map((project) => [
+                    heading(project.name),
+                    ...indent(wrap(project.description, 68)),
+                    ...indent(
+                        wrap_items(project.tech, 68, ' · ').map((l) => dim(l)),
+                    ),
+                ]),
+            ),
     },
     {
         name: 'contact',
@@ -244,9 +252,37 @@ export function execute(input: string, profile: Profile): string[] {
     const parsed = parse(input);
     if (parsed == null) return [];
     if ((DEFERRED_COMMANDS as readonly string[]).includes(parsed.name)) {
-        return [dim(`${parsed.name}: ${DEFERRED_MESSAGE}`)];
+        // Through the same normaliser: this branch returned early and so was
+        // the one printing command still spaced differently from the rest.
+        return with_trailing_blank([
+            dim(`${parsed.name}: ${DEFERRED_MESSAGE}`),
+        ]);
     }
     const command = find_command(parsed.name);
-    if (command == null) return [`${parsed.name}: command not found`];
-    return command.run(parsed.args, profile);
+    const lines =
+        command == null
+            ? [`${parsed.name}: command not found`]
+            : command.run(parsed.args, profile);
+    return with_trailing_blank(lines);
+}
+
+/**
+ * Exactly ONE blank line after any output, and none after silence.
+ *
+ * Normalised here rather than per command, which is why the commands no longer
+ * append their own: `skills`, `experience` and `projects` blanked after every
+ * group and so ended with one, while `about`, `contact`, `social` and `help`
+ * ended flush against the next prompt. Seven call sites each deciding
+ * separately is how that drifted — the same shape as every other "rule applied
+ * at one call site" defect in this repo, just cosmetic.
+ *
+ * Commands that print nothing (`clear`, `matrix`, `hack`) stay silent: a blank
+ * line before a freshly cleared screen's prompt would be a visible artefact.
+ */
+export function with_trailing_blank(lines: string[]): string[] {
+    const trimmed = [...lines];
+    while (trimmed.length > 0 && trimmed[trimmed.length - 1] === BLANK) {
+        trimmed.pop();
+    }
+    return trimmed.length === 0 ? [] : [...trimmed, BLANK];
 }

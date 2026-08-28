@@ -122,7 +122,7 @@
     const HACK_STEPS = [
         'Bypassing mainframe firewall',
         'Injecting recursive polymorphic payload',
-        'Rerouting through 7 proxies (Reykjavik, Minsk, ...)',
+        'Rerouting through 7 proxies',
         'Decrypting RSA-8192 with a paperclip',
         'Downloading the entire internet',
     ];
