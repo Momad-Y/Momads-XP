@@ -370,6 +370,90 @@ test('the desktop right-click menu opens a terminal', async ({ page }) => {
         .toContain('from-the-desktop');
 });
 
+test('a context-menu icon is centred and clear of its label', async ({
+    page,
+}) => {
+    // Command Prompt is the first top-level context-menu entry to carry an
+    // icon, which is how this went unnoticed: the top-level slot never got the
+    // `flex items-center justify-center` the submenu and the Start Menu flyout
+    // already had, so the icon sat flush LEFT (0px one side, 3px the other) and
+    // the label began 3px after it, reading as jammed together.
+    await bootToDesktop(page);
+    await page
+        .locator('#work-space')
+        .click({ button: 'right', position: { x: 400, y: 300 } });
+    const ctx = page.locator('.context-menu');
+    await expect(ctx).toBeVisible();
+
+    const row = await ctx.evaluate((root) => {
+        for (const r of Array.from(root.querySelectorAll('div.py-1'))) {
+            const label = r.querySelector('p');
+            const img = r.querySelector('img');
+            const slot = img?.parentElement;
+            if (!label || !img || slot == null) continue;
+            if (label.textContent !== 'Command Prompt') continue;
+            const s = slot.getBoundingClientRect();
+            const i = img.getBoundingClientRect();
+            const t = label.getBoundingClientRect();
+            return {
+                left_pad: i.left - s.left,
+                right_pad: s.right - i.right,
+                icon_to_label: t.left - i.right,
+            };
+        }
+        return null;
+    });
+
+    expect(row, 'no icon row found in the desktop menu').not.toBeNull();
+    // Centred: the padding either side of the icon matches.
+    expect(Math.abs((row?.left_pad ?? 0) - (row?.right_pad ?? 0))).toBeLessThan(
+        1,
+    );
+    // And clear of the label rather than touching it.
+    expect(row?.icon_to_label ?? 0).toBeGreaterThanOrEqual(4);
+});
+
+test('widening the icon gutter did not wrap any menu label', async ({
+    page,
+}) => {
+    // The gutter costs every label 4px of width. The tightest one in any menu
+    // is the New submenu's "Compressed (zipped) Folder", which had 12px of
+    // headroom in a 142px column and now has 8px. Measured with a Range around
+    // the TEXT NODE: `<p>` is block-level and always reports its column's
+    // width, so its own box says nothing about the glyphs.
+    await bootToDesktop(page);
+    await page
+        .locator('#work-space')
+        .click({ button: 'right', position: { x: 400, y: 300 } });
+    const ctx = page.locator('.context-menu');
+    await expect(ctx).toBeVisible();
+    await ctx.getByText('New', { exact: true }).hover();
+    await expect(ctx.getByText('Compressed (zipped) Folder')).toBeVisible();
+
+    const worst = await ctx.evaluate((root) => {
+        let tightest = { label: '', headroom: Number.POSITIVE_INFINITY };
+        let wrapped: string | null = null;
+        for (const label of Array.from(root.querySelectorAll('p'))) {
+            const column = label.parentElement;
+            if (column == null) continue;
+            const range = document.createRange();
+            range.selectNodeContents(label);
+            const glyphs = range.getBoundingClientRect().width;
+            const headroom = column.getBoundingClientRect().width - glyphs;
+            if (headroom < tightest.headroom) {
+                tightest = { label: label.textContent ?? '', headroom };
+            }
+            if (label.getBoundingClientRect().height > 24) {
+                wrapped = label.textContent;
+            }
+        }
+        return { ...tightest, wrapped };
+    });
+
+    expect(worst.wrapped, `"${worst.wrapped ?? ''}" wrapped`).toBeNull();
+    expect(worst.headroom, `tightest label: ${worst.label}`).toBeGreaterThan(0);
+});
+
 test('sudo refuses, using the name from profile.json', async ({ page }) => {
     await bootToDesktop(page);
     await openCmd(page);
