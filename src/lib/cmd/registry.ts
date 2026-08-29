@@ -55,8 +55,7 @@ function join_blocks(blocks: string[][]): string[] {
  */
 const WHOAMI_ASIDE =
     '...is whose computer this is. You, on the other hand, are a guest who ' +
-    'arrived through a browser tab — the closest thing this OS has to a front ' +
-    'door. No password was required. There is no password.';
+    'arrived through a browser tab.';
 
 function bio_lines(profile: Profile): string[] {
     return profile.about.bio.flatMap((para, i) => [
@@ -164,7 +163,6 @@ export const COMMANDS: readonly Command[] = [
         // rather than as part of the reply.
         run: (_args, profile) => [
             profile.meta.shortName.toLowerCase(),
-            BLANK,
             ...wrap(WHOAMI_ASIDE).map(dim),
         ],
     },
