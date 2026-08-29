@@ -17,10 +17,22 @@
         colour,
         CR,
         CRLF,
+        CURSOR_HOME,
         DIM,
+        ETX,
         FG_BRIGHT_GREEN,
         FG_GREY,
+        HIDE_CURSOR,
+        SHOW_CURSOR,
     } from '../../../lib/term/ansi';
+    import {
+        advance,
+        init_columns,
+        MATRIX_FRAME_MS,
+        MATRIX_INTRO,
+        MATRIX_INTRO_PAUSE_MS,
+        render_frame,
+    } from '../../../lib/cmd/matrix';
     import {
         BEAT_GAP_MS,
         DOT_INTERVAL_MS,
@@ -96,9 +108,34 @@
     let animation_generation = 0;
     let animation_running = false;
 
+    /**
+     * Returns the terminal to a usable state and reissues the prompt.
+     *
+     * Per animation, because they do not leave the same mess: `hack` scrolls
+     * normally and only needs a newline, while `matrix` has hidden the cursor
+     * and painted over the whole grid. Cancellation used to write CRLF +
+     * prompt unconditionally from `on_data`, which would strand the matrix
+     * with no cursor.
+     */
+    let animation_teardown: () => void = () => {};
+
+    /**
+     * True while ONLY Ctrl+C ends the running animation.
+     *
+     * `hack` is finite, so any key skipping it is a courtesy. `matrix` runs
+     * until interrupted, and for a full-screen effect a stray keystroke ending
+     * it is the wrong default — so it swallows everything else, and its intro
+     * says so before it starts.
+     */
+    let animation_needs_ctrl_c = false;
+
     function cancel_animation() {
         animation_generation++;
         animation_running = false;
+        const teardown = animation_teardown;
+        animation_teardown = () => {};
+        animation_needs_ctrl_c = false;
+        teardown();
     }
 
     function write(text: string) {
@@ -122,25 +159,6 @@
         if (back > 0) write(`\x1b[${String(back)}D`);
     }
 
-    const MATRIX_GLYPHS =
-        'ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ0123456789';
-
-    function random_matrix_row(width: number): string {
-        let row = '';
-        for (let i = 0; i < width; i++) {
-            row +=
-                Math.random() < 0.12
-                    ? (MATRIX_GLYPHS[
-                          Math.floor(Math.random() * MATRIX_GLYPHS.length)
-                      ] ?? ' ')
-                    : ' ';
-        }
-        return colour(row, FG_BRIGHT_GREEN);
-    }
-
-    const MATRIX_FRAME_COUNT = 60;
-    const MATRIX_FRAME_MS = 45;
-
     function sleep(ms: number): Promise<void> {
         return new Promise((resolve) => setTimeout(resolve, ms));
     }
@@ -157,28 +175,74 @@
     function finish_animation(generation: number) {
         if (generation !== animation_generation) return;
         animation_running = false;
+        animation_teardown = () => {};
         if (term?.is_disposed() === true) return;
         write(CRLF);
         prompt();
     }
 
     /**
-     * The `disposed` check inside the loops is not belt-and-braces: closing the
+     * Full-screen rain, until Ctrl+C.
+     *
+     * The `disposed` check inside the loop is not belt-and-braces: closing the
      * window mid-animation leaves the loop scheduled, and a write into a
-     * disposed xterm throws asynchronously into no handler.
+     * disposed xterm throws asynchronously into no handler. It is the ONLY
+     * thing besides Ctrl+C that ends this one, so it carries more weight here
+     * than it did when the egg stopped by itself after 60 frames.
      */
     async function run_matrix() {
         const generation = ++animation_generation;
         animation_running = true;
+        animation_needs_ctrl_c = true;
+        animation_teardown = () => {
+            // Cursor back BEFORE the clear, so a teardown that races disposal
+            // cannot leave the terminal permanently cursorless.
+            write(SHOW_CURSOR + CLEAR_SCREEN);
+            write('^C' + CRLF);
+            prompt();
+        };
         const superseded = () => generation !== animation_generation;
 
-        for (let i = 0; i < MATRIX_FRAME_COUNT; i++) {
-            if (superseded() || term?.is_disposed() === true) break;
-            write(random_matrix_row(70) + CRLF);
+        // Say how to leave BEFORE trapping the keyboard, and give it a beat to
+        // be read. Starting the rain instantly would bury the one line that
+        // explains the only way out.
+        for (const line of MATRIX_INTRO) {
+            write(
+                colour(
+                    line.text,
+                    line.aside ? DIM + FG_BRIGHT_GREEN : FG_BRIGHT_GREEN,
+                ) + CRLF,
+            );
+        }
+        await sleep(MATRIX_INTRO_PAUSE_MS);
+        if (superseded() || term?.is_disposed() === true) return;
+
+        write(CLEAR_SCREEN + HIDE_CURSOR);
+
+        let grid = required(term, 'terminal').size();
+        let columns = init_columns(grid.cols, grid.rows);
+
+        while (!superseded() && term?.is_disposed() !== true) {
+            // Re-read every frame: the window is resizable, and a grid frozen
+            // at the size the egg started at would leave a dead margin down one
+            // side after a drag.
+            const size = required(term, 'terminal').size();
+            if (size.cols !== grid.cols || size.rows !== grid.rows) {
+                grid = size;
+                columns = init_columns(grid.cols, grid.rows);
+            }
+
+            // Home rather than clear: clearing first flashes the background
+            // between frames, and every cell is overwritten anyway.
+            write(CURSOR_HOME + render_frame(columns, grid.rows).join(CRLF));
+            columns = advance(columns, grid.rows);
             await sleep(MATRIX_FRAME_MS);
         }
 
-        finish_animation(generation);
+        // No `finish_animation` here. This egg only ever ends by cancellation,
+        // which has already run the teardown, or by disposal, where there is
+        // nothing left to write to.
+        if (!superseded()) animation_running = false;
     }
 
     /**
@@ -192,6 +256,10 @@
     async function run_hack() {
         const generation = ++animation_generation;
         animation_running = true;
+        animation_teardown = () => {
+            write(CRLF);
+            prompt();
+        };
         const superseded = () => generation !== animation_generation;
         const accent = (text: string) => {
             write(colour(text, FG_BRIGHT_GREEN));
@@ -291,9 +359,11 @@
         // terminal toy behaves this way, and a visitor who cannot type is
         // trapped.
         if (animation_running) {
+            // `matrix` runs until interrupted and ignores everything else; its
+            // intro is what makes that discoverable. `hack` is finite, so any
+            // key skips it.
+            if (animation_needs_ctrl_c && data !== ETX) return;
             cancel_animation();
-            write(CRLF);
-            prompt();
             return;
         }
 
