@@ -136,7 +136,18 @@
                         }
                     }}
                 >
-                    <div class="w-[20px] ml-1 shrink-0">
+                    <!--
+                        `flex items-center justify-center` centres the 17px icon in
+                        its 20px slot; without it the icon sat flush LEFT (0px one
+                        side, 3px the other). `mr-1` is the gap to the label, which
+                        was 3px — the label began exactly where the slot ended. The
+                        submenu below and the Start Menu flyout both already did
+                        this; only the top level was missed, and it went unnoticed
+                        until a top-level entry first carried an icon.
+                    -->
+                    <div
+                        class="w-[20px] ml-1 mr-1 shrink-0 flex items-center justify-center"
+                    >
                         {#if item.icon}
                             <img
                                 src={item.icon}
@@ -205,7 +216,7 @@
                                         }}
                                     >
                                         <div
-                                            class="w-[20px] ml-1 shrink-0 flex items-center justify-center"
+                                            class="w-[20px] ml-1 mr-1 shrink-0 flex items-center justify-center"
                                         >
                                             {#if sub_item.icon}
                                                 <img
