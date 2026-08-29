@@ -11,7 +11,7 @@ export const make = ({
 }): ContextMenuSpec => {
     return {
         required_width: 180 + 20,
-        required_height: 27 * 6 + 20,
+        required_height: 27 * 7 + 20,
         menu: [
             [
                 // {
@@ -137,6 +137,29 @@ export const make = ({
                             icon: '/images/xp/icons/Zipfolder.png',
                         },
                     ],
+                },
+            ],
+            [
+                {
+                    // Labelled exactly as the Start Menu labels it, so the two
+                    // launch surfaces agree. NOT "Open Command Prompt Here":
+                    // the terminal has no working directory — `ls`, `cd`, `pwd`
+                    // and `cat` are deferred to Phase 6 and answer "not
+                    // available yet" — so "here" would promise something that
+                    // does not exist.
+                    name: 'Command Prompt',
+                    icon: '/images/xp/icons/CommandPrompt.png',
+                    action: () => {
+                        queueProgram.set({
+                            name: 'Command Prompt',
+                            icon: '/images/xp/icons/CommandPrompt.png',
+                            // Resolved through `find_app` in work_space's
+                            // launch; CMDesktop.test.ts asserts it still
+                            // matches a registered app, because a typo here is
+                            // otherwise only visible at runtime.
+                            path: './programs/cmd.svelte',
+                        });
+                    },
                 },
             ],
             [
