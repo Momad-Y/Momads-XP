@@ -10,6 +10,12 @@
 import { colour, FG_GREY, FG_YELLOW } from '../term/ansi';
 import { XP_CONSOLE_THEME } from '../term/theme';
 
+/**
+ * The one non-hex argument `color` accepts. Exported so the completer offers
+ * exactly what `run_color` accepts, rather than a second copy that can drift.
+ */
+export const COLOR_RESET = 'reset';
+
 /** The default accent, restored by `color reset`. */
 export const DEFAULT_ACCENT = XP_CONSOLE_THEME.brightGreen;
 
@@ -129,7 +135,7 @@ export function run_color(args: string[], current: string): ColorResult {
         };
     }
 
-    if (arg.toLowerCase() === 'reset') {
+    if (arg.toLowerCase() === COLOR_RESET) {
         return {
             accent: DEFAULT_ACCENT,
             lines: [`Accent colour reset to ${DEFAULT_ACCENT}.`],

@@ -454,6 +454,86 @@ test('widening the icon gutter did not wrap any menu label', async ({
     expect(worst.headroom, `tightest label: ${worst.label}`).toBeGreaterThan(0);
 });
 
+/** The line the cursor is on — i.e. what completion just left there. */
+async function promptLine(page: Page): Promise<string> {
+    const lines = (await screen(page))
+        .split('\n')
+        .map((l) => l.trimEnd())
+        .filter((l) => l.trim().length > 0);
+    return lines[lines.length - 1] ?? '';
+}
+
+test('Tab completes a unique command and leaves it runnable', async ({
+    page,
+}) => {
+    await bootToDesktop(page);
+    await openCmd(page);
+
+    await page.locator('.xterm-helper-textarea').last().fill('');
+    await page.keyboard.type('hel');
+    await page.keyboard.press('Tab');
+
+    // Asserted on the CURRENT INPUT LINE, never over the whole screen: the
+    // banner and earlier commands are still in the scrollback, so a `toContain`
+    // matches them regardless of what Tab did.
+    await expect
+        .poll(async () => promptLine(page), { timeout: 10_000 })
+        .toBe('momad@xp:~$ help');
+
+    // The trailing space is part of the contract, and the completed line has to
+    // actually run — a completer that finishes a name the shell then rejects is
+    // worse than no completer.
+    await page.keyboard.press('Enter');
+    await expect
+        .poll(async () => screen(page), { timeout: 10_000 })
+        .toContain('available commands');
+});
+
+test('Tab lists the candidates when several commands match', async ({
+    page,
+}) => {
+    await bootToDesktop(page);
+    await openCmd(page);
+
+    await page.locator('.xterm-helper-textarea').last().fill('');
+    await page.keyboard.type('co');
+    await page.keyboard.press('Tab');
+
+    // `color` and `contact` share `co`, so there is no progress to make and the
+    // shell shows the options instead of silently doing nothing.
+    await expect
+        .poll(async () => screen(page), { timeout: 10_000 })
+        .toContain('contact');
+    expect(await screen(page)).toContain('color');
+    // The half-typed line is reprinted underneath, ready to keep typing.
+    expect(await promptLine(page)).toBe('momad@xp:~$ co');
+});
+
+test('Tab on a prefix no command has leaves the line untouched', async ({
+    page,
+}) => {
+    await bootToDesktop(page);
+    await openCmd(page);
+
+    await page.locator('.xterm-helper-textarea').last().fill('');
+    await page.keyboard.type('zzz');
+    await page.keyboard.press('Tab');
+    await page.waitForTimeout(400);
+    expect(await promptLine(page)).toBe('momad@xp:~$ zzz');
+});
+
+test('Tab completes an argument, not just a command', async ({ page }) => {
+    await bootToDesktop(page);
+    await openCmd(page);
+
+    await page.locator('.xterm-helper-textarea').last().fill('');
+    await page.keyboard.type('color re');
+    await page.keyboard.press('Tab');
+    await expect
+        .poll(async () => promptLine(page), { timeout: 10_000 })
+        .toBe('momad@xp:~$ color reset');
+});
+
 test('sudo refuses, using the name from profile.json', async ({ page }) => {
     await bootToDesktop(page);
     await openCmd(page);
