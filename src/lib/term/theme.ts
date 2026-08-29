@@ -68,12 +68,7 @@ export const XP_CONSOLE_THEME = {
  * the host's computed size — so the gutter directly reduces usable columns and
  * `TERMINAL_MIN_WIDTH` has to account for it (theme.test.ts derives that).
  */
-// 8, not 4. The gutter first shipped at 4px while its own commit message and
-// PR both described 8 — measured on production at a 4px inset, which still
-// reads tight against the frame. The horizontal value carries the visible
-// weight (the left column and the scrollbar edge), so it gets the larger
-// inset; 4px vertical is enough to lift the first row off the title bar.
-export const TERMINAL_PADDING_X = 8;
+export const TERMINAL_PADDING_X = 4;
 export const TERMINAL_PADDING_Y = 4;
 
 /**
