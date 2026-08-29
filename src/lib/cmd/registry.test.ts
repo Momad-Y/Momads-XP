@@ -217,6 +217,20 @@ describe('the command set matches SPECIFICATION.md §3.2', () => {
     });
 });
 
+describe('color', () => {
+    it('is listed so help advertises it', () => {
+        // Same shape as `exit`: the repaint acts on the TERMINAL, not on
+        // output, so the component owns it and the command layer stays pure.
+        // It still has to appear in `help` per §1b's no-dead-entries standard.
+        expect(find_command('color')).toBeDefined();
+        expect(plain('help')).toContain('color');
+    });
+
+    it('produces no output of its own', () => {
+        expect(execute('color', profile)).toEqual([]);
+    });
+});
+
 describe('exit', () => {
     it('is listed so help advertises it', () => {
         // The window close is handled by the component — the command layer is
