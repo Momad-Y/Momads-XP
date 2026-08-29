@@ -62,10 +62,27 @@ describe('lookup', () => {
 });
 
 describe('content commands read from profile.json', () => {
-    it('whoami derives from meta.shortName and is not a literal', () => {
+    it('whoami ANSWERS on line one before it jokes', () => {
         // §3.2: "All command output data sourced from JSON", and CLAUDE.md
-        // forbids hardcoded personal content anywhere.
-        expect(plain('whoami')).toBe(profile.meta.shortName.toLowerCase());
+        // forbids hardcoded personal content anywhere. The joke sits UNDER the
+        // answer rather than replacing it — `whoami` that does not print the
+        // user is a broken command wearing a punchline.
+        const lines = execute('whoami', profile).map(strip_ansi);
+        expect(lines[0]).toBe(profile.meta.shortName.toLowerCase());
+    });
+
+    it("whoami's aside is the shell's voice, not Momad's", () => {
+        // The name is the only thing allowed to come from profile.json; the
+        // remark underneath must not smuggle personal content back in as a
+        // literal.
+        const aside = execute('whoami', profile)
+            .slice(1)
+            .map(strip_ansi)
+            .join(' ');
+        expect(aside.trim().length).toBeGreaterThan(0);
+        expect(aside).not.toContain(profile.meta.name);
+        expect(aside).not.toContain(profile.meta.email);
+        expect(aside).not.toContain(profile.meta.location);
     });
 
     it('about prints the real name, title and every bio paragraph', () => {

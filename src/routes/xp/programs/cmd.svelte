@@ -17,9 +17,18 @@
         colour,
         CR,
         CRLF,
+        DIM,
         FG_BRIGHT_GREEN,
         FG_GREY,
     } from '../../../lib/term/ansi';
+    import {
+        BEAT_GAP_MS,
+        DOT_INTERVAL_MS,
+        HACK_SCRIPT,
+        PROGRESS_FRAME_MS,
+        PROGRESS_WIDTH,
+        progress_bar,
+    } from '../../../lib/cmd/hack';
     import {
         TERMINAL_MIN_HEIGHT,
         TERMINAL_MIN_WIDTH,
@@ -129,54 +138,109 @@
         return colour(row, FG_BRIGHT_GREEN);
     }
 
-    const HACK_STEPS = [
-        'Bypassing mainframe firewall',
-        'Injecting recursive polymorphic payload',
-        'Rerouting through 7 proxies',
-        'Decrypting RSA-8192 with a paperclip',
-        'Downloading the entire internet',
-    ];
+    const MATRIX_FRAME_COUNT = 60;
+    const MATRIX_FRAME_MS = 45;
+
+    function sleep(ms: number): Promise<void> {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+    }
 
     /**
-     * Run an easter egg until it finishes or ANY key cancels it.
+     * Hand the prompt back — but ONLY for the run that is still current.
      *
-     * The `disposed` check is not belt-and-braces: closing the window mid
-     * animation leaves this loop scheduled, and a write into a disposed xterm
-     * throws asynchronously into no handler.
+     * A cancelled run must not write here: `on_data` already emitted the CRLF
+     * and reissued the prompt the moment the key landed, so doing it again
+     * leaves a duplicate prompt on screen. The generation check covers the
+     * second case too, where a new egg has already started and the outgoing
+     * loop would otherwise print a prompt into the middle of it.
      */
-    async function run_animation(kind: 'matrix' | 'hack') {
-        const generation = ++animation_generation;
-        animation_running = true;
-        const frames = kind === 'matrix' ? 60 : HACK_STEPS.length;
-        const superseded = () => generation !== animation_generation;
-
-        for (let i = 0; i < frames; i++) {
-            if (superseded() || term?.is_disposed() === true) break;
-            if (kind === 'matrix') {
-                write(random_matrix_row(70) + CRLF);
-                await new Promise((r) => setTimeout(r, 45));
-            } else {
-                write(colour(`[*] ${HACK_STEPS[i] ?? ''}`, FG_BRIGHT_GREEN));
-                for (let d = 0; d < 3; d++) {
-                    if (superseded()) break;
-                    await new Promise((r) => setTimeout(r, 180));
-                    write('.');
-                }
-                write(CRLF);
-            }
-        }
-
-        const was_cancelled = superseded();
-        if (!was_cancelled) animation_running = false;
+    function finish_animation(generation: number) {
+        if (generation !== animation_generation) return;
+        animation_running = false;
         if (term?.is_disposed() === true) return;
-        if (kind === 'hack' && !was_cancelled) {
-            write(
-                colour('ACCESS GRANTED — just kidding.', FG_BRIGHT_GREEN) +
-                    CRLF,
-            );
-        }
         write(CRLF);
         prompt();
+    }
+
+    /**
+     * The `disposed` check inside the loops is not belt-and-braces: closing the
+     * window mid-animation leaves the loop scheduled, and a write into a
+     * disposed xterm throws asynchronously into no handler.
+     */
+    async function run_matrix() {
+        const generation = ++animation_generation;
+        animation_running = true;
+        const superseded = () => generation !== animation_generation;
+
+        for (let i = 0; i < MATRIX_FRAME_COUNT; i++) {
+            if (superseded() || term?.is_disposed() === true) break;
+            write(random_matrix_row(70) + CRLF);
+            await sleep(MATRIX_FRAME_MS);
+        }
+
+        finish_animation(generation);
+    }
+
+    /**
+     * Walk `HACK_SCRIPT`. The component owns the CLOCK and nothing else — what
+     * is said lives in `src/lib/cmd/hack.ts`, where it is unit-tested.
+     *
+     * EVERY write goes through the accent, the trailing dots included. They
+     * used to be written bare, so the step text followed `color` while the dots
+     * after it stayed in the default foreground.
+     */
+    async function run_hack() {
+        const generation = ++animation_generation;
+        animation_running = true;
+        const superseded = () => generation !== animation_generation;
+        const accent = (text: string) => {
+            write(colour(text, FG_BRIGHT_GREEN));
+        };
+        // DIM over the SAME palette slot, not grey: an aside needs to read
+        // quieter than the steps without dropping off the accent that `color`
+        // repaints.
+        const aside = (text: string) => {
+            write(colour(text, DIM + FG_BRIGHT_GREEN));
+        };
+
+        for (const beat of HACK_SCRIPT) {
+            if (superseded() || term?.is_disposed() === true) break;
+
+            if (beat.kind === 'step') {
+                accent(`[*] ${beat.text}`);
+                for (let d = 0; d < beat.dots; d++) {
+                    await sleep(DOT_INTERVAL_MS);
+                    if (superseded()) break;
+                    accent('.');
+                }
+                if (superseded()) break;
+                accent(` ${beat.tag}`);
+                write(CRLF);
+            } else if (beat.kind === 'progress') {
+                accent(`[*] ${beat.label}`);
+                write(CRLF);
+                for (let f = 0; f <= PROGRESS_WIDTH; f++) {
+                    if (superseded()) break;
+                    // CR, not a fresh line: the bar redraws in place. Its width
+                    // is constant by construction, so nothing is left behind.
+                    write(CR);
+                    accent(progress_bar(f));
+                    await sleep(PROGRESS_FRAME_MS);
+                }
+                if (superseded()) break;
+                write(CRLF);
+            } else if (beat.kind === 'line') {
+                accent(beat.text);
+                write(CRLF);
+            } else {
+                aside(beat.text);
+                write(CRLF);
+            }
+
+            await sleep(BEAT_GAP_MS);
+        }
+
+        finish_animation(generation);
     }
 
     function submit(line: string) {
@@ -209,8 +273,12 @@
             prompt();
             return;
         }
-        if (name === 'matrix' || name === 'hack') {
-            void run_animation(name);
+        if (name === 'matrix') {
+            void run_matrix();
+            return;
+        }
+        if (name === 'hack') {
+            void run_hack();
             return;
         }
 
