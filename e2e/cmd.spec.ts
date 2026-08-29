@@ -10,32 +10,50 @@ import { bootToDesktop } from './helpers';
  */
 
 async function openCmd(page: Page) {
+    // Counted BEFORE the click, so the wait below is for one MORE terminal
+    // rather than for "a terminal" — CMD is deliberately multi-instance, and a
+    // page-wide `.xterm` assertion resolves on the first poll against the
+    // terminal that was already there.
+    const already_open = await page.locator('.xterm').count();
+
     await page.locator('#start-menu-btn').click();
     await page.locator('#start-menu').getByText('All Programs').hover();
     const flyout = page.locator('#all-programs-flyout');
     await expect(flyout).toBeVisible();
     await flyout.getByText('Command Prompt', { exact: true }).click();
-    // xterm renders into a canvas/rows structure; .xterm-rows is the text
-    // layer. Waiting for `.xterm` to be VISIBLE is not enough: the banner is
-    // written from `on_ready`, which the component defers a frame past the
-    // window's open transition, so a read immediately after this resolved
-    // against an empty terminal on a 2-core CI runner. Wait for actual
-    // CONTENT, which is the thing every caller goes on to assert about.
-    await expect(page.locator('.xterm')).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator('.xterm')).toHaveCount(already_open + 1, {
+        timeout: 20_000,
+    });
+
+    // Then wait for actual CONTENT. The banner is written from `on_ready`,
+    // which the component defers a frame past the window's open transition, so
+    // a read immediately after mount resolved against an empty terminal on a
+    // 2-core CI runner.
     await expect
-        .poll(async () => page.locator('.xterm-rows').innerText(), {
-            timeout: 20_000,
-        })
+        .poll(async () => screen(page), { timeout: 20_000 })
         .toContain('momad@xp:~$');
 }
 
-/** Everything currently on screen, as plain text. */
+/**
+ * Everything on the NEWEST terminal's screen, as plain text.
+ *
+ * `.last()` is not defensive tidying. A bare `page.locator('.xterm-rows')`
+ * resolves to two elements the moment a second terminal mounts, and every read
+ * through it then throws a strict-mode violation — which is how `openCmd`
+ * failed on CI. It passed almost everywhere because the poll normally won the
+ * race against the second terminal's dynamic xterm import and so saw exactly
+ * one element; a loaded 2-core runner loses that race.
+ *
+ * Newest is last: windows are appended to `#work-space` in creation order.
+ */
 async function screen(page: Page): Promise<string> {
-    return page.locator('.xterm-rows').innerText();
+    return page.locator('.xterm-rows').last().innerText();
 }
 
 async function run(page: Page, line: string) {
-    await page.locator('.xterm-helper-textarea').fill('');
+    // Same reason as `screen`: typing must go to the newest terminal, and a
+    // page-wide textarea locator throws once a second one exists.
+    await page.locator('.xterm-helper-textarea').last().fill('');
     await page.keyboard.type(line);
     await page.keyboard.press('Enter');
 }
@@ -224,6 +242,15 @@ test('two terminals can be open at once', async ({ page }) => {
     // first terminal exists, so the second was never waited for or observed.
     await expect(page.locator('.xterm')).toHaveCount(2, { timeout: 20_000 });
 
+    // Reading a terminal must keep working while two are open. This is the
+    // deterministic form of a failure that used to surface as a flake: a
+    // page-wide `.xterm-rows` locator throws a strict-mode violation here every
+    // single time, and `openCmd` only escaped it by usually reading before the
+    // second terminal had mounted.
+    await expect
+        .poll(async () => screen(page), { timeout: 20_000 })
+        .toContain('momad@xp:~$');
+
     // And they must CASCADE rather than land pixel-identical. Registry apps
     // were mounted without `options.id`, so calc_nudges found no sibling and
     // both windows opened at the same coordinates.
@@ -250,7 +277,7 @@ test('exit and Ctrl+D each close the terminal', async ({ page }) => {
 
     // Ctrl+D on an EMPTY line does the same, as in any shell.
     await openCmd(page);
-    await page.locator('.xterm-helper-textarea').click();
+    await page.locator('.xterm-helper-textarea').last().click();
     await page.keyboard.press('Control+d');
     await expect(page.locator('#work-space .window')).toHaveCount(0);
 });
@@ -261,7 +288,7 @@ test('Ctrl+D mid-line does NOT close the terminal', async ({ page }) => {
     // worst possible reading of the key.
     await bootToDesktop(page);
     await openCmd(page);
-    await page.locator('.xterm-helper-textarea').click();
+    await page.locator('.xterm-helper-textarea').last().click();
     await page.keyboard.type('some text');
     await page.keyboard.press('Control+d');
     await page.waitForTimeout(300);
