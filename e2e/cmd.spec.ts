@@ -155,6 +155,53 @@ test('an easter egg can be escaped, twice in a row', async ({ page }) => {
     }
 });
 
+test('hack runs its script, and the whole line follows the accent', async ({
+    page,
+}) => {
+    await bootToDesktop(page);
+    await openCmd(page);
+
+    await run(page, 'color #ff8800');
+    await expect
+        .poll(async () => screen(page))
+        .toContain('Accent colour set to #ff8800');
+
+    await run(page, 'hack');
+    // Polled on the TAG, not on the step text: the tag is written after the
+    // last dot, so waiting for the text alone read the line mid-animation and
+    // saw a single dot.
+    await expect
+        .poll(async () => screen(page), { timeout: 20_000 })
+        .toContain('FOUND');
+
+    // xterm merges runs of cells that share their attributes into ONE span, so
+    // a step whose dots carry the accent arrives as a single span containing
+    // both the text and the dots. That is the whole assertion: the dots used to
+    // be written bare, which put them in a span of their own at the default
+    // foreground while the text beside them followed `color`.
+    const step = await page.locator('.xterm-rows').evaluate((root) => {
+        for (const el of Array.from(root.querySelectorAll('span'))) {
+            const text = el.textContent ?? '';
+            if (text.includes('Locating mainframe')) {
+                return { text, color: getComputedStyle(el).color };
+            }
+        }
+        return null;
+    });
+
+    expect(step, 'no span carried the step text').not.toBeNull();
+    expect(step?.text).toContain('...... FOUND');
+    expect(step?.color).toBe('rgb(255, 136, 0)');
+
+    // Escapable like every other egg — this one runs for about ten seconds,
+    // so a visitor who cannot interrupt it is stuck watching.
+    await page.keyboard.press('x');
+    await run(page, 'echo hack-escaped');
+    await expect
+        .poll(async () => screen(page), { timeout: 10_000 })
+        .toContain('hack-escaped');
+});
+
 test('sudo refuses, using the name from profile.json', async ({ page }) => {
     await bootToDesktop(page);
     await openCmd(page);

@@ -48,6 +48,16 @@ function join_blocks(blocks: string[][]): string[] {
     return blocks.flatMap((block, i) => (i === 0 ? block : [BLANK, ...block]));
 }
 
+/**
+ * `whoami`'s remark. Kept beside the command set rather than inline so the
+ * prose is wrapped by the same formatter as every other paragraph in the
+ * terminal and cannot drift past 72 columns.
+ */
+const WHOAMI_ASIDE =
+    '...is whose computer this is. You, on the other hand, are a guest who ' +
+    'arrived through a browser tab — the closest thing this OS has to a front ' +
+    'door. No password was required. There is no password.';
+
 function bio_lines(profile: Profile): string[] {
     return profile.about.bio.flatMap((para, i) => [
         ...wrap(para),
@@ -144,9 +154,19 @@ export const COMMANDS: readonly Command[] = [
     {
         name: 'whoami',
         summary: 'print the current user',
-        // Derived, never a literal: §3.2 requires all output to come from JSON,
-        // and CLAUDE.md forbids hardcoded personal content.
-        run: (_args, profile) => [profile.meta.shortName.toLowerCase()],
+        // The NAME is derived, never a literal: §3.2 requires all output to come
+        // from JSON, and CLAUDE.md forbids hardcoded personal content. The
+        // aside underneath is the shell's own voice, which is why it can be a
+        // literal — it says nothing about Momad.
+        //
+        // The first line stays exactly the bare username, so `whoami` still
+        // ANSWERS before it jokes; the aside is dimmed to read as a remark
+        // rather than as part of the reply.
+        run: (_args, profile) => [
+            profile.meta.shortName.toLowerCase(),
+            BLANK,
+            ...wrap(WHOAMI_ASIDE).map(dim),
+        ],
     },
     {
         name: 'uname',
