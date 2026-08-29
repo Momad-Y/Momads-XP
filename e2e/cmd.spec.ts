@@ -559,6 +559,60 @@ test('Tab completes an argument, not just a command', async ({ page }) => {
         .toBe('momad@xp:~$ color reset');
 });
 
+test('sudo follows the accent — headline and aside both', async ({ page }) => {
+    await bootToDesktop(page);
+    await openCmd(page);
+
+    await run(page, 'color #ff8800');
+    await expect
+        .poll(async () => screen(page))
+        .toContain('Accent colour set to #ff8800');
+
+    await run(page, 'sudo rm -rf /');
+    await expect
+        .poll(async () => screen(page), { timeout: 10_000 })
+        .toContain('from inside the website');
+
+    const colours = await page
+        .locator('.xterm-rows')
+        .last()
+        .evaluate((root) => {
+            const found: Record<string, string> = {};
+            for (const el of Array.from(root.querySelectorAll('span'))) {
+                const text = el.textContent ?? '';
+                if (text.includes('sudoers file')) {
+                    found.headline = getComputedStyle(el).color;
+                }
+                if (text.includes('from inside the website')) {
+                    found.aside = getComputedStyle(el).color;
+                }
+            }
+            return found;
+        });
+
+    // The headline is the accent outright. `sudo` used to be written in
+    // `warn`-yellow, a fixed ANSI slot `color` never repaints — the loudest
+    // line in the command set was the one colour that could not follow it.
+    expect(colours.headline).toBe('rgb(255, 136, 0)');
+    // The aside is DIM over the SAME slot, which xterm renders as that colour
+    // at reduced alpha — quieter without leaving the accent.
+    expect(colours.aside).toMatch(/^rgba\(255, 136, 0/);
+    expect(colours.aside).not.toBe(colours.headline);
+});
+
+test('sudo makes the sandwich', async ({ page }) => {
+    await bootToDesktop(page);
+    await openCmd(page);
+
+    await run(page, 'sudo make me a sandwich');
+    await expect
+        .poll(async () => screen(page), { timeout: 10_000 })
+        .toContain('Made you a sandwich');
+    // xkcd 149: the whole joke is that sudo makes it WORK, so this is the one
+    // invocation that must not refuse.
+    expect(await screen(page)).not.toContain('sudoers');
+});
+
 test('sudo refuses, using the name from profile.json', async ({ page }) => {
     await bootToDesktop(page);
     await openCmd(page);

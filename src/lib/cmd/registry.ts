@@ -11,13 +11,13 @@
  * specified.
  */
 import type { Profile } from '../profile';
+import { run_sudo } from './sudo';
 import {
     BLANK,
     columns,
     dim,
     heading,
     indent,
-    warn,
     wrap,
     wrap_items,
 } from './format';
@@ -245,11 +245,9 @@ export const COMMANDS: readonly Command[] = [
     {
         name: 'sudo',
         summary: 'attempt to elevate privileges',
-        run: (_args, profile) => [
-            warn(
-                `${profile.meta.shortName.toLowerCase()} is not in the sudoers file. This incident will be reported.`,
-            ),
-        ],
+        // Branches and jokes live in `sudo.ts`; the name stays derived here.
+        run: (args, profile) =>
+            run_sudo(args, profile.meta.shortName.toLowerCase()),
     },
 ];
 
