@@ -338,6 +338,38 @@ test('help advertises python, and it is not a dead entry', async ({ page }) => {
     expect(await screen(page)).not.toContain('python: command not found');
 });
 
+test('the desktop right-click menu opens a terminal', async ({ page }) => {
+    await bootToDesktop(page);
+
+    // An explicit EMPTY spot, not the element centre. Desktop icons live inside
+    // `#work-space`, and a centre click that happens to land on one opens the
+    // FSItem menu instead — which has no Command Prompt entry and would fail
+    // for a reason that has nothing to do with this feature.
+    await page
+        .locator('#work-space')
+        .click({ button: 'right', position: { x: 600, y: 400 } });
+
+    const ctx = page.locator('.context-menu');
+    await expect(ctx).toBeVisible();
+    // Confirm it really is the DESKTOP menu before asserting about its rows.
+    await expect(ctx.getByText('Properties', { exact: true })).toBeVisible();
+    await expect(ctx.getByText('Refresh', { exact: true })).toBeVisible();
+
+    await ctx.getByText('Command Prompt', { exact: true }).click();
+
+    await expect(page.locator('.xterm')).toHaveCount(1, { timeout: 20_000 });
+    await expect
+        .poll(async () => screen(page), { timeout: 20_000 })
+        .toContain("Welcome to Momad's XP Terminal");
+    await expect(page.locator('#work-space .window')).toHaveCount(1);
+
+    // A real terminal, not just a window that looks like one.
+    await run(page, 'echo from-the-desktop');
+    await expect
+        .poll(async () => screen(page), { timeout: 10_000 })
+        .toContain('from-the-desktop');
+});
+
 test('sudo refuses, using the name from profile.json', async ({ page }) => {
     await bootToDesktop(page);
     await openCmd(page);
