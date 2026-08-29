@@ -187,6 +187,13 @@ export const COMMANDS: readonly Command[] = [
         run: () => [new Date().toTimeString().split(' ')[0] ?? ''],
     },
     {
+        name: 'color',
+        summary: 'set the accent colour, e.g. color #ff8800',
+        // Listed for `help`; the repaint is applied by the component, which
+        // owns the terminal. The command layer stays pure.
+        run: () => [],
+    },
+    {
         name: 'exit',
         summary: 'close the terminal (or Ctrl+D)',
         // Listed so `help` advertises it, but the window close is handled by

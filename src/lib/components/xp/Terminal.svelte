@@ -54,6 +54,20 @@
         term.write(text);
     }
 
+    /**
+     * Repaint the accent by rewriting ONE palette slot.
+     *
+     * Every accent in the terminal — prompt, headings, banner, matrix rain —
+     * is written with `\x1b[92m` (bright green), so replacing that slot
+     * recolours the SCROLLBACK as well as future output. That is cmd.exe's own
+     * `color` behaviour, and it is why this is a theme update rather than a
+     * search-and-replace over what was already printed.
+     */
+    export function set_accent(hex: string): void {
+        if (disposed || term == null) return;
+        term.options.theme = { ...XP_CONSOLE_THEME, brightGreen: hex };
+    }
+
     export function focus(): void {
         if (disposed || term == null) return;
         term.focus();
