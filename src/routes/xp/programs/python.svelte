@@ -13,17 +13,24 @@
     } from '../../../lib/python/client';
     import type { PythonClient } from '../../../lib/python/client';
     import type { FromRuntime } from '../../../lib/python/protocol';
+    import {
+        initial_repl_state,
+        on_eof,
+        on_interrupt,
+        on_runtime_message,
+        on_submit,
+        prompt_text,
+        PYTHON_GREETING,
+        PYTHON_LOADING,
+    } from '../../../lib/python/repl';
+    import type {
+        ReplEffect,
+        ReplResult,
+        ReplState,
+    } from '../../../lib/python/repl';
     import { feed, initial_state } from '../../../lib/term/readline';
     import type { ReadlineState } from '../../../lib/term/readline';
-    import {
-        CLEAR_LINE_RIGHT,
-        colour,
-        CR,
-        CRLF,
-        FG_GREY,
-        FG_RED,
-        FG_YELLOW,
-    } from '../../../lib/term/ansi';
+    import { CLEAR_LINE_RIGHT, CR } from '../../../lib/term/ansi';
     import {
         TERMINAL_MIN_HEIGHT,
         TERMINAL_MIN_WIDTH,
@@ -63,202 +70,91 @@
         resizable: true,
     };
 
-    /** §3.2's pre-loaded greeting. */
-    const GREETING = 'print("Welcome to Momad\'s XP")';
-
-    const PS1 = colour('>>>', '\x1b[38;2;53;114;165m') + ' ';
-    const PS2 = colour('...', FG_GREY) + ' ';
-
     let term: TerminalHandle | undefined;
     let frame: HTMLIFrameElement | undefined;
     let client: PythonClient | undefined;
 
-    let state: ReadlineState = initial_state();
-    let ready = false;
-    /** Accumulated lines of a multi-line block, per PyodideConsole. */
-    let block: string[] = [];
-    let awaiting = false;
+    /**
+     * Line editing and REPL semantics are BOTH pure modules now — `readline.ts`
+     * and `repl.ts`. This component is the host: it owns the iframe, the
+     * client, the xterm handle, and the one policy the module deliberately does
+     * not decide, which is what `exit` means. Here it closes the window; a
+     * session hosted inside CMD returns to the shell instead.
+     */
+    let line_state: ReadlineState = initial_state();
+    let repl: ReplState = initial_repl_state();
 
     function write(text: string) {
         term?.write(text);
     }
-    function write_lines(lines: string[]) {
-        for (const line of lines) write(line + CRLF);
+
+    function run_effects(effects: readonly ReplEffect[]) {
+        for (const effect of effects) {
+            switch (effect.kind) {
+                case 'write':
+                    write(effect.text);
+                    break;
+                case 'exec':
+                    client?.exec(effect.source);
+                    break;
+                case 'restart':
+                    client?.restart();
+                    break;
+                case 'focus':
+                    term?.focus();
+                    break;
+                case 'exit':
+                    destroy();
+                    break;
+            }
+        }
     }
-    function prompt() {
-        write(block.length > 0 ? PS2 : PS1);
+
+    function apply(result: ReplResult) {
+        repl = result.state;
+        run_effects(result.effects);
     }
+
     function redraw() {
-        const p = block.length > 0 ? PS2 : PS1;
-        write(CR + CLEAR_LINE_RIGHT + p + state.buffer);
-        const back = state.buffer.length - state.cursor;
+        const p = prompt_text(repl);
+        write(CR + CLEAR_LINE_RIGHT + p + line_state.buffer);
+        const back = line_state.buffer.length - line_state.cursor;
         if (back > 0) write(`\x1b[${String(back)}D`);
     }
 
     function on_runtime(message: FromRuntime) {
         if (term?.is_disposed() === true) return;
-
-        switch (message.kind) {
-            case 'loading':
-                // Skip the sandbox handshake — it is plumbing, not progress.
-                if (message.detail === 'Sandbox ready') return;
-                write_lines([colour(`… ${message.detail}`, FG_GREY)]);
-                return;
-            case 'ready':
-                ready = true;
-                // SPLIT the banner: it is multi-line, and writing it as one
-                // string leaves bare \n characters in the stream. xterm does
-                // not translate those — a bare \n moves the cursor DOWN
-                // without returning it to column 0, so the second line starts
-                // wherever the first ended and the banner staircases. Caught
-                // on a parity screenshot, which is what the loop is for.
-                write_lines([
-                    ...message.banner
-                        .trimEnd()
-                        .split('\n')
-                        .map((l) => l.trimEnd()),
-                    '',
-                ]);
-                prompt();
-                term?.focus();
-                return;
-            case 'stdout':
-                write(message.text.replace(/\n/g, CRLF));
-                return;
-            case 'stderr':
-                write(colour(message.text.replace(/\n/g, CRLF), FG_RED));
-                return;
-            case 'result': {
-                awaiting = false;
-                if (message.status === 'incomplete') {
-                    // PyodideConsole says the block is unfinished — that is
-                    // CPython's own codeop, so `def f():` continues correctly.
-                    prompt();
-                    return;
-                }
-                block = [];
-                if (message.repr != null) write_lines([message.repr]);
-                prompt();
-                return;
-            }
-            case 'error':
-                ready = false;
-                awaiting = false;
-                // Clear the block too: leaving it non-empty renders a `...`
-                // continuation prompt that can never advance, because submit()
-                // returns early while !ready.
-                block = [];
-                write_lines([
-                    '',
-                    colour(message.message, FG_YELLOW),
-                    colour(
-                        'The window still works — close it and try again once you are back online.',
-                        FG_GREY,
-                    ),
-                ]);
-                return;
-        }
-    }
-
-    /**
-     * `exit`, `exit()`, `quit`, `quit()` — with or without the parentheses,
-     * exactly as CPython accepts them.
-     *
-     * Intercepted BEFORE the runtime sees them. Pyodide has no process to
-     * exit, so `exit()` raises SystemExit and dumps a six-frame traceback
-     * through weblooop/asyncio/console internals — which reads as a crash, not
-     * as "the interpreter closed". Closing the window is what the visitor
-     * actually meant.
-     */
-    function is_exit_command(line: string): boolean {
-        return /^\s*(exit|quit)\s*(\(\s*\))?\s*$/.test(line);
-    }
-
-    function submit(line: string) {
-        write(CRLF);
-        if (is_exit_command(line)) {
-            destroy();
-            return;
-        }
-        if (!ready) {
-            prompt();
-            return;
-        }
-        // ONE LINE, never the joined block. `PyodideConsole.push()` appends to
-        // its OWN buffer and re-joins (console.py: `self.buffer.append(line);
-        // source = "\n".join(self.buffer)`), so sending the accumulated block
-        // double-concatenates it:
-        //   push("def f():")                 -> incomplete, buffer kept
-        //   push("def f():\n    return 41")  -> IndentationError
-        // Every multi-line block was a syntax error and the function was never
-        // defined. `block` is kept ONLY to choose PS1 vs PS2.
-        block = [...block, line];
-        awaiting = true;
-        client?.exec(line);
+        apply(on_runtime_message(repl, message));
     }
 
     function on_data(data: string) {
-        const result = feed(state, data);
-        state = result.state;
+        const result = feed(line_state, data);
+        line_state = result.state;
 
         for (const effect of result.effects) {
             if (effect.kind === 'submit') {
-                submit(effect.line);
+                apply(on_submit(repl, effect.line));
                 return;
             }
             if (effect.kind === 'interrupt') {
-                write('^C' + CRLF);
-
-                // IDLE: behave like CPython — abandon the current input and
-                // give a fresh prompt. The session SURVIVES.
-                //
-                // The previous version always terminated and respawned the
-                // worker, so pressing Ctrl+C out of habit to clear a line
-                // silently destroyed every variable the visitor had defined.
-                // That is a restart, not an interrupt, and it is not what the
-                // key means anywhere else.
-                if (!awaiting) {
-                    write_lines([colour('KeyboardInterrupt', FG_RED)]);
-                    block = [];
-                    prompt();
-                    return;
-                }
-
-                // BUSY: a running worker cannot be interrupted —
-                // setInterruptBuffer needs SharedArrayBuffer, which needs
-                // COOP/COEP, which §5 records as breaking other embeds here.
-                // Terminate-and-respawn is the only lever, so say plainly that
-                // it costs the session.
-                write_lines([
-                    colour(
-                        'Restarting Python… (session state cleared)',
-                        FG_YELLOW,
-                    ),
-                ]);
-                ready = false;
-                block = [];
-                awaiting = false;
-                client?.restart();
+                apply(on_interrupt(repl));
                 return;
             }
             if (effect.kind === 'eof') {
-                // Ctrl+D on an empty line closes the interpreter, as it does
-                // in a real terminal.
-                write(CRLF);
-                destroy();
+                apply(on_eof(repl));
                 return;
             }
             write('\x07'); // the only remaining effect kind
         }
-        if (!awaiting) redraw();
+        if (!repl.awaiting) redraw();
     }
 
     function on_ready() {
-        write_lines([colour('Loading Python runtime…', FG_GREY)]);
+        write(PYTHON_LOADING);
         if (frame != null) {
             client = create_python_client(frame, {
                 on_message: on_runtime,
-                greeting: GREETING,
+                greeting: PYTHON_GREETING,
             });
         }
     }

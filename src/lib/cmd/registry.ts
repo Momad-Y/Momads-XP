@@ -226,6 +226,13 @@ export const COMMANDS: readonly Command[] = [
         run: () => [],
     },
     {
+        name: 'python',
+        summary: 'start the Python interpreter in this window',
+        // Listed for `help`; the session is hosted by the component, which owns
+        // the terminal and the sandbox frame. The command layer stays pure.
+        run: () => [],
+    },
+    {
         name: 'matrix',
         summary: 'follow the white rabbit',
         run: () => [],

@@ -325,6 +325,19 @@ test('matrix fills the screen, rains until Ctrl+C, and follows the accent', asyn
         .toContain('matrix-escaped');
 });
 
+test('help advertises python, and it is not a dead entry', async ({ page }) => {
+    // §1b's no-dead-entries standard. The session itself needs the real runtime
+    // and so is covered by the @online specs; what belongs here is that the
+    // command is discoverable and that asking for it does not open a second
+    // window.
+    await bootToDesktop(page);
+    await openCmd(page);
+
+    await run(page, 'help');
+    await expect.poll(async () => screen(page)).toContain('python');
+    expect(await screen(page)).not.toContain('python: command not found');
+});
+
 test('sudo refuses, using the name from profile.json', async ({ page }) => {
     await bootToDesktop(page);
     await openCmd(page);
