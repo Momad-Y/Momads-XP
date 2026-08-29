@@ -97,6 +97,8 @@ export const TERMINAL_MIN_HEIGHT = 380;
  */
 export interface TerminalHandle {
     write: (text: string) => void;
+    /** Repaint the accent palette slot; see Terminal.svelte. */
+    set_accent: (hex: string) => void;
     focus: () => void;
     is_disposed: () => boolean;
 }

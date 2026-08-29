@@ -221,3 +221,50 @@ test('Ctrl+D mid-line does NOT close the terminal', async ({ page }) => {
     await expect(page.locator('#work-space .window')).toHaveCount(1);
     await expect.poll(async () => screen(page)).toContain('some text');
 });
+
+test('color repaints the accent, including existing scrollback', async ({
+    page,
+}) => {
+    await bootToDesktop(page);
+    await openCmd(page);
+
+    /** The rendered colour of the prompt, read from the DOM. */
+    const promptColour = async () =>
+        page.evaluate(() => {
+            const spans = [
+                ...document.querySelectorAll('.xterm-rows span'),
+            ] as HTMLElement[];
+            const el = spans.find((s) => s.textContent?.includes('momad@xp'));
+            return el ? getComputedStyle(el).color : null;
+        });
+
+    const before = await promptColour();
+    expect(before).not.toBeNull();
+
+    await run(page, 'color #ff8800');
+    await expect.poll(async () => screen(page)).toContain('#ff8800');
+
+    // The BANNER's prompt — printed long before the command ran — must have
+    // repainted too. That is the point of rewriting the palette slot rather
+    // than colouring new output: cmd.exe's `color` recolours the console, not
+    // just what comes next.
+    await expect.poll(promptColour).not.toBe(before);
+    await expect.poll(promptColour).toBe('rgb(255, 136, 0)');
+
+    await run(page, 'color reset');
+    await expect.poll(promptColour).toBe(before);
+});
+
+test('color refuses black, and the terminal keeps working', async ({
+    page,
+}) => {
+    await bootToDesktop(page);
+    await openCmd(page);
+
+    await run(page, 'color #000000');
+    await expect.poll(async () => screen(page)).toContain('genius');
+
+    // Nothing was applied, and the prompt still responds.
+    await run(page, 'echo still-here');
+    await expect.poll(async () => screen(page)).toContain('still-here');
+});

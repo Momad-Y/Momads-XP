@@ -7,7 +7,8 @@
     import { required } from '../../../lib/types';
     import Terminal from '../../../lib/components/xp/Terminal.svelte';
     import { profile } from '../../../lib/profile';
-    import { execute } from '../../../lib/cmd/registry';
+    import { execute, with_trailing_blank } from '../../../lib/cmd/registry';
+    import { DEFAULT_ACCENT, run_color } from '../../../lib/cmd/color';
     import { feed, initial_state } from '../../../lib/term/readline';
     import type { ReadlineState } from '../../../lib/term/readline';
     import {
@@ -74,6 +75,15 @@
      * by TypeScript's flow analysis, which turns the guard into dead code the
      * linter then rejects.
      */
+    /**
+     * PER WINDOW, like cmd.exe's `color` — which affects the console it was
+     * typed into and no other. A shared store would recolour every open
+     * terminal at once, which is not what the command means.
+     */
+    // Explicitly `string`: XP_CONSOLE_THEME is `as const`, so DEFAULT_ACCENT
+    // narrows to its literal and would reject any other colour.
+    let accent: string = DEFAULT_ACCENT;
+
     let animation_generation = 0;
     let animation_running = false;
 
@@ -181,6 +191,19 @@
             return;
         }
 
+        if (name === 'color') {
+            const args = line.trim().split(/\s+/).slice(1);
+            const result = run_color(args, accent);
+            if (result.accent != null) {
+                accent = result.accent;
+                // Applied BEFORE the confirmation is written, so the line
+                // announcing the change is itself drawn in the new colour.
+                term?.set_accent(accent);
+            }
+            write_lines(with_trailing_blank(result.lines));
+            prompt();
+            return;
+        }
         if (name === 'clear') {
             write(CLEAR_SCREEN);
             prompt();
