@@ -148,17 +148,23 @@ test('clear wipes the screen but keeps the prompt', async ({ page }) => {
     await expect.poll(async () => screen(page)).toContain('momad@xp:~$');
 });
 
-test('an easter egg can be escaped, twice in a row', async ({ page }) => {
+test('a FINITE easter egg can be escaped by any key, twice in a row', async ({
+    page,
+}) => {
     await bootToDesktop(page);
     await openCmd(page);
 
+    // `hack`, not `matrix`: the two eggs now have deliberately different exit
+    // policies. `hack` is finite, so any key skips it; `matrix` runs until
+    // interrupted and answers only to Ctrl+C, which its own test covers.
+    //
     // Run, cancel, run again, cancel again. The second half is the point: a
     // cancellation latch that does not reset leaves the terminal permanently
     // deaf, and this repo has a scar from exactly that shape
     // (`rename_cancelled`).
     for (let i = 0; i < 2; i++) {
         const marker = `escaped-${String(i)}`;
-        await run(page, 'matrix');
+        await run(page, 'hack');
         await page.waitForTimeout(400);
         await page.keyboard.press('x');
 
@@ -218,6 +224,105 @@ test('hack runs its script, and the whole line follows the accent', async ({
     await expect
         .poll(async () => screen(page), { timeout: 10_000 })
         .toContain('hack-escaped');
+});
+
+test('matrix fills the screen, rains until Ctrl+C, and follows the accent', async ({
+    page,
+}) => {
+    await bootToDesktop(page);
+    await openCmd(page);
+
+    await run(page, 'color #ff8800');
+    await expect
+        .poll(async () => screen(page))
+        .toContain('Accent colour set to #ff8800');
+
+    // The terminal's REAL width, measured from the banner BEFORE the rain
+    // starts — deliberately NOT derived from the thing under test. xterm does
+    // not pad its DOM rows, so a rendered row is exactly as wide as whatever
+    // was written into it; measuring the rain's rows against each other passes
+    // just as happily when the rain covers 70 columns of an 83-column
+    // terminal. It did, which is why this measurement is here.
+    const cols = await page
+        .locator('.xterm-rows')
+        .last()
+        .evaluate((root) => {
+            const span = root.querySelector('span');
+            const screen = root.parentElement;
+            if (!span || !screen) return 0;
+            const text = span.textContent ?? '';
+            const cell = span.getBoundingClientRect().width / text.length;
+            return Math.round(screen.getBoundingClientRect().width / cell);
+        });
+    expect(cols).toBeGreaterThan(70);
+
+    await run(page, 'matrix');
+
+    // The intro names the only way out BEFORE the keyboard is trapped. If this
+    // ever stops appearing, the egg becomes a dead end for anyone who does not
+    // already know the convention.
+    await expect
+        .poll(async () => screen(page), { timeout: 20_000 })
+        .toContain('There is only Ctrl+C');
+
+    // Past the intro pause and well past the 60 frames the old egg stopped at.
+    await page.waitForTimeout(4_000);
+
+    const grid = await page
+        .locator('.xterm-rows')
+        .last()
+        .evaluate((root) => {
+            const rows = Array.from(root.children).map(
+                (r) => r.textContent ?? '',
+            );
+            const accents = new Set<string>();
+            for (const el of Array.from(root.querySelectorAll('span'))) {
+                if ((el.textContent ?? '').trim().length > 0) {
+                    accents.add(getComputedStyle(el).color);
+                }
+            }
+            return {
+                rows,
+                // The rightmost column that actually carries a glyph.
+                reach: Math.max(...rows.map((r) => r.trimEnd().length)),
+                accents: Array.from(accents),
+            };
+        });
+
+    // FULL SCREEN, which is the whole point of the rewrite: every row of the
+    // grid carries glyphs. The original wrote one 70-column row per frame and
+    // scrolled it, so the top of the terminal stayed empty.
+    expect(grid.rows.length).toBeGreaterThan(10);
+    const lit = grid.rows.filter((r) => r.trim().length > 0);
+    expect(lit.length).toBe(grid.rows.length);
+    // And it spans the terminal's REAL width, not a hardcoded 70.
+    expect(grid.reach).toBeGreaterThanOrEqual(cols - 2);
+
+    // Head and trail both resolve through the one palette slot `color`
+    // repaints, so the rain is in the accent rather than the default green.
+    expect(grid.accents).toContain('rgb(255, 136, 0)');
+    expect(grid.accents).not.toContain('rgb(0, 255, 0)');
+
+    // Still raining: the frame must differ a moment later.
+    const before = await screen(page);
+    await page.waitForTimeout(600);
+    expect(await screen(page)).not.toBe(before);
+
+    // An ordinary key is SWALLOWED. The egg is infinite on purpose and says so.
+    await page.keyboard.press('x');
+    await page.waitForTimeout(600);
+    expect(await screen(page)).not.toContain('momad@xp:~$');
+
+    // Ctrl+C, and only Ctrl+C, gives the terminal back.
+    await page.keyboard.press('Control+c');
+    await expect
+        .poll(async () => screen(page), { timeout: 10_000 })
+        .toContain('momad@xp:~$');
+
+    await run(page, 'echo matrix-escaped');
+    await expect
+        .poll(async () => screen(page), { timeout: 10_000 })
+        .toContain('matrix-escaped');
 });
 
 test('sudo refuses, using the name from profile.json', async ({ page }) => {

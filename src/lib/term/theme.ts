@@ -94,6 +94,8 @@ export interface TerminalHandle {
     write: (text: string) => void;
     /** Repaint the accent palette slot; see Terminal.svelte. */
     set_accent: (hex: string) => void;
+    /** Current grid, for full-screen painting. Changes as the window resizes. */
+    size: () => { cols: number; rows: number };
     focus: () => void;
     is_disposed: () => boolean;
 }

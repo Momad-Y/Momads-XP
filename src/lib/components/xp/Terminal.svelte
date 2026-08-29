@@ -68,6 +68,18 @@
         term.options.theme = { ...XP_CONSOLE_THEME, brightGreen: hex };
     }
 
+    /**
+     * The current grid, for anything that has to paint the WHOLE screen.
+     *
+     * FitAddon derives these from the host's size, so they change with the
+     * window; the `matrix` egg re-reads them every frame and reflows rather
+     * than assuming the size it started at.
+     */
+    export function size(): { cols: number; rows: number } {
+        if (disposed || term == null) return { cols: 80, rows: 24 };
+        return { cols: term.cols, rows: term.rows };
+    }
+
     export function focus(): void {
         if (disposed || term == null) return;
         term.focus();
