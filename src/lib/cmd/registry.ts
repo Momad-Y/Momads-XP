@@ -253,6 +253,21 @@ export const COMMANDS: readonly Command[] = [
     },
 ];
 
+/**
+ * Every name the shell recognises, sorted — including the deferred filesystem
+ * commands.
+ *
+ * Deferred ones are INCLUDED on purpose. `help` advertises them as "coming in a
+ * later update" and `execute` answers them specially, so they are names the
+ * shell knows; having Tab claim otherwise would contradict the menu the shell
+ * itself prints.
+ */
+export function command_names(): string[] {
+    return [...COMMANDS.map((c) => c.name), ...DEFERRED_COMMANDS].sort((a, b) =>
+        a.localeCompare(b),
+    );
+}
+
 export function find_command(name: string): Command | undefined {
     // Case-SENSITIVE, like bash. §3.2 line 1 specifies "bash emulation, not
     // Windows cmd", and the plan's original case-insensitive lookup was a

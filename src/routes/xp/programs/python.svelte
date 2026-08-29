@@ -144,6 +144,13 @@
                 apply(on_eof(repl));
                 return;
             }
+            if (effect.kind === 'complete') {
+                // Tab does nothing in the interpreter. It was silently
+                // swallowed by the line editor before completion existed, so
+                // ignoring it explicitly is the no-change behaviour; falling
+                // through to the bell below would be a regression.
+                return;
+            }
             write('\x07'); // the only remaining effect kind
         }
         if (!repl.awaiting) redraw();

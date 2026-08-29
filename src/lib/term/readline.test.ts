@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { feed, initial_state, PASTE_START, PASTE_END } from './readline';
+import {
+    PASTE_END,
+    PASTE_START,
+    feed,
+    initial_state,
+    set_line,
+} from './readline';
 import type { ReadlineState } from './readline';
 
 /** Type `data` into a fresh (or given) state and return the resulting state. */
@@ -212,5 +218,52 @@ describe('Ctrl+D (EOF)', () => {
     it('emits eof after the line is cleared', () => {
         const cleared = feed(type('abc').state, '\x7f\x7f\x7f');
         expect(feed(cleared.state, '\x04').effects).toEqual([{ kind: 'eof' }]);
+    });
+});
+
+describe('Tab', () => {
+    it('reports a completion request instead of editing the line', () => {
+        // The editor is shared with the Python REPL, whose vocabulary is
+        // entirely different, so it must not decide what Tab means.
+        const result = feed(initial_state(), 'hel\t');
+        expect(result.state.buffer).toBe('hel');
+        expect(result.effects).toContainEqual({ kind: 'complete' });
+    });
+
+    it('was silently swallowed before, so ignoring it is still a no-op', () => {
+        // Tab is a C0 byte and fell into the "any other control byte" branch.
+        // Nothing inserted it then and nothing inserts it now.
+        expect(feed(initial_state(), '\t').state.buffer).toBe('');
+    });
+
+    it('still INSERTS a tab inside a bracketed paste', () => {
+        // Pasting indented Python must keep its indentation. The paste branch
+        // runs before the control-character section for exactly this reason.
+        const result = feed(
+            initial_state(),
+            `${PASTE_START}\tindented${PASTE_END}`,
+        );
+        expect(result.state.buffer).toBe('\tindented');
+        expect(result.effects).not.toContainEqual({ kind: 'complete' });
+    });
+});
+
+describe('set_line', () => {
+    it('replaces the line and moves the cursor', () => {
+        const state = feed(initial_state(), 'hel').state;
+        const next = set_line(state, 'help ', 5);
+        expect(next.buffer).toBe('help ');
+        expect(next.cursor).toBe(5);
+    });
+
+    it('clamps a cursor that does not fit the new line', () => {
+        const next = set_line(initial_state(), 'ab', 99);
+        expect(next.cursor).toBe(2);
+        expect(set_line(initial_state(), 'ab', -5).cursor).toBe(0);
+    });
+
+    it('preserves history, so completing does not cost the ring', () => {
+        const typed = feed(initial_state(), 'echo one\r').state;
+        expect(set_line(typed, 'hel', 3).history).toEqual(['echo one']);
     });
 });
