@@ -295,8 +295,33 @@ test('matrix fills the screen, rains until Ctrl+C, and follows the accent', asyn
     expect(grid.rows.length).toBeGreaterThan(10);
     const lit = grid.rows.filter((r) => r.trim().length > 0);
     expect(lit.length).toBe(grid.rows.length);
-    // And it spans the terminal's REAL width, not a hardcoded 70.
-    expect(grid.reach).toBeGreaterThanOrEqual(cols - 2);
+    // And it spans the terminal's REAL width, not a hardcoded 70 — measured
+    // as the MAX reach across several frames, never a single one.
+    //
+    // A column is blank while its drop is in the respawn gap above the screen,
+    // so the rightmost column need not be lit in any given frame. Over 120
+    // single-frame samples locally the worst deficit was 1 column; CI hit 3,
+    // which is exactly how the original single-frame form failed there while
+    // passing everywhere else. Any column that goes briefly dark is lit again
+    // within a frame or two, so the max across frames has no such tail.
+    let reach = 0;
+    for (let i = 0; i < 12; i++) {
+        reach = Math.max(
+            reach,
+            await page
+                .locator('.xterm-rows')
+                .last()
+                .evaluate((root) =>
+                    Math.max(
+                        ...Array.from(root.children).map(
+                            (row) => (row.textContent ?? '').trimEnd().length,
+                        ),
+                    ),
+                ),
+        );
+        await page.waitForTimeout(120);
+    }
+    expect(reach).toBeGreaterThanOrEqual(cols - 2);
 
     // Head and trail both resolve through the one palette slot `color`
     // repaints, so the rain is in the accent rather than the default green.
