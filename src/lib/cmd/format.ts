@@ -5,19 +5,34 @@
  * short lines (≤72 columns, the width TERMINAL_MIN_WIDTH is sized around)
  * rather than trying to be a layout engine.
  */
-import {
-    colour,
-    FG_BRIGHT_GREEN,
-    FG_CYAN,
-    FG_GREY,
-    FG_YELLOW,
-} from '../term/ansi';
+import { colour, DIM, FG_BRIGHT_GREEN, FG_CYAN, FG_GREY } from '../term/ansi';
 
 /** Longest line the formatters aim for; see theme.TERMINAL_MIN_WIDTH. */
 export const MAX_COLS = 72;
 
-export function heading(text: string): string {
+/**
+ * Text in the terminal ACCENT — `\x1b[92m`, the one palette slot `color`
+ * repaints. Anything written with this follows the accent, scrollback included;
+ * anything written with `dim`, `warn` or `label` deliberately does not.
+ */
+export function accent(text: string): string {
     return colour(text, FG_BRIGHT_GREEN);
+}
+
+/**
+ * A quieter line that STILL follows `color`: DIM over the same slot.
+ *
+ * Distinct from `dim`, which is grey and fixed. Use this when an aside has to
+ * recolour with everything around it — `hack` and `matrix` do the same thing
+ * inline, and this is that idiom for the command layer.
+ */
+export function dim_accent(text: string): string {
+    return colour(text, DIM + FG_BRIGHT_GREEN);
+}
+
+/** One definition of the accent colour; a heading is just accent text. */
+export function heading(text: string): string {
+    return accent(text);
 }
 
 export function label(text: string): string {
@@ -26,10 +41,6 @@ export function label(text: string): string {
 
 export function dim(text: string): string {
     return colour(text, FG_GREY);
-}
-
-export function warn(text: string): string {
-    return colour(text, FG_YELLOW);
 }
 
 /**
