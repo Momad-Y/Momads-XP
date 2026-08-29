@@ -363,3 +363,163 @@ test('Ctrl+C at an IDLE prompt keeps the session @online', async ({ page }) => {
         })
         .toContain('99');
 });
+
+/**
+ * CMD hosts a session in its OWN window (`python` at the shell prompt).
+ *
+ * The REPL semantics come from `src/lib/python/repl.ts`, shared with the
+ * standalone app and covered by unit tests. What only a browser can show is
+ * what this asserts: that it is genuinely the same window, that leaving hands
+ * the shell back rather than closing it, and that the two sessions keep
+ * separate line histories.
+ */
+async function openCmd(page: Page) {
+    const open = await page.locator('.xterm').count();
+    await page.locator('#start-menu-btn').click();
+    await page.locator('#start-menu').getByText('All Programs').hover();
+    const flyout = page.locator('#all-programs-flyout');
+    await expect(flyout).toBeVisible();
+    await flyout.getByText('Command Prompt', { exact: true }).click();
+    await expect(page.locator('.xterm')).toHaveCount(open + 1, {
+        timeout: 20_000,
+    });
+    await expect
+        .poll(async () => page.locator('.xterm-rows').last().innerText(), {
+            timeout: 20_000,
+        })
+        .toContain('momad@xp:~$');
+}
+
+async function type(page: Page, line: string) {
+    await page.locator('.xterm-helper-textarea').last().fill('');
+    await page.keyboard.type(line);
+    await page.keyboard.press('Enter');
+}
+
+async function cmdScreen(page: Page): Promise<string> {
+    return page.locator('.xterm-rows').last().innerText();
+}
+
+test('python runs INSIDE the cmd window, and exit() gives the shell back @online', async ({
+    page,
+}) => {
+    test.setTimeout(180_000);
+    await bootToDesktop(page);
+    await openCmd(page);
+
+    // No sandbox frame exists until a session is asked for — the runtime is
+    // not loaded just because a terminal is open.
+    await expect(
+        page.locator('iframe[title="Python runtime (isolated)"]'),
+    ).toHaveCount(0);
+
+    await type(page, 'python');
+    await expect
+        .poll(async () => cmdScreen(page), { timeout: 120_000 })
+        .toContain('Python 3.13');
+
+    // THE POINT OF THE FEATURE: one window, not two.
+    await expect(page.locator('#work-space .window')).toHaveCount(1);
+    await expect(page.locator('.xterm')).toHaveCount(1);
+
+    await type(page, '2 + 3');
+    await expect
+        .poll(async () => cmdScreen(page), { timeout: 30_000 })
+        .toContain('5');
+
+    // A multi-line block, in the NEW host. This is the shape that was broken
+    // for the whole of Phase 3 — a joined block is an IndentationError — so it
+    // is asserted wherever a session can run, not only where it was fixed.
+    await type(page, 'def f():');
+    await type(page, '    return 41');
+    await type(page, '');
+    await type(page, 'f()');
+    await expect
+        .poll(async () => cmdScreen(page), { timeout: 30_000 })
+        .toContain('41');
+    expect(await cmdScreen(page)).not.toContain('IndentationError');
+
+    // exit() ends the interpreter and hands back the SHELL — it does not close
+    // the window, which would throw away the shell session with it.
+    await type(page, 'exit()');
+    await expect
+        .poll(async () => cmdScreen(page), { timeout: 30_000 })
+        .toContain('momad@xp:~$');
+    await expect(page.locator('#work-space .window')).toHaveCount(1);
+
+    // The runtime is released rather than parked in the background.
+    await expect(
+        page.locator('iframe[title="Python runtime (isolated)"]'),
+    ).toHaveCount(0);
+
+    // And the shell is genuinely usable again.
+    await type(page, 'echo back-in-the-shell');
+    await expect
+        .poll(async () => cmdScreen(page), { timeout: 30_000 })
+        .toContain('back-in-the-shell');
+});
+
+/** The line the cursor is on — i.e. what history recall just put there. */
+async function lastLine(page: Page): Promise<string> {
+    const text = await cmdScreen(page);
+    const lines = text
+        .split('\n')
+        .map((l) => l.trimEnd())
+        .filter((l) => l.trim().length > 0);
+    return lines[lines.length - 1] ?? '';
+}
+
+test('the shell and the interpreter keep separate line histories @online', async ({
+    page,
+}) => {
+    test.setTimeout(180_000);
+    await bootToDesktop(page);
+    await openCmd(page);
+
+    await type(page, 'echo shell-line');
+    await expect
+        .poll(async () => cmdScreen(page), { timeout: 30_000 })
+        .toContain('shell-line');
+
+    await type(page, 'python');
+    await expect
+        .poll(async () => cmdScreen(page), { timeout: 120_000 })
+        .toContain('Python 3.13');
+
+    // Asserted on the CURRENT INPUT LINE, never on the whole screen. The
+    // commands typed earlier are still in the scrollback, so a `toContain`
+    // over everything matches them and passes no matter what Up-arrow did —
+    // which is exactly how a shared-history regression slipped through this
+    // test on its first draft.
+    await page.locator('.xterm-helper-textarea').last().click();
+    await page.keyboard.press('ArrowUp');
+    await page.waitForTimeout(400);
+    // A fresh interpreter has no history at all, so Up-arrow recalls NOTHING.
+    // Sharing the shell's ring would offer `python` here.
+    expect(await lastLine(page)).toBe('>>>');
+
+    await type(page, 'x = 41');
+    await page.waitForTimeout(400);
+    await page.keyboard.press('ArrowUp');
+    await expect
+        .poll(async () => lastLine(page), { timeout: 10_000 })
+        .toBe('>>> x = 41');
+
+    // Ctrl+C abandons the recalled line without running it.
+    await page.keyboard.press('Control+c');
+    await type(page, 'exit()');
+    await expect
+        .poll(async () => cmdScreen(page), { timeout: 30_000 })
+        .toContain('momad@xp:~$');
+
+    // The shell's own ring survived, and holds only shell lines: two steps back
+    // is `echo shell-line`. A shared ring would have `x = 41` and `exit()`
+    // stacked on top, so two steps back would land on `x = 41`.
+    await page.keyboard.press('ArrowUp');
+    await page.waitForTimeout(200);
+    expect(await lastLine(page)).toBe('momad@xp:~$ python');
+    await page.keyboard.press('ArrowUp');
+    await expect
+        .poll(async () => lastLine(page), { timeout: 10_000 })
+        .toBe('momad@xp:~$ echo shell-line');
+});

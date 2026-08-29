@@ -248,6 +248,21 @@ describe('color', () => {
     });
 });
 
+describe('python', () => {
+    it('is listed so help advertises it', () => {
+        // Same shape as `color` and `exit`: the SESSION is hosted by the
+        // component, which owns the terminal and the sandbox frame, so the
+        // command layer stays pure. It must still appear in `help`, per §1b's
+        // no-dead-entries standard.
+        expect(find_command('python')).toBeDefined();
+        expect(plain('help')).toContain('python');
+    });
+
+    it('produces no output of its own', () => {
+        expect(execute('python', profile)).toEqual([]);
+    });
+});
+
 describe('exit', () => {
     it('is listed so help advertises it', () => {
         // The window close is handled by the component — the command layer is
