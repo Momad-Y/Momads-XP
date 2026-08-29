@@ -40,6 +40,13 @@ export type ReadlineEffect =
      * it entirely, which is why this is only emitted when the buffer is empty.
      */
     | { kind: 'eof' }
+    /**
+     * Tab. The line editor deliberately does NOT know what completes to what —
+     * it is shared with the Python REPL, which has an entirely different
+     * vocabulary — so it reports the request and the host answers it with
+     * `set_line`.
+     */
+    | { kind: 'complete' }
     | { kind: 'bell' };
 
 export interface ReadlineResult {
@@ -69,6 +76,25 @@ function insert(state: ReadlineState, text: string): ReadlineState {
             text +
             state.buffer.slice(state.cursor),
         cursor: state.cursor + text.length,
+    };
+}
+
+/**
+ * Replace the line being edited. The host's half of a `complete` effect.
+ *
+ * `browsing` is deliberately left alone, matching `insert`: editing a recalled
+ * history entry does not drop you out of the history ring anywhere else in this
+ * editor, and completion is an edit like any other.
+ */
+export function set_line(
+    state: ReadlineState,
+    buffer: string,
+    cursor: number,
+): ReadlineState {
+    return {
+        ...state,
+        buffer,
+        cursor: Math.max(0, Math.min(buffer.length, cursor)),
     };
 }
 
@@ -200,6 +226,14 @@ export function feed(state: ReadlineState, data: string): ReadlineResult {
             // cause of a shipped clipboard bug.
             next = { ...next, buffer: '', cursor: 0, browsing: null };
             effects.push({ kind: 'interrupt' });
+            i++;
+            continue;
+        }
+        if (ch === '\t') {
+            // Reported, never acted on here. Note this sits AFTER the paste
+            // branch above, so a tab inside a bracketed paste is still inserted
+            // as text — pasting indented Python must keep its indentation.
+            effects.push({ kind: 'complete' });
             i++;
             continue;
         }

@@ -295,8 +295,33 @@ test('matrix fills the screen, rains until Ctrl+C, and follows the accent', asyn
     expect(grid.rows.length).toBeGreaterThan(10);
     const lit = grid.rows.filter((r) => r.trim().length > 0);
     expect(lit.length).toBe(grid.rows.length);
-    // And it spans the terminal's REAL width, not a hardcoded 70.
-    expect(grid.reach).toBeGreaterThanOrEqual(cols - 2);
+    // And it spans the terminal's REAL width, not a hardcoded 70 — measured
+    // as the MAX reach across several frames, never a single one.
+    //
+    // A column is blank while its drop is in the respawn gap above the screen,
+    // so the rightmost column need not be lit in any given frame. Over 120
+    // single-frame samples locally the worst deficit was 1 column; CI hit 3,
+    // which is exactly how the original single-frame form failed there while
+    // passing everywhere else. Any column that goes briefly dark is lit again
+    // within a frame or two, so the max across frames has no such tail.
+    let reach = 0;
+    for (let i = 0; i < 12; i++) {
+        reach = Math.max(
+            reach,
+            await page
+                .locator('.xterm-rows')
+                .last()
+                .evaluate((root) =>
+                    Math.max(
+                        ...Array.from(root.children).map(
+                            (row) => (row.textContent ?? '').trimEnd().length,
+                        ),
+                    ),
+                ),
+        );
+        await page.waitForTimeout(120);
+    }
+    expect(reach).toBeGreaterThanOrEqual(cols - 2);
 
     // Head and trail both resolve through the one palette slot `color`
     // repaints, so the rain is in the accent rather than the default green.
@@ -452,6 +477,86 @@ test('widening the icon gutter did not wrap any menu label', async ({
 
     expect(worst.wrapped, `"${worst.wrapped ?? ''}" wrapped`).toBeNull();
     expect(worst.headroom, `tightest label: ${worst.label}`).toBeGreaterThan(0);
+});
+
+/** The line the cursor is on — i.e. what completion just left there. */
+async function promptLine(page: Page): Promise<string> {
+    const lines = (await screen(page))
+        .split('\n')
+        .map((l) => l.trimEnd())
+        .filter((l) => l.trim().length > 0);
+    return lines[lines.length - 1] ?? '';
+}
+
+test('Tab completes a unique command and leaves it runnable', async ({
+    page,
+}) => {
+    await bootToDesktop(page);
+    await openCmd(page);
+
+    await page.locator('.xterm-helper-textarea').last().fill('');
+    await page.keyboard.type('hel');
+    await page.keyboard.press('Tab');
+
+    // Asserted on the CURRENT INPUT LINE, never over the whole screen: the
+    // banner and earlier commands are still in the scrollback, so a `toContain`
+    // matches them regardless of what Tab did.
+    await expect
+        .poll(async () => promptLine(page), { timeout: 10_000 })
+        .toBe('momad@xp:~$ help');
+
+    // The trailing space is part of the contract, and the completed line has to
+    // actually run — a completer that finishes a name the shell then rejects is
+    // worse than no completer.
+    await page.keyboard.press('Enter');
+    await expect
+        .poll(async () => screen(page), { timeout: 10_000 })
+        .toContain('available commands');
+});
+
+test('Tab lists the candidates when several commands match', async ({
+    page,
+}) => {
+    await bootToDesktop(page);
+    await openCmd(page);
+
+    await page.locator('.xterm-helper-textarea').last().fill('');
+    await page.keyboard.type('co');
+    await page.keyboard.press('Tab');
+
+    // `color` and `contact` share `co`, so there is no progress to make and the
+    // shell shows the options instead of silently doing nothing.
+    await expect
+        .poll(async () => screen(page), { timeout: 10_000 })
+        .toContain('contact');
+    expect(await screen(page)).toContain('color');
+    // The half-typed line is reprinted underneath, ready to keep typing.
+    expect(await promptLine(page)).toBe('momad@xp:~$ co');
+});
+
+test('Tab on a prefix no command has leaves the line untouched', async ({
+    page,
+}) => {
+    await bootToDesktop(page);
+    await openCmd(page);
+
+    await page.locator('.xterm-helper-textarea').last().fill('');
+    await page.keyboard.type('zzz');
+    await page.keyboard.press('Tab');
+    await page.waitForTimeout(400);
+    expect(await promptLine(page)).toBe('momad@xp:~$ zzz');
+});
+
+test('Tab completes an argument, not just a command', async ({ page }) => {
+    await bootToDesktop(page);
+    await openCmd(page);
+
+    await page.locator('.xterm-helper-textarea').last().fill('');
+    await page.keyboard.type('color re');
+    await page.keyboard.press('Tab');
+    await expect
+        .poll(async () => promptLine(page), { timeout: 10_000 })
+        .toBe('momad@xp:~$ color reset');
 });
 
 test('sudo refuses, using the name from profile.json', async ({ page }) => {

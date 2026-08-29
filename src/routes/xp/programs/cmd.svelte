@@ -8,8 +8,10 @@
     import Terminal from '../../../lib/components/xp/Terminal.svelte';
     import { profile } from '../../../lib/profile';
     import { execute, with_trailing_blank } from '../../../lib/cmd/registry';
+    import { complete } from '../../../lib/cmd/complete';
+    import { MAX_COLS, wrap_items } from '../../../lib/cmd/format';
     import { DEFAULT_ACCENT, run_color } from '../../../lib/cmd/color';
-    import { feed, initial_state } from '../../../lib/term/readline';
+    import { feed, initial_state, set_line } from '../../../lib/term/readline';
     import type { ReadlineState } from '../../../lib/term/readline';
     import {
         CLEAR_LINE_RIGHT,
@@ -311,6 +313,13 @@
                 apply_python(py_on_eof(py));
                 return;
             }
+            if (effect.kind === 'complete') {
+                // Tab does nothing in the interpreter. It was silently
+                // swallowed by the line editor before completion existed, so
+                // ignoring it explicitly is the no-change behaviour; falling
+                // through to the bell below would be a regression.
+                return;
+            }
             write('\x07'); // the only remaining effect kind
         }
         if (!py.awaiting) redraw();
@@ -515,6 +524,30 @@
         prompt();
     }
 
+    /**
+     * Tab. What completes to what is decided by `src/lib/cmd/complete.ts`; this
+     * only draws the outcome.
+     */
+    function on_complete() {
+        const result = complete(state.buffer, state.cursor);
+
+        if (result.buffer !== state.buffer) {
+            state = set_line(state, result.buffer, result.cursor);
+            redraw();
+            return;
+        }
+        if (result.candidates.length > 1) {
+            // No progress but several ways forward, so show them. bash makes
+            // you press Tab twice for this; one press is friendlier and the
+            // only thing the second press would buy is a moment of silence.
+            write(CRLF);
+            write_lines(wrap_items(result.candidates, MAX_COLS, '  '));
+            redraw();
+            return;
+        }
+        write('\x07'); // nothing matched
+    }
+
     function on_data(data: string) {
         // A running animation swallows the keystroke and stops — every real
         // terminal toy behaves this way, and a visitor who cannot type is
@@ -551,6 +584,10 @@
                 // any real shell.
                 write(CRLF);
                 destroy();
+                return;
+            }
+            if (effect.kind === 'complete') {
+                on_complete();
                 return;
             }
             write('\x07'); // bell — the only remaining effect kind
