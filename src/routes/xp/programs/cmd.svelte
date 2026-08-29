@@ -1,7 +1,7 @@
 <svelte:options accessors={true} />
 
 <script lang="ts">
-    import { unmount } from 'svelte';
+    import { onDestroy, tick, unmount } from 'svelte';
     import Window from '../../../lib/components/xp/Window.svelte';
     import { runningPrograms } from '../../../lib/store';
     import { required } from '../../../lib/types';
@@ -33,6 +33,28 @@
         MATRIX_INTRO_PAUSE_MS,
         render_frame,
     } from '../../../lib/cmd/matrix';
+    import {
+        create_python_client,
+        SANDBOX_ATTR,
+        SANDBOX_URL,
+    } from '../../../lib/python/client';
+    import type { PythonClient } from '../../../lib/python/client';
+    import type { FromRuntime } from '../../../lib/python/protocol';
+    import {
+        initial_repl_state,
+        on_eof as py_on_eof,
+        on_interrupt as py_on_interrupt,
+        on_runtime_message,
+        on_submit as py_on_submit,
+        prompt_text,
+        PYTHON_GREETING,
+        PYTHON_LOADING,
+    } from '../../../lib/python/repl';
+    import type {
+        ReplEffect,
+        ReplResult,
+        ReplState,
+    } from '../../../lib/python/repl';
     import {
         BEAT_GAP_MS,
         DOT_INTERVAL_MS,
@@ -68,8 +90,18 @@
         void unmount(required(get_self(), 'cmd instance'));
     }
 
+    const SHELL_TITLE = 'momad@xp:~';
+    /**
+     * Real terminals retitle themselves for the foreground program, and with
+     * the shell and the interpreter now sharing one window it is the only
+     * outward sign of which is reading your keystrokes. The ICON deliberately
+     * does not change: someone hunting the taskbar for their terminal looks for
+     * the terminal's icon.
+     */
+    const PYTHON_TITLE = 'momad@xp:~ — python';
+
     export let options: WindowOptions = {
-        title: 'momad@xp:~',
+        title: SHELL_TITLE,
         icon: '/images/xp/icons/CommandPrompt.png',
         id,
         exec_path,
@@ -84,6 +116,29 @@
 
     let term: TerminalHandle | undefined;
     let state: ReadlineState = initial_state();
+
+    /**
+     * `python` runs IN this window, as a shell runs a child process — so the
+     * terminal has two modes and the shell is only one of them.
+     *
+     * The REPL's semantics are NOT reimplemented here. They live in
+     * `src/lib/python/repl.ts` and are shared with the standalone Python app,
+     * because two copies of "one line per push, idle Ctrl+C survives, exit()
+     * is intercepted" would drift — and both of those rules have already been
+     * wrong once each.
+     */
+    let mode: 'shell' | 'python' = 'shell';
+    let py_frame: HTMLIFrameElement | undefined;
+    let py_client: PythonClient | undefined;
+    let py: ReplState = initial_repl_state();
+    /**
+     * A SEPARATE line editor for the interpreter.
+     *
+     * Sharing one history would put `ls` and `import sys` in the same Up-arrow
+     * ring, which is not how running python from a shell behaves — and the
+     * shell's history has to survive the session and still be there afterwards.
+     */
+    let py_line: ReadlineState = initial_state();
 
     /**
      * Easter-egg cancellation, as a GENERATION COUNTER rather than a boolean
@@ -154,9 +209,111 @@
     function redraw() {
         // \r to column 0, clear right, reprint. Cheaper and steadier than
         // tracking individual cursor moves, and it cannot desynchronise.
-        write(CR + CLEAR_LINE_RIGHT + PROMPT + state.buffer);
-        const back = state.buffer.length - state.cursor;
+        //
+        // Mode-aware on BOTH counts: the prompt and the buffer both come from
+        // whichever session is in the foreground. Reprinting the shell's
+        // prompt in front of a Python line is how a redraw desynchronises.
+        const line = mode === 'python' ? py_line : state;
+        const p = mode === 'python' ? prompt_text(py) : PROMPT;
+        write(CR + CLEAR_LINE_RIGHT + p + line.buffer);
+        const back = line.buffer.length - line.cursor;
         if (back > 0) write(`\x1b[${String(back)}D`);
+    }
+
+    // ---------------------------------------------------------------------
+    // The hosted Python session.
+    // ---------------------------------------------------------------------
+
+    function run_python_effects(effects: readonly ReplEffect[]) {
+        for (const effect of effects) {
+            switch (effect.kind) {
+                case 'write':
+                    write(effect.text);
+                    break;
+                case 'exec':
+                    py_client?.exec(effect.source);
+                    break;
+                case 'restart':
+                    py_client?.restart();
+                    break;
+                case 'focus':
+                    term?.focus();
+                    break;
+                case 'exit':
+                    // The ONE policy this host decides differently from the
+                    // standalone app: `exit()` and Ctrl+D end the interpreter
+                    // and hand the shell back, exactly as they do when you run
+                    // python from a real terminal. Closing the window here
+                    // would throw away the shell session too.
+                    stop_python();
+                    break;
+            }
+        }
+    }
+
+    function apply_python(result: ReplResult) {
+        py = result.state;
+        run_python_effects(result.effects);
+    }
+
+    function on_python_message(message: FromRuntime) {
+        // A late message from a runtime whose session has already ended must
+        // not paint over the shell prompt.
+        if (mode !== 'python' || term?.is_disposed() === true) return;
+        apply_python(on_runtime_message(py, message));
+    }
+
+    async function start_python() {
+        mode = 'python';
+        py = initial_repl_state();
+        py_line = initial_state();
+        window?.update_title(PYTHON_TITLE);
+        write(PYTHON_LOADING);
+
+        // The iframe is rendered by the `{#if}` below, so it does not exist
+        // until Svelte has flushed. Creating the client before that would
+        // attach to nothing and the handshake would never start.
+        await tick();
+        if (py_frame == null || term?.is_disposed() === true) return;
+        py_client = create_python_client(py_frame, {
+            on_message: on_python_message,
+            greeting: PYTHON_GREETING,
+        });
+    }
+
+    function stop_python() {
+        py_client?.dispose();
+        py_client = undefined;
+        // Dropping `mode` unmounts the iframe, which takes the worker and the
+        // ~30 MB runtime with it. Keeping it alive so a later `python` starts
+        // instantly would be a lie about what `exit()` did, and would leak a
+        // runtime per session the visitor ever opened.
+        mode = 'shell';
+        py = initial_repl_state();
+        window?.update_title(SHELL_TITLE);
+        prompt();
+    }
+
+    function on_python_data(data: string) {
+        const result = feed(py_line, data);
+        py_line = result.state;
+
+        for (const effect of result.effects) {
+            if (effect.kind === 'submit') {
+                apply_python(py_on_submit(py, effect.line));
+                return;
+            }
+            if (effect.kind === 'interrupt') {
+                apply_python(py_on_interrupt(py));
+                return;
+            }
+            if (effect.kind === 'eof') {
+                apply_python(py_on_eof(py));
+                return;
+            }
+            write('\x07'); // the only remaining effect kind
+        }
+        if (!py.awaiting) redraw();
     }
 
     function sleep(ms: number): Promise<void> {
@@ -341,6 +498,10 @@
             prompt();
             return;
         }
+        if (name === 'python') {
+            void start_python();
+            return;
+        }
         if (name === 'matrix') {
             void run_matrix();
             return;
@@ -364,6 +525,11 @@
             // key skips it.
             if (animation_needs_ctrl_c && data !== ETX) return;
             cancel_animation();
+            return;
+        }
+
+        if (mode === 'python') {
+            on_python_data(data);
             return;
         }
 
@@ -392,6 +558,13 @@
         redraw();
     }
 
+    onDestroy(() => {
+        // Closing the window mid-session must not leave the client listening on
+        // the shared `window` message bus.
+        py_client?.dispose();
+        py_client = undefined;
+    });
+
     function on_ready() {
         // §3.2's startup banner. The third line was amended for Phase 3: the
         // original told visitors to try `ls` and `cd experience`, which are
@@ -414,5 +587,25 @@
 <Window {options} bind:this={window} on_click_close={destroy}>
     <div slot="content" class="flex h-full w-full flex-col bg-black">
         <Terminal bind:this={term} {on_ready} {on_data} />
+        <!--
+            Mounted only while a session is running, so leaving the interpreter
+            actually frees the runtime.
+
+            The isolation boundary is the same as the standalone app's:
+            `allow-scripts` WITHOUT allow-same-origin gives the runtime an
+            opaque origin — no IndexedDB (the VFS), Origin: null on every
+            fetch, and no access to our storage or cookies. Hidden because it
+            renders nothing; the terminal above is the UI.
+        -->
+        {#if mode === 'python'}
+            <iframe
+                bind:this={py_frame}
+                title="Python runtime (isolated)"
+                src={SANDBOX_URL}
+                sandbox={SANDBOX_ATTR}
+                referrerpolicy="no-referrer"
+                class="pointer-events-none absolute h-0 w-0 border-0 opacity-0"
+            ></iframe>
+        {/if}
     </div>
 </Window>
