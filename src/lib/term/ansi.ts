@@ -19,8 +19,32 @@ export const FG_GREY = `${CSI}90m`;
 /** Clear the screen and park the cursor at the top-left (the `clear` command). */
 export const CLEAR_SCREEN = `${CSI}2J${CSI}H`;
 
+/**
+ * Park the cursor at the top-left WITHOUT clearing.
+ *
+ * The full-screen repaint the `matrix` egg uses homes and overwrites every
+ * cell; clearing first would flash the background between frames.
+ */
+export const CURSOR_HOME = `${CSI}H`;
+
+/**
+ * A blinking cursor wandering across a full-screen animation reads as a
+ * rendering fault, so it is hidden for the duration and restored after.
+ */
+export const HIDE_CURSOR = `${CSI}?25l`;
+export const SHOW_CURSOR = `${CSI}?25h`;
+
 /** Erase from the cursor to the end of the line — used when redrawing input. */
 export const CLEAR_LINE_RIGHT = `${CSI}0K`;
+
+/**
+ * Ctrl+C as the KEYBOARD sends it — the one input byte in this file.
+ *
+ * It lives here beside CR and LF, which are equally both directions, so the
+ * `matrix` egg does not have to compare against a bare `'\x03'` literal while
+ * deciding whether a keystroke is its documented exit.
+ */
+export const ETX = '\x03';
 
 export const CR = '\r';
 export const LF = '\n';
