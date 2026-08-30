@@ -1,6 +1,6 @@
 # Momad's XP — repo rules for Claude sessions
 
-Source of truth: `docs/SPECIFICATION.md` (features, architecture, phases, §11 six-gate workflow). Phase handoffs: `docs/phase-{0,1,2}-guide.md` — read the latest one at session start.
+Source of truth: `docs/SPECIFICATION.md` (features, architecture, phases, §11 six-gate workflow). Phase handoffs: `docs/phase-{0,1,2,3}-guide.md` — read the latest one at session start. Post-phase work that changes shipped behaviour gets its own plan doc (e.g. `docs/cmd-filesystem-plan.md`) and a superseded-note in the guide it contradicts.
 
 ## Hard rules
 
