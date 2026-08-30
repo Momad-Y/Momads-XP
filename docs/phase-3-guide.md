@@ -29,9 +29,12 @@ Predecessors: `docs/phase-{0,1,2}-guide.md`. The phase's own gate artefacts:
 
 **Explicitly deferred**
 
-- `ls` / `cd` / `pwd` / `cat` — §3.2 assigns them to Phase 6 by name. They are
-  *known* commands that say when they arrive, and `help` lists them under a
-  "coming" heading.
+- ~~`ls` / `cd` / `pwd` / `cat`~~ — **no longer deferred.** Pulled forward after
+  Phase 3 and shipped; see `docs/cmd-filesystem-plan.md`. They walk the live
+  Explorer drive, `help` lists them normally, and the "coming in a later
+  update" footer is gone. The banner's original third line is restored with
+  them. The rest of this file describes Phase 3 as it shipped and is left as
+  the record of that.
 - Spotify embed mode (§3.2 stretch).
 - `input()` in the REPL — see §10.
 - Migrating the other 20 programs onto the app registry (Phase 6).
@@ -225,7 +228,8 @@ cannot be automated here:
 
 - [x] Start ▸ All Programs ▸ **Command Prompt** opens `momad@xp:~`, prints the intro, and every §3.2 command outputs `profile.json` data
 - [x] Unknown command answers `foo: command not found`; lookup is case-sensitive
-- [x] `ls` answers "not available yet", not "command not found"
+- [x] ~~`ls` answers "not available yet"~~ — superseded: `ls` now lists the
+      current directory (`docs/cmd-filesystem-plan.md`)
 - [x] `matrix` / `hack` cancel on any key, **twice in a row**; `sudo` refuses
 - [x] Start ▸ **Python** prints a real `Python 3.13.2` banner and evaluates code
 - [x] Python cannot reach IndexedDB, `localStorage`, or a same-origin worker; its fetches carry `Origin: null`

@@ -3,19 +3,30 @@
 <script lang="ts">
     import { onDestroy, tick, unmount } from 'svelte';
     import Window from '../../../lib/components/xp/Window.svelte';
-    import { runningPrograms } from '../../../lib/store';
+    import { hardDrive, runningPrograms } from '../../../lib/store';
     import { required } from '../../../lib/types';
     import Terminal from '../../../lib/components/xp/Terminal.svelte';
     import { profile } from '../../../lib/profile';
     import { execute, normalise_spacing } from '../../../lib/cmd/registry';
     import { complete } from '../../../lib/cmd/complete';
+    import {
+        FS_COMMANDS,
+        remainder,
+        run_fs,
+    } from '../../../lib/cmd/fs_commands';
+    import { display_path, home_id, ROOT } from '../../../lib/cmd/path';
     import { MAX_COLS, wrap_items } from '../../../lib/cmd/format';
     import { DEFAULT_ACCENT, run_color } from '../../../lib/cmd/color';
     import { feed, initial_state, set_line } from '../../../lib/term/readline';
+    import {
+        DEFAULT_COLS,
+        render_line,
+        row_of,
+    } from '../../../lib/term/render';
     import type { ReadlineState } from '../../../lib/term/readline';
     import {
-        CLEAR_LINE_RIGHT,
         CLEAR_SCREEN,
+        CSI,
         colour,
         CR,
         CRLF,
@@ -114,7 +125,50 @@
         resizable: true,
     };
 
-    const PROMPT = colour('momad@xp', FG_BRIGHT_GREEN) + ':~$ ';
+    /**
+     * This window's working directory, as a VFS id — `null` meaning "home",
+     * so there is no boolean latch waiting for the drive to seed.
+     *
+     * PER WINDOW, like `accent` below and unlike anything in a store: two
+     * terminals are a shipped behaviour, and a shared cwd would move both when
+     * you `cd` in one. It survives `clear` and a whole `python` session, as a
+     * real shell's does.
+     */
+    let cwd: string | null = null;
+
+    /**
+     * FUNCTIONS, not `$:` values.
+     *
+     * `cd` assigns `cwd` and calls `prompt()` in the same synchronous block,
+     * and a reactive statement does not run until the flush AFTER that — so a
+     * reactive prompt printed the directory the shell had just LEFT. Caught by
+     * the E2E, invisible to the unit tests, because only a real Svelte
+     * component has a flush to be late for.
+     */
+    function current_dir(): string {
+        return cwd ?? ($hardDrive == null ? ROOT : home_id($hardDrive));
+    }
+
+    function location(): string {
+        return $hardDrive == null
+            ? '~'
+            : display_path(current_dir(), $hardDrive);
+    }
+
+    function shell_prompt(): string {
+        return colour('momad@xp', FG_BRIGHT_GREEN) + `:${location()}$ `;
+    }
+
+    // The TITLE may lag a flush — nobody can see a taskbar label update one
+    // tick late — so it stays reactive and simply tracks cwd and the drive.
+    $: title_location =
+        $hardDrive == null
+            ? '~'
+            : display_path(cwd ?? home_id($hardDrive), $hardDrive);
+
+    // Real terminals retitle themselves as they navigate. Guarded on mode so
+    // it cannot overwrite the interpreter's title mid-session.
+    $: if (mode === 'shell') window?.update_title(`momad@xp:${title_location}`);
 
     let term: TerminalHandle | undefined;
     let state: ReadlineState = initial_state();
@@ -195,8 +249,56 @@
         teardown();
     }
 
+    /**
+     * Where `redraw` last left the cursor, and where the line it drew ends,
+     * both as COLUMN OFFSETS from the line's first cell.
+     *
+     * Offsets rather than rows because the window is resizable: xterm reflows
+     * a wrapped line when the width changes, so a stored row is measured
+     * against a width that no longer exists.
+     *
+     * Two of them because they are genuinely different places. After Home, or
+     * any left-arrow, the cursor sits in the MIDDLE of a wrapped line while
+     * the line ends two rows further down — and anything written next has to
+     * step down there first or it lands on top of what the visitor typed.
+     */
+    let cursor_offset = 0;
+    let end_offset = 0;
+
+    /**
+     * Step off the input line before writing anything else.
+     *
+     * Every non-redraw write goes through here, so no call site has to
+     * remember. `0/0` is the resting state, and the guard makes this a no-op
+     * everywhere there is no input line to leave — including the `hack` egg's
+     * dot loop, which writes without a newline and must not be sent to
+     * column 0.
+     */
+    function leave_input_line() {
+        if (end_offset === 0 && cursor_offset === 0) return;
+        const cols = term?.size().cols ?? DEFAULT_COLS;
+        const down = row_of(end_offset, cols) - row_of(cursor_offset, cols);
+        if (down > 0) term?.write(`${CSI}${String(down)}B${CR}`);
+        cursor_offset = 0;
+        end_offset = 0;
+    }
+
     function write(text: string) {
+        leave_input_line();
         term?.write(text);
+    }
+
+    /**
+     * The bell, which moves the cursor NOWHERE.
+     *
+     * Deliberately not `write`: routing a zero-motion byte through it would
+     * reset the offsets while the cursor stayed on a wrapped line's second
+     * row, and the next redraw would then fail to climb — reprinting the
+     * prompt mid-line, which is the exact defect this whole mechanism exists
+     * to prevent. Tab-with-no-match and Ctrl+D-mid-line both reach it.
+     */
+    function bell() {
+        term?.write('\x07');
     }
 
     function write_lines(lines: string[]) {
@@ -204,22 +306,37 @@
     }
 
     function prompt() {
-        write(PROMPT);
+        write(shell_prompt());
     }
 
-    /** Redraw the current input line in place, cursor included. */
+    /**
+     * Redraw the current input line in place, cursor included.
+     *
+     * Mode-aware on BOTH counts: the prompt and the buffer come from whichever
+     * session is in the foreground. Reprinting the shell's prompt in front of a
+     * Python line is how a redraw desynchronises.
+     *
+     * The row arithmetic is in `src/lib/term/render.ts`, shared with the
+     * standalone REPL and unit-tested there — a line that wraps needs the
+     * cursor moved by row and column, and the single-row form this replaced
+     * corrupted every input longer than the window is wide.
+     *
+     * `term.write` directly, not `write`: this is the one caller that has to
+     * KEEP its cursor row rather than reset it.
+     */
     function redraw() {
-        // \r to column 0, clear right, reprint. Cheaper and steadier than
-        // tracking individual cursor moves, and it cannot desynchronise.
-        //
-        // Mode-aware on BOTH counts: the prompt and the buffer both come from
-        // whichever session is in the foreground. Reprinting the shell's
-        // prompt in front of a Python line is how a redraw desynchronises.
         const line = mode === 'python' ? py_line : state;
-        const p = mode === 'python' ? prompt_text(py) : PROMPT;
-        write(CR + CLEAR_LINE_RIGHT + p + line.buffer);
-        const back = line.buffer.length - line.cursor;
-        if (back > 0) write(`\x1b[${String(back)}D`);
+        const p = mode === 'python' ? prompt_text(py) : shell_prompt();
+        const rendered = render_line({
+            prompt: p,
+            buffer: line.buffer,
+            cursor: line.cursor,
+            cols: term?.size().cols ?? DEFAULT_COLS,
+            prev_cursor_offset: cursor_offset,
+        });
+        term?.write(rendered.text);
+        cursor_offset = rendered.cursor_offset;
+        end_offset = rendered.end_offset;
     }
 
     // ---------------------------------------------------------------------
@@ -292,7 +409,9 @@
         // runtime per session the visitor ever opened.
         mode = 'shell';
         py = initial_repl_state();
-        window?.update_title(SHELL_TITLE);
+        // The directory the shell was in is still the directory it is in, so
+        // the title comes back with the path rather than a hardcoded `~`.
+        window?.update_title(`momad@xp:${title_location}`);
         prompt();
     }
 
@@ -320,7 +439,7 @@
                 // through to the bell below would be a regression.
                 return;
             }
-            write('\x07'); // the only remaining effect kind
+            bell(); // the only remaining effect kind
         }
         if (!py.awaiting) redraw();
     }
@@ -522,6 +641,23 @@
             return;
         }
 
+        // The filesystem commands need the drive and this window's working
+        // directory, so they are dispatched here for the same reason `color`
+        // and `python` are — it keeps `registry.ts` pure. One membership test
+        // rather than four more branches.
+        if ((FS_COMMANDS as readonly string[]).includes(name)) {
+            const result = run_fs(name, remainder(line), {
+                drive: $hardDrive,
+                cwd: current_dir(),
+            });
+            if (result.cwd != null) cwd = result.cwd;
+            write_lines(
+                normalise_spacing(result.lines, result.blank_after ?? false),
+            );
+            prompt();
+            return;
+        }
+
         write_lines(execute(line, profile));
         prompt();
     }
@@ -531,7 +667,10 @@
      * only draws the outcome.
      */
     function on_complete() {
-        const result = complete(state.buffer, state.cursor);
+        const result = complete(state.buffer, state.cursor, {
+            drive: $hardDrive,
+            cwd: current_dir(),
+        });
 
         if (result.buffer !== state.buffer) {
             state = set_line(state, result.buffer, result.cursor);
@@ -547,7 +686,7 @@
             redraw();
             return;
         }
-        write('\x07'); // nothing matched
+        bell(); // nothing matched
     }
 
     function on_data(data: string) {
@@ -592,7 +731,7 @@
                 on_complete();
                 return;
             }
-            write('\x07'); // bell — the only remaining effect kind
+            bell(); // the only remaining effect kind
         }
         redraw();
     }
@@ -605,15 +744,25 @@
     });
 
     function on_ready() {
-        // §3.2's startup banner. The third line was amended for Phase 3: the
-        // original told visitors to try `ls` and `cd experience`, which are
-        // Phase 6 commands — so the terminal's own first screen would have
-        // advertised two commands that answer "not available yet".
+        // §3.2's startup banner. The third line is the ORIGINAL one, restored:
+        // it was amended for Phase 3 because `ls` and `cd` answered "not
+        // available yet", and it comes back now that they run.
+        //
+        // The aside underneath is the answer to the obvious question — the
+        // title bar says Command Prompt and the shell inside it takes `ls`.
+        // Saying so up front is also what makes `dir` a joke rather than a
+        // dead end.
         write_lines([
             colour("Welcome to Momad's XP Terminal", FG_BRIGHT_GREEN),
             "Type 'help' to see available commands.",
+            "Navigate my portfolio like a filesystem — try 'ls' or 'cd experience'.",
+            '',
             colour(
-                "Type 'about' to start, or 'projects' to see what I have built.",
+                "That's 'ls', not 'dir'. The title bar says Command Prompt; the",
+                FG_GREY,
+            ),
+            colour(
+                'shell inside it disagrees, and I sided with the shell.',
                 FG_GREY,
             ),
             '',
