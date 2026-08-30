@@ -613,6 +613,52 @@ test('sudo makes the sandwich', async ({ page }) => {
     expect(await screen(page)).not.toContain('sudoers');
 });
 
+/**
+ * The row directly above the live prompt, read from the DOM rows rather than
+ * from innerText — `.xterm-rows` innerText COLLAPSES blank rows, so the one
+ * thing this test is about is invisible through it.
+ */
+async function rowAbovePrompt(page: Page): Promise<string> {
+    return page
+        .locator('.xterm-rows')
+        .last()
+        .evaluate((root) => {
+            const rows = Array.from(root.children).map((r) =>
+                (r.textContent ?? '').trimEnd(),
+            );
+            for (let i = rows.length - 1; i >= 1; i--) {
+                if (rows[i] === 'momad@xp:~$') return rows[i - 1] ?? '';
+            }
+            return '<no prompt found>';
+        });
+}
+
+test('a short command does not pad the prompt, a block does', async ({
+    page,
+}) => {
+    await bootToDesktop(page);
+    await openCmd(page);
+
+    // A real shell answers `whoami` and gets out of the way. Padding after
+    // every command is what stopped this feeling like cmd.
+    await run(page, 'whoami');
+    await expect
+        .poll(async () => screen(page), { timeout: 10_000 })
+        .toContain('is whose computer this is');
+    expect(await rowAbovePrompt(page)).not.toBe('');
+
+    await run(page, 'date');
+    await page.waitForTimeout(300);
+    expect(await rowAbovePrompt(page)).not.toBe('');
+
+    // A block of portfolio content still gets its blank line.
+    await run(page, 'contact');
+    await expect
+        .poll(async () => screen(page), { timeout: 10_000 })
+        .toContain('email');
+    expect(await rowAbovePrompt(page)).toBe('');
+});
+
 test('sudo refuses, using the name from profile.json', async ({ page }) => {
     await bootToDesktop(page);
     await openCmd(page);

@@ -5,7 +5,7 @@ import {
     execute,
     find_command,
     parse,
-    with_trailing_blank,
+    normalise_spacing,
 } from './registry';
 import { strip_ansi } from '../term/ansi';
 import { profile } from '../profile';
@@ -278,9 +278,13 @@ describe('exit', () => {
     });
 });
 
-describe('output spacing is consistent across commands', () => {
-    /** Commands that produce output and are therefore spaced identically. */
-    const PRINTING = [
+describe('output spacing follows the command, not a blanket rule', () => {
+    /**
+     * The commands that print a BLOCK and are padded from the next prompt:
+     * every portfolio-content command, plus `help`, which has the same dense
+     * multi-group shape.
+     */
+    const BLOCKS = [
         'help',
         'about',
         'skills',
@@ -288,19 +292,13 @@ describe('output spacing is consistent across commands', () => {
         'projects',
         'contact',
         'social',
-        'whoami',
-        'uname -a',
-        'date',
-        'time',
-        'sudo',
     ];
 
-    it('every printing command ends with EXACTLY one blank line', () => {
-        // The reported inconsistency: skills/experience/projects blanked after
-        // every group and so ended with one, while about/contact/social/help
-        // ended flush against the next prompt. Seven call sites each deciding
-        // separately is how it drifted.
-        for (const cmd of PRINTING) {
+    /** Everything else that prints — short answers a real shell does not pad. */
+    const TERSE = ['whoami', 'uname -a', 'date', 'time', 'sudo'];
+
+    it('a block ends with EXACTLY one blank line', () => {
+        for (const cmd of BLOCKS) {
             const out = execute(cmd, profile);
             expect(out.length, `${cmd} printed nothing`).toBeGreaterThan(0);
             expect(out[out.length - 1], `${cmd} does not end blank`).toBe('');
@@ -311,14 +309,24 @@ describe('output spacing is consistent across commands', () => {
         }
     });
 
-    it('an unknown command is spaced the same way', () => {
-        const out = execute('nope', profile);
-        expect(out[out.length - 1]).toBe('');
+    it('a short answer ends on its last line, with no padding', () => {
+        // The reported problem: padding after EVERY command does not feel like
+        // a real shell. `whoami` and `date` answer and get out of the way.
+        for (const cmd of TERSE) {
+            const out = execute(cmd, profile);
+            expect(out.length, `${cmd} printed nothing`).toBeGreaterThan(0);
+            expect(out[out.length - 1], `${cmd} pads the prompt`).not.toBe('');
+        }
     });
 
-    it('a deferred filesystem command is spaced the same way', () => {
+    it('an unknown command does not pad either', () => {
+        const out = execute('nope', profile);
+        expect(out[out.length - 1]).not.toBe('');
+    });
+
+    it('a deferred filesystem command does not pad either', () => {
         const out = execute('ls', profile);
-        expect(out[out.length - 1]).toBe('');
+        expect(out[out.length - 1]).not.toBe('');
     });
 
     it('silent commands stay silent', () => {
@@ -327,6 +335,15 @@ describe('output spacing is consistent across commands', () => {
         for (const cmd of ['clear', 'matrix', 'hack', 'exit']) {
             expect(execute(cmd, profile), cmd).toEqual([]);
         }
+    });
+
+    it('marks exactly the block commands, and nothing else', () => {
+        // Guards the flag itself. Adding `blank_after` to `date` would restore
+        // the padding this change removed, and no other test would notice.
+        const flagged = COMMANDS.filter((c) => c.blank_after === true).map(
+            (c) => c.name,
+        );
+        expect(flagged.sort()).toEqual([...BLOCKS].sort());
     });
 
     it('still separates groups with a single blank line', () => {
@@ -342,17 +359,31 @@ describe('output spacing is consistent across commands', () => {
     });
 });
 
-describe('with_trailing_blank', () => {
-    it('collapses several trailing blanks to one', () => {
-        expect(with_trailing_blank(['a', '', '', ''])).toEqual(['a', '']);
+describe('normalise_spacing', () => {
+    it('collapses several trailing blanks to one when padding is asked for', () => {
+        expect(normalise_spacing(['a', '', '', ''], true)).toEqual(['a', '']);
     });
 
     it('adds one when there is none', () => {
-        expect(with_trailing_blank(['a'])).toEqual(['a', '']);
+        expect(normalise_spacing(['a'], true)).toEqual(['a', '']);
     });
 
-    it('leaves empty output empty', () => {
-        expect(with_trailing_blank([])).toEqual([]);
-        expect(with_trailing_blank(['', ''])).toEqual([]);
+    it('strips them all when padding is NOT asked for', () => {
+        expect(normalise_spacing(['a', '', ''], false)).toEqual(['a']);
+        expect(normalise_spacing(['a'], false)).toEqual(['a']);
+    });
+
+    it('leaves empty output empty either way', () => {
+        expect(normalise_spacing([], true)).toEqual([]);
+        expect(normalise_spacing(['', ''], true)).toEqual([]);
+        expect(normalise_spacing(['', ''], false)).toEqual([]);
+    });
+
+    it('keeps blank lines that are INSIDE the output', () => {
+        expect(normalise_spacing(['a', '', 'b'], false)).toEqual([
+            'a',
+            '',
+            'b',
+        ]);
     });
 });

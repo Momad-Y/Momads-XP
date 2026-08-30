@@ -26,6 +26,22 @@ export interface Command {
     name: string;
     /** One-line summary shown by `help`. */
     summary: string;
+    /**
+     * End the output with one blank line, separating a BLOCK from the next
+     * prompt.
+     *
+     * Only the commands that print a block of portfolio content — `about`,
+     * `skills`, `experience`, `projects`, `contact`, `social` — plus `help`,
+     * which has the same dense multi-group shape. A real shell does not pad
+     * after `whoami` or `date`, and doing it everywhere is what stopped this
+     * feeling like cmd.
+     *
+     * A FLAG on the command rather than a list of names elsewhere: a name in a
+     * separate set can be misspelled and silently do nothing, and this way
+     * adding a command forces the choice. `execute` is still the only place
+     * that applies it, which is the property that stopped the original drift.
+     */
+    blank_after?: boolean;
     run: (args: string[], profile: Profile) => string[];
 }
 
@@ -68,6 +84,7 @@ export const COMMANDS: readonly Command[] = [
     {
         name: 'help',
         summary: 'list available commands',
+        blank_after: true,
         run: () => [
             heading("Momad's XP Terminal — available commands"),
             BLANK,
@@ -84,6 +101,7 @@ export const COMMANDS: readonly Command[] = [
     {
         name: 'about',
         summary: 'print bio',
+        blank_after: true,
         run: (_args, profile) => [
             heading(`${profile.meta.name} — ${profile.meta.title}`),
             BLANK,
@@ -93,6 +111,7 @@ export const COMMANDS: readonly Command[] = [
     {
         name: 'skills',
         summary: 'list skills by area',
+        blank_after: true,
         run: (_args, profile) =>
             join_blocks(
                 Object.entries(profile.skills).map(([group, items]) => [
@@ -104,6 +123,7 @@ export const COMMANDS: readonly Command[] = [
     {
         name: 'experience',
         summary: 'print experience summary',
+        blank_after: true,
         run: (_args, profile) =>
             join_blocks(
                 profile.experience.map((job) => [
@@ -116,6 +136,7 @@ export const COMMANDS: readonly Command[] = [
     {
         name: 'projects',
         summary: 'list projects',
+        blank_after: true,
         run: (_args, profile) =>
             join_blocks(
                 profile.projects.map((project) => [
@@ -130,6 +151,7 @@ export const COMMANDS: readonly Command[] = [
     {
         name: 'contact',
         summary: 'show contact info',
+        blank_after: true,
         run: (_args, profile) => [
             heading('Contact'),
             BLANK,
@@ -145,6 +167,7 @@ export const COMMANDS: readonly Command[] = [
     {
         name: 'social',
         summary: 'list social links',
+        blank_after: true,
         run: (_args, profile) =>
             columns(
                 profile.social.map((s) => [s.platform, s.url] as const),
@@ -298,36 +321,46 @@ export function execute(input: string, profile: Profile): string[] {
     if (parsed == null) return [];
     if ((DEFERRED_COMMANDS as readonly string[]).includes(parsed.name)) {
         // Through the same normaliser: this branch returned early and so was
-        // the one printing command still spaced differently from the rest.
-        return with_trailing_blank([
-            dim(`${parsed.name}: ${DEFERRED_MESSAGE}`),
-        ]);
+        // the one printing command still spaced differently from the rest. One
+        // line of apology needs no padding after it.
+        return normalise_spacing(
+            [dim(`${parsed.name}: ${DEFERRED_MESSAGE}`)],
+            false,
+        );
     }
     const command = find_command(parsed.name);
-    const lines =
-        command == null
-            ? [`${parsed.name}: command not found`]
-            : command.run(parsed.args, profile);
-    return with_trailing_blank(lines);
+    if (command == null) {
+        return normalise_spacing([`${parsed.name}: command not found`], false);
+    }
+    return normalise_spacing(
+        command.run(parsed.args, profile),
+        command.blank_after === true,
+    );
 }
 
 /**
- * Exactly ONE blank line after any output, and none after silence.
+ * Strip any trailing blanks a command produced, then add ONE back only if it
+ * asked for it.
  *
- * Normalised here rather than per command, which is why the commands no longer
- * append their own: `skills`, `experience` and `projects` blanked after every
- * group and so ended with one, while `about`, `contact`, `social` and `help`
- * ended flush against the next prompt. Seven call sites each deciding
- * separately is how that drifted — the same shape as every other "rule applied
- * at one call site" defect in this repo, just cosmetic.
+ * Applied here and nowhere else. `skills`, `experience` and `projects` blank
+ * after every group and so used to end with one, while `about`, `contact`,
+ * `social` and `help` ended flush against the next prompt — seven call sites
+ * each deciding separately, which is the same "rule applied at one call site"
+ * shape as every other defect in this repo, just cosmetic. Centralising it is
+ * what makes `blank_after` a single honest switch rather than seven.
  *
- * Commands that print nothing (`clear`, `matrix`, `hack`) stay silent: a blank
- * line before a freshly cleared screen's prompt would be a visible artefact.
+ * Commands that print nothing (`clear`, `matrix`, `hack`) stay silent either
+ * way: a blank line before a freshly cleared screen's prompt would be a visible
+ * artefact.
  */
-export function with_trailing_blank(lines: string[]): string[] {
+export function normalise_spacing(
+    lines: string[],
+    blank_after: boolean,
+): string[] {
     const trimmed = [...lines];
     while (trimmed.length > 0 && trimmed[trimmed.length - 1] === BLANK) {
         trimmed.pop();
     }
-    return trimmed.length === 0 ? [] : [...trimmed, BLANK];
+    if (trimmed.length === 0) return [];
+    return blank_after ? [...trimmed, BLANK] : trimmed;
 }

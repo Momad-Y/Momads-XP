@@ -7,7 +7,7 @@
     import { required } from '../../../lib/types';
     import Terminal from '../../../lib/components/xp/Terminal.svelte';
     import { profile } from '../../../lib/profile';
-    import { execute, with_trailing_blank } from '../../../lib/cmd/registry';
+    import { execute, normalise_spacing } from '../../../lib/cmd/registry';
     import { complete } from '../../../lib/cmd/complete';
     import { MAX_COLS, wrap_items } from '../../../lib/cmd/format';
     import { DEFAULT_ACCENT, run_color } from '../../../lib/cmd/color';
@@ -498,7 +498,9 @@
                 // announcing the change is itself drawn in the new colour.
                 term?.set_accent(accent);
             }
-            write_lines(with_trailing_blank(result.lines));
+            // `color` reports in one or two lines; a shell does not pad after
+            // those, so this asks for no trailing blank.
+            write_lines(normalise_spacing(result.lines, false));
             prompt();
             return;
         }
