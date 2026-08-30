@@ -267,6 +267,8 @@ Bash-style `foo: command not found`, case-sensitive (§3.2: "bash emulation,
 'projects' to see what I have built.` — v1's mandated text advertised `ls`,
 which answers "not available yet". `ls`/`cd`/`cat`/`pwd` are known commands
 saying so. Eggs cancellable, torn down on unmount.
+(**Superseded after Phase 3** — those four shipped and the banner's original
+line is back; see `docs/cmd-filesystem-plan.md`.)
 
 **Also owns:** `start_menu.svelte`'s Command Prompt entry.
 

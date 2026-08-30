@@ -45,20 +45,6 @@ export interface Command {
     run: (args: string[], profile: Profile) => string[];
 }
 
-/**
- * Commands §3.2 assigns to PHASE 6, listed so they are a deliberate deferral
- * rather than a dead end.
- *
- * The startup banner used to advertise `ls` and `cd` (SPECIFICATION.md §3.2),
- * which would have made the terminal's first screen point at commands that
- * refuse to run. The banner's third line was amended for Phase 3 and is
- * restored alongside these — see docs/phase-3-spec.md D-A6.
- */
-export const DEFERRED_COMMANDS = ['ls', 'cd', 'pwd', 'cat'] as const;
-
-const DEFERRED_MESSAGE =
-    'not available yet — filesystem navigation lands in a later update';
-
 /** Join blocks with exactly one blank line BETWEEN them, none trailing. */
 function join_blocks(blocks: string[][]): string[] {
     return blocks.flatMap((block, i) => (i === 0 ? block : [BLANK, ...block]));
@@ -93,9 +79,6 @@ export const COMMANDS: readonly Command[] = [
                     (c) => [c.name, c.summary] as const,
                 ),
             ).map((l) => `  ${l}`),
-            BLANK,
-            dim('Coming in a later update:'),
-            `  ${dim(DEFERRED_COMMANDS.join(', '))}`,
         ],
     },
     {
@@ -249,6 +232,35 @@ export const COMMANDS: readonly Command[] = [
         run: () => [],
     },
     {
+        name: 'ls',
+        summary: 'list this directory, or `ls -a` to include hidden entries',
+        // Listed for `help`; the working directory belongs to the component,
+        // so the four filesystem commands are dispatched there through
+        // `src/lib/cmd/fs_commands.ts` — exactly as `color` and `python` are.
+        // The command layer stays pure `(args, profile) => string[]`.
+        run: () => [],
+    },
+    {
+        name: 'cd',
+        summary: 'change directory, e.g. cd experience',
+        run: () => [],
+    },
+    {
+        name: 'pwd',
+        summary: 'print the current directory',
+        run: () => [],
+    },
+    {
+        name: 'cat',
+        summary: 'print a file, e.g. cat about.txt',
+        run: () => [],
+    },
+    {
+        name: 'dir',
+        summary: 'what a Windows person types; it runs ls',
+        run: () => [],
+    },
+    {
         name: 'python',
         summary: 'start the Python interpreter in this window',
         // Listed for `help`; the session is hosted by the component, which owns
@@ -274,19 +286,9 @@ export const COMMANDS: readonly Command[] = [
     },
 ];
 
-/**
- * Every name the shell recognises, sorted — including the deferred filesystem
- * commands.
- *
- * Deferred ones are INCLUDED on purpose. `help` advertises them as "coming in a
- * later update" and `execute` answers them specially, so they are names the
- * shell knows; having Tab claim otherwise would contradict the menu the shell
- * itself prints.
- */
+/** Every name the shell recognises, sorted. */
 export function command_names(): string[] {
-    return [...COMMANDS.map((c) => c.name), ...DEFERRED_COMMANDS].sort((a, b) =>
-        a.localeCompare(b),
-    );
+    return COMMANDS.map((c) => c.name).sort((a, b) => a.localeCompare(b));
 }
 
 export function find_command(name: string): Command | undefined {
@@ -319,15 +321,6 @@ export function parse(input: string): ParsedInput | null {
 export function execute(input: string, profile: Profile): string[] {
     const parsed = parse(input);
     if (parsed == null) return [];
-    if ((DEFERRED_COMMANDS as readonly string[]).includes(parsed.name)) {
-        // Through the same normaliser: this branch returned early and so was
-        // the one printing command still spaced differently from the rest. One
-        // line of apology needs no padding after it.
-        return normalise_spacing(
-            [dim(`${parsed.name}: ${DEFERRED_MESSAGE}`)],
-            false,
-        );
-    }
     const command = find_command(parsed.name);
     if (command == null) {
         return normalise_spacing([`${parsed.name}: command not found`], false);

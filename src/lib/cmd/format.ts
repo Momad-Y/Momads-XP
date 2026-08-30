@@ -5,7 +5,14 @@
  * short lines (≤72 columns, the width TERMINAL_MIN_WIDTH is sized around)
  * rather than trying to be a layout engine.
  */
-import { colour, DIM, FG_BRIGHT_GREEN, FG_CYAN, FG_GREY } from '../term/ansi';
+import {
+    colour,
+    DIM,
+    FG_BRIGHT_GREEN,
+    FG_CYAN,
+    FG_GREY,
+    visible_length,
+} from '../term/ansi';
 
 /** Longest line the formatters aim for; see theme.TERMINAL_MIN_WIDTH. */
 export const MAX_COLS = 72;
@@ -87,7 +94,11 @@ export function wrap_items(
     for (const item of items) {
         const candidate =
             line.length === 0 ? item : `${line}${separator}${item}`;
-        if (line.length > 0 && candidate.length > width) {
+        // Measured WITHOUT colour codes. `ls` paints directories, and an ANSI
+        // escape is ~9 bytes of zero width — counting them as columns packs
+        // every line nine columns short and the output goes ragged. The same
+        // hazard `columns()` documents below.
+        if (line.length > 0 && visible_length(candidate) > width) {
             lines.push(`${line}${separator.trimEnd()}`);
             line = item;
         } else {

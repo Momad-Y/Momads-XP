@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
     COMMANDS,
-    DEFERRED_COMMANDS,
     execute,
     find_command,
     parse,
@@ -163,22 +162,47 @@ describe('help', () => {
         }
     });
 
-    it('names the deferred commands under a "coming" heading', () => {
-        // §1b's "no dead entries" standard: a deferral has to be legible.
-        const out = plain('help');
-        for (const name of DEFERRED_COMMANDS) expect(out).toContain(name);
-        expect(out.toLowerCase()).toContain('later update');
+    it('advertises nothing as coming later, now that nothing is', () => {
+        // The filesystem commands were the only deferral. The footer has to go
+        // with them or `help` prints an empty "coming in a later update" list.
+        expect(plain('help').toLowerCase()).not.toContain('later update');
+    });
+
+    it('lists the filesystem commands with their summaries', () => {
+        // A POSITIVE assertion, because the negative one above passes on an
+        // empty help screen. Matched at the start of a line so `ls` cannot be
+        // satisfied by the `ls` inside "skills" — which is how the existing
+        // every-command check was quietly passing.
+        const lines = plain('help').split('\n');
+        for (const name of ['ls', 'cd', 'pwd', 'cat', 'dir']) {
+            const row = lines.find((l) => l.trimStart().startsWith(`${name} `));
+            expect(row, `help does not list ${name}`).toBeDefined();
+            expect(
+                row?.trim().length,
+                `${name} has no summary`,
+            ).toBeGreaterThan(name.length + 4);
+        }
     });
 });
 
-describe('deferred filesystem commands', () => {
-    it('answer as KNOWN commands, not "command not found"', () => {
-        // §3.2 assigns ls/cd/pwd/cat to Phase 6 by name. Answering
-        // "command not found" would read as broken rather than deferred.
-        for (const name of DEFERRED_COMMANDS) {
-            const out = plain(name);
-            expect(out).toContain('not available yet');
-            expect(out).not.toContain('command not found');
+describe('the filesystem commands', () => {
+    it('are real commands the shell recognises', () => {
+        // They used to answer "not available yet". §3.2 assigns them by name
+        // and they now run, so the registry must know them or Tab and `help`
+        // would advertise commands that answer "command not found".
+        for (const name of ['ls', 'cd', 'pwd', 'cat', 'dir']) {
+            expect(find_command(name), name).toBeDefined();
+            expect(plain(name), name).not.toContain('command not found');
+        }
+    });
+
+    it('produce no lines here, because the component runs them', () => {
+        // They need the working directory, which belongs to the terminal —
+        // the same split `color`, `clear` and `python` already use. This test
+        // is what stops someone giving them a `run` body that silently never
+        // executes.
+        for (const name of ['ls', 'cd', 'pwd', 'cat', 'dir']) {
+            expect(execute(name, profile), name).toEqual([]);
         }
     });
 });
@@ -321,11 +345,6 @@ describe('output spacing follows the command, not a blanket rule', () => {
 
     it('an unknown command does not pad either', () => {
         const out = execute('nope', profile);
-        expect(out[out.length - 1]).not.toBe('');
-    });
-
-    it('a deferred filesystem command does not pad either', () => {
-        const out = execute('ls', profile);
         expect(out[out.length - 1]).not.toBe('');
     });
 

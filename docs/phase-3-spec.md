@@ -334,6 +334,11 @@ makes the shipped app self-consistent without moving Phase 6's work.
 **Against, accepted:** a spec-copy edit and a weaker exit criterion — both
 recorded here rather than discovered at gate 6.
 
+**Superseded after Phase 3:** the filesystem commands were pulled forward and
+shipped, so the third line is restored and the deferral message is gone. The
+verdict above was right for Phase 3 and is left as the record of it; the
+current behaviour is `docs/cmd-filesystem-plan.md`.
+
 ### D-A8 — Unknown commands **(REVERSED)**
 
 v1 chose cmd.exe's `'foo' is not recognized as an internal or external
