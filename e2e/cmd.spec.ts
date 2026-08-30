@@ -50,6 +50,18 @@ async function screen(page: Page): Promise<string> {
     return page.locator('.xterm-rows').last().innerText();
 }
 
+/** Every row of the newest terminal, concatenated (wrapped rows included). */
+async function rows(page: Page): Promise<string> {
+    return page
+        .locator('.xterm-rows')
+        .last()
+        .evaluate((root) =>
+            Array.from(root.children)
+                .map((r) => (r.textContent ?? '').trimEnd())
+                .join(''),
+        );
+}
+
 async function run(page: Page, line: string) {
     // Same reason as `screen`: typing must go to the newest terminal, and a
     // page-wide textarea locator throws once a second one exists.
@@ -142,13 +154,18 @@ test('navigates the real filesystem with ls, cd, pwd and cat', async ({
         .toContain('Printerpix — AI Engineer.txt');
 
     await run(page, 'cat Printerpix — AI Engineer.txt');
-    await expect.poll(async () => screen(page)).toContain('AI Engineer');
+    // NOT 'AI Engineer' — that is a substring of the filename `ls` printed two
+    // commands ago and still on screen, so it would pass even if `cat` printed
+    // nothing at all. The dim meta line only `cat` produces is the real proof.
+    await expect
+        .poll(async () => screen(page))
+        .toContain('Printerpix · October 2025');
 
     await run(page, 'cd ..');
     await expect.poll(async () => promptLine(page)).toBe('momad@xp:~$');
 });
 
-test('the working directory is per window and survives a python session', async ({
+test('the working directory is per window and survives clear', async ({
     page,
 }) => {
     await bootToDesktop(page);
@@ -824,15 +841,7 @@ test('an input line longer than the window redraws without duplicating the promp
     await page.locator('.xterm-helper-textarea').last().fill('');
     await page.keyboard.type(`echo ${payload}`);
 
-    const rows = await page
-        .locator('.xterm-rows')
-        .last()
-        .evaluate((root) =>
-            Array.from(root.children).map((r) =>
-                (r.textContent ?? '').trimEnd(),
-            ),
-        );
-    const joined = rows.join('');
+    const joined = await rows(page);
 
     // One prompt on screen: the one the banner left. The bug printed a fresh
     // one per keystroke past the wrap.
@@ -847,6 +856,62 @@ test('an input line longer than the window redraws without duplicating the promp
     await expect
         .poll(async () => (await screen(page)).replace(/\n/g, ''))
         .toContain(payload);
+});
+
+/**
+ * The bell, and the cursor sitting anywhere but the end of a wrapped line.
+ *
+ * Both re-armed the duplicated-prompt bug after it was fixed: the bell is a
+ * ZERO-MOTION write, so routing it through the write path that resets the
+ * cursor row left the row claiming 0 while the cursor was still on row 1; and
+ * every other write assumed the cursor was at the line's END, which it is not
+ * after Home or a left-arrow.
+ */
+test('a bell on a wrapped line does not corrupt the next redraw', async ({
+    page,
+}) => {
+    await bootToDesktop(page);
+    await openCmd(page);
+
+    await page.locator('.xterm-helper-textarea').last().fill('');
+    await page.keyboard.type(`echo ${'w'.repeat(140)}`);
+    // Nothing completes this, so the completer rings the bell and moves the
+    // cursor nowhere.
+    await page.keyboard.press('Tab');
+    await page.keyboard.type('X');
+
+    const joined = await rows(page);
+    expect(joined.split('momad@xp:~$').length - 1).toBe(1);
+    expect(joined).toContain(`echo ${'w'.repeat(140)}X`);
+});
+
+test('Home on a wrapped line does not let output land mid-line', async ({
+    page,
+}) => {
+    await bootToDesktop(page);
+    await openCmd(page);
+
+    const payload = 'w'.repeat(140);
+    await page.locator('.xterm-helper-textarea').last().fill('');
+    await page.keyboard.type(`echo ${payload}`);
+    // Cursor to the start — two rows above where the line ends.
+    await page.keyboard.press('Home');
+    await page.keyboard.press('Enter');
+
+    // Polled on the PROMPT COUNT, not on the payload: the payload is already
+    // on screen in the line just typed, so polling for it would resolve before
+    // the command had run and prove nothing.
+    await expect
+        .poll(async () => (await rows(page)).split('momad@xp:~$').length - 1)
+        .toBe(2);
+
+    // Twice: once in the line the visitor typed, once in what `echo` printed.
+    // Before the fix the CRLF was written from the CURSOR's row rather than
+    // the line's end, so the output landed on the second half of the typed
+    // line and overwrote it — leaving exactly one copy.
+    const joined = await rows(page);
+    expect(joined.split(payload).length - 1).toBe(2);
+    expect(joined).toContain(`echo ${payload}`);
 });
 
 test('two terminals can be open at once', async ({ page }) => {

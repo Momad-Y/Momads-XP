@@ -18,10 +18,15 @@
     import { MAX_COLS, wrap_items } from '../../../lib/cmd/format';
     import { DEFAULT_ACCENT, run_color } from '../../../lib/cmd/color';
     import { feed, initial_state, set_line } from '../../../lib/term/readline';
-    import { DEFAULT_COLS, render_line } from '../../../lib/term/render';
+    import {
+        DEFAULT_COLS,
+        render_line,
+        row_of,
+    } from '../../../lib/term/render';
     import type { ReadlineState } from '../../../lib/term/readline';
     import {
         CLEAR_SCREEN,
+        CSI,
         colour,
         CR,
         CRLF,
@@ -245,15 +250,55 @@
     }
 
     /**
-     * The row `redraw` last left the cursor on, relative to the input line's
-     * first row. Only `redraw` sets it; every other write resets it, because
-     * output and a fresh prompt both leave the cursor on a line of its own.
+     * Where `redraw` last left the cursor, and where the line it drew ends,
+     * both as COLUMN OFFSETS from the line's first cell.
+     *
+     * Offsets rather than rows because the window is resizable: xterm reflows
+     * a wrapped line when the width changes, so a stored row is measured
+     * against a width that no longer exists.
+     *
+     * Two of them because they are genuinely different places. After Home, or
+     * any left-arrow, the cursor sits in the MIDDLE of a wrapped line while
+     * the line ends two rows further down — and anything written next has to
+     * step down there first or it lands on top of what the visitor typed.
      */
-    let cursor_row = 0;
+    let cursor_offset = 0;
+    let end_offset = 0;
+
+    /**
+     * Step off the input line before writing anything else.
+     *
+     * Every non-redraw write goes through here, so no call site has to
+     * remember. `0/0` is the resting state, and the guard makes this a no-op
+     * everywhere there is no input line to leave — including the `hack` egg's
+     * dot loop, which writes without a newline and must not be sent to
+     * column 0.
+     */
+    function leave_input_line() {
+        if (end_offset === 0 && cursor_offset === 0) return;
+        const cols = term?.size().cols ?? DEFAULT_COLS;
+        const down = row_of(end_offset, cols) - row_of(cursor_offset, cols);
+        if (down > 0) term?.write(`${CSI}${String(down)}B${CR}`);
+        cursor_offset = 0;
+        end_offset = 0;
+    }
 
     function write(text: string) {
+        leave_input_line();
         term?.write(text);
-        cursor_row = 0;
+    }
+
+    /**
+     * The bell, which moves the cursor NOWHERE.
+     *
+     * Deliberately not `write`: routing a zero-motion byte through it would
+     * reset the offsets while the cursor stayed on a wrapped line's second
+     * row, and the next redraw would then fail to climb — reprinting the
+     * prompt mid-line, which is the exact defect this whole mechanism exists
+     * to prevent. Tab-with-no-match and Ctrl+D-mid-line both reach it.
+     */
+    function bell() {
+        term?.write('\x07');
     }
 
     function write_lines(lines: string[]) {
@@ -287,10 +332,11 @@
             buffer: line.buffer,
             cursor: line.cursor,
             cols: term?.size().cols ?? DEFAULT_COLS,
-            prev_cursor_row: cursor_row,
+            prev_cursor_offset: cursor_offset,
         });
         term?.write(rendered.text);
-        cursor_row = rendered.cursor_row;
+        cursor_offset = rendered.cursor_offset;
+        end_offset = rendered.end_offset;
     }
 
     // ---------------------------------------------------------------------
@@ -393,7 +439,7 @@
                 // through to the bell below would be a regression.
                 return;
             }
-            write('\x07'); // the only remaining effect kind
+            bell(); // the only remaining effect kind
         }
         if (!py.awaiting) redraw();
     }
@@ -640,7 +686,7 @@
             redraw();
             return;
         }
-        write('\x07'); // nothing matched
+        bell(); // nothing matched
     }
 
     function on_data(data: string) {
@@ -685,7 +731,7 @@
                 on_complete();
                 return;
             }
-            write('\x07'); // bell — the only remaining effect kind
+            bell(); // the only remaining effect kind
         }
         redraw();
     }

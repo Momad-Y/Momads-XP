@@ -26,6 +26,7 @@ import {
 import {
     children_of,
     display_path,
+    drive_segment,
     home_id,
     is_dir,
     posix_path,
@@ -73,9 +74,18 @@ function take_all_flag(rest: string): { all: boolean; path: string } {
     return { all: true, path: rest.slice(match[0].length).trim() };
 }
 
-/** A directory entry as `ls` prints it: folders accented and slash-suffixed. */
-function entry_label(item: VfsItem): string {
-    return is_dir(item) ? accent(`${item.name}/`) : item.name;
+/**
+ * A directory entry as `ls` prints it: directories accented and
+ * slash-suffixed.
+ *
+ * A DRIVE prints its path segment (`c/`), not its Explorer name (`C:/`).
+ * `pwd` prints `/c` and `cd /c` is what works, so listing `C:` at the root
+ * would teach the wrong vocabulary for the shell's own path model.
+ */
+function entry_label(item: VfsItem, at_root: boolean): string {
+    if (!is_dir(item)) return item.name;
+    const name = at_root ? drive_segment(item) : item.name;
+    return accent(`${name}/`);
 }
 
 function run_ls(rest: string, drive: HardDrive, cwd: string): FsResult {
@@ -89,7 +99,9 @@ function run_ls(rest: string, drive: HardDrive, cwd: string): FsResult {
     const item = drive[target.id];
     if (item != null && !is_dir(item)) return { lines: [item.name] };
 
-    const entries = children_of(target.id, drive, all).map(entry_label);
+    const entries = children_of(target.id, drive, all).map((entry) =>
+        entry_label(entry, target.id === ROOT),
+    );
     // An empty directory prints NOTHING, which is what bash does. D: and F:
     // have no children, so this is reachable from the first `ls /`.
     return { lines: wrap_items(entries, MAX_COLS, '  ') };
@@ -195,9 +207,20 @@ function run_cat(rest: string, drive: HardDrive, cwd: string): FsResult {
 export function run_fs(
     name: string,
     rest: string,
-    { drive, cwd }: ShellContext,
+    { drive, cwd: requested }: ShellContext,
 ): FsResult {
     if (drive == null) return NO_DRIVE;
+
+    // ONE fallback, before dispatch, rather than one buried in `resolve`.
+    // `del_fs` unlinks a parent and deletes its children across separate store
+    // updates (`fs.ts:99-134`), so a visitor who deletes the folder a terminal
+    // is sitting in leaves its cwd dangling — and with the fallback only in
+    // `resolve`, `cd` recovered while `ls` printed an empty directory and
+    // `pwd` claimed `~`. Three surfaces disagreeing about where the shell was.
+    const cwd =
+        requested === ROOT || drive[requested] != null
+            ? requested
+            : home_id(drive);
 
     switch (name) {
         case 'ls':
@@ -206,7 +229,13 @@ export function run_fs(
             const listed = run_ls(rest, drive, cwd);
             return {
                 ...listed,
-                lines: [dim(DIR_ASIDE), BLANK, ...listed.lines],
+                // Re-labelled: `dir nope` answering "ls: nope: ..." leaks the
+                // implementation through the joke.
+                lines: [
+                    dim(DIR_ASIDE),
+                    BLANK,
+                    ...listed.lines.map((l) => l.replace(/^ls: /, 'dir: ')),
+                ],
             };
         }
         case 'cd':

@@ -363,7 +363,16 @@ export function to_hard_drive(value: unknown): HardDrive {
     return drive;
 }
 
-/** Structural check for every field `VfsItem` declares as required. */
+/**
+ * Structural check for every field `VfsItem` declares as required.
+ *
+ * Deliberately NOT folded into `is_full_vfs_item` above, which looks similar.
+ * That one narrows an already-typed `Partial<VfsItem>` at the work_space →
+ * program boundary, where the fields exist and may be absent; this one narrows
+ * genuinely untyped JSON, where `type` could be any string at all — which is
+ * why it checks the union and the other does not. Merging them would need a
+ * cast the lint set forbids.
+ */
 function is_vfs_item(value: unknown): value is VfsItem {
     if (typeof value !== 'object' || value === null) return false;
     const item: Record<string, unknown> = { ...value };

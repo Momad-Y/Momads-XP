@@ -241,7 +241,13 @@ export function resolve(
  */
 export function strip_quotes(input: string): string {
     const first = input.at(0);
-    if ((first === '"' || first === "'") && input.endsWith(first)) {
+    // `length > 1` or a lone `"` is both the opening and the closing quote and
+    // strips to nothing, which then reads as "no argument".
+    if (
+        input.length > 1 &&
+        (first === '"' || first === "'") &&
+        input.endsWith(first)
+    ) {
         return input.slice(1, -1);
     }
     return input;

@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { candidates_for, common_prefix, complete, word_at } from './complete';
-import { command_names, find_command } from './registry';
+import { command_names, execute, find_command } from './registry';
+import { profile } from '../profile';
+import { strip_ansi } from '../term/ansi';
 import { readFileSync } from 'node:fs';
-import { to_hard_drive } from '../types';
+import { required, to_hard_drive } from '../types';
 
 /** Complete at the end of the line, which is where Tab is normally pressed. */
 function at_end(buffer: string) {
@@ -92,18 +94,23 @@ describe('completing a command name', () => {
         }
     });
 
-    it('only ever completes to a name the shell actually recognises', () => {
-        // The failure this guards is a completer drifting from the registry and
-        // confidently finishing a command that answers "command not found".
-        for (const name of command_names()) {
-            const typed = name.slice(0, 2);
-            for (const candidate of candidates_for(typed, typed.length)) {
-                expect(
-                    find_command(candidate),
-                    `${candidate} is not a real command`,
-                ).toBeDefined();
-            }
-        }
+    it('offers exactly what `help` advertises — no more, no less', () => {
+        // The old form of this test compared `candidates_for` against
+        // `find_command`, and once DEFERRED_COMMANDS was deleted both sides
+        // became the same array and it could no longer fail. This compares two
+        // INDEPENDENT renderings instead: what Tab offers and what the shell's
+        // own menu prints. A command added to one and not the other fails here.
+        const advertised = execute('help', profile)
+            .map(strip_ansi)
+            .flatMap((line) => {
+                const row = /^ {2}(\S+) {2,}\S/.exec(line);
+                return row?.[1] == null ? [] : [row[1]];
+            });
+        expect(advertised.length).toBeGreaterThan(10);
+        expect(
+            [...advertised, 'help'].sort((a, b) => a.localeCompare(b)),
+        ).toEqual(command_names());
+        expect(candidates_for('', 0)).toEqual(command_names());
     });
 });
 
@@ -207,6 +214,45 @@ describe('completing a path', () => {
     it('still completes command names, and non-path arguments', () => {
         expect(tab('cle').buffer).toBe('clear ');
         expect(tab('color re').buffer).toBe('color reset ');
+    });
+
+    it('completes with the cursor MID-LINE, keeping the tail', () => {
+        // Every other path test completes at the end of the line, so the
+        // `slice(0, start) + insertion + slice(cursor)` splice was only ever
+        // covered for the command-name branch.
+        const line = 'cd Experi | tail';
+        const at = 'cd Experi'.length;
+        expect(complete(line, at, ctx).buffer).toBe('cd Experience/ | tail');
+    });
+
+    it('completes a drive to its path segment, not its Explorer name', () => {
+        // `pwd` prints `/c`; rewriting the visitor's correct `/c` into `/C:`
+        // would teach the wrong vocabulary for the shell's own path model.
+        expect(tab('cd /').candidates).toEqual(['c/', 'd/', 'f/']);
+    });
+
+    it('offers a shortcut to a folder, which cd accepts', () => {
+        // `resolve` derefs shortcuts, so `cd Link.lnk` works. Filtering on the
+        // shortcut's own type made completion refuse what the command allows.
+        const root = required(drive[C], 'seed root');
+        const linked = {
+            ...drive,
+            [C]: { ...root, children: [...root.children, 'lnk'] },
+            lnk: {
+                ...required(drive['p2FolderProjects'], 'seed folder'),
+                id: 'lnk',
+                type: 'file' as const,
+                name: 'Link to Projects.lnk',
+                basename: 'Link to Projects',
+                ext: '.lnk',
+                parent: C,
+                children: [],
+                shortcut_target: 'p2FolderProjects',
+            },
+        };
+        expect(complete('cd Link', 7, { drive: linked, cwd: C }).buffer).toBe(
+            'cd Link to Projects.lnk/',
+        );
     });
 
     it('offers nothing at all before the drive is seeded', () => {

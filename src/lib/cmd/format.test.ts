@@ -116,6 +116,13 @@ describe('wrap_items measures visible width', () => {
         const items = ['aaaaaaaaaa', 'bbbbbbbbbb', 'cccccccccc'].map((i) =>
             accent(i),
         );
-        expect(wrap_items(items, 40, '  ')).toHaveLength(1);
+        const packed = wrap_items(items, 40, '  ');
+        expect(packed).toHaveLength(1);
+        // The CONTENT too: a length assertion alone passes for an
+        // implementation that simply concatenates everything.
+        expect(strip_ansi(packed[0] ?? '')).toBe(
+            'aaaaaaaaaa  bbbbbbbbbb  cccccccccc',
+        );
+        expect(visible_length(packed[0] ?? '')).toBeLessThanOrEqual(40);
     });
 });

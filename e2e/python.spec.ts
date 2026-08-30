@@ -413,6 +413,11 @@ test('python runs INSIDE the cmd window, and exit() gives the shell back @online
         page.locator('iframe[title="Python runtime (isolated)"]'),
     ).toHaveCount(0);
 
+    // Somewhere other than home first, so exit() has a working directory to
+    // give back. A real shell's cwd survives a child process; this is the only
+    // coverage `stop_python`'s title/prompt restoration has.
+    await type(page, 'cd projects');
+
     await type(page, 'python');
     await expect
         .poll(async () => cmdScreen(page), { timeout: 120_000 })
@@ -442,9 +447,11 @@ test('python runs INSIDE the cmd window, and exit() gives the shell back @online
     // exit() ends the interpreter and hands back the SHELL — it does not close
     // the window, which would throw away the shell session with it.
     await type(page, 'exit()');
+    // Back in ~/Projects, not at home: the shell was never moved, so restoring
+    // a hardcoded `momad@xp:~` would have been a lie about where it is.
     await expect
         .poll(async () => cmdScreen(page), { timeout: 30_000 })
-        .toContain('momad@xp:~$');
+        .toContain('momad@xp:~/Projects$');
     await expect(page.locator('#work-space .window')).toHaveCount(1);
 
     // The runtime is released rather than parked in the background.

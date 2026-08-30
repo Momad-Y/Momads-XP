@@ -32,14 +32,26 @@ export interface LineRender {
     /** Everything to write, cursor placement included. */
     text: string;
     /**
-     * Rows between the first row of the line and the row the cursor ends on.
+     * Column offset of the cursor from the line's very first cell.
      *
-     * Feed it back as `prev_cursor_row` on the next call: it is exactly how
-     * far the next redraw has to climb before it can clear downward. Reset it
-     * to 0 after writing anything else (a command's output, a fresh prompt),
-     * because the cursor is then back on a line of its own.
+     * An OFFSET, not a row, and that is the whole point: the window is
+     * resizable and xterm REFLOWS a wrapped line when it changes, so a stored
+     * row is measured against a width that no longer exists and the next
+     * redraw climbs the wrong distance. An offset survives the reflow — the
+     * row is just `row_of(offset, current cols)`.
+     *
+     * Feed it back as `prev_cursor_offset`. Reset it to 0 after writing
+     * anything else, because the cursor is then on a line of its own.
      */
-    cursor_row: number;
+    cursor_offset: number;
+    /**
+     * Column offset of the END of the line.
+     *
+     * The cursor is not always there — Home, or any left-arrow — and anything
+     * written next has to step DOWN to it first, or it lands in the middle of
+     * what the visitor typed.
+     */
+    end_offset: number;
 }
 
 export interface LineRenderOptions {
@@ -49,7 +61,12 @@ export interface LineRenderOptions {
     cursor: number;
     /** The terminal's current column count, from `TerminalHandle.size()`. */
     cols: number;
-    prev_cursor_row: number;
+    prev_cursor_offset: number;
+}
+
+/** Which visual row a column offset falls on, at a given terminal width. */
+export function row_of(offset: number, cols: number): number {
+    return Math.floor(offset / Math.max(1, cols));
 }
 
 export function render_line({
@@ -57,11 +74,15 @@ export function render_line({
     buffer,
     cursor,
     cols,
-    prev_cursor_row,
+    prev_cursor_offset,
 }: LineRenderOptions): LineRender {
     // A zero would divide by zero below. xterm reports 0 for a host element
     // that has not been laid out yet, which is a real state during mount.
     const width = Math.max(1, cols);
+    // UTF-16 units, not display columns. Every character on this drive is one
+    // cell wide, so the two agree; a folder renamed with an emoji or a
+    // combining mark in Explorer would put the arithmetic a column out. Worth
+    // knowing, not worth a grapheme segmenter for a shell over a fixed seed.
     const start = visible_length(prompt);
     const end = start + buffer.length;
     const at = start + Math.max(0, Math.min(buffer.length, cursor));
@@ -69,7 +90,10 @@ export function render_line({
     let text = '';
     // Climb to the line's FIRST row before clearing, or the clear only reaches
     // the rows below the cursor and leaves the wrapped remainder on screen.
-    if (prev_cursor_row > 0) text += `${CSI}${String(prev_cursor_row)}A`;
+    // Derived from the offset at the CURRENT width, so a resize mid-edit —
+    // which reflows the line under us — cannot make this climb wrong.
+    const prev_row = row_of(prev_cursor_offset, width);
+    if (prev_row > 0) text += `${CSI}${String(prev_row)}A`;
     text += CR + CLEAR_SCREEN_DOWN + prompt + buffer;
 
     // Text ending exactly on the right margin leaves the cursor in xterm's
@@ -78,8 +102,8 @@ export function render_line({
     // puts it somewhere both we and the terminal agree on.
     if (end > 0 && end % width === 0) text += CRLF;
 
-    const end_row = Math.floor(end / width);
-    const cursor_row = Math.floor(at / width);
+    const end_row = row_of(end, width);
+    const cursor_row = row_of(at, width);
     const cursor_col = at % width;
 
     // Absolute placement (up N, column 0, right N) rather than `\x1b[{n}D`:
@@ -90,5 +114,5 @@ export function render_line({
     text += CR;
     if (cursor_col > 0) text += `${CSI}${String(cursor_col)}C`;
 
-    return { text, cursor_row };
+    return { text, cursor_offset: at, end_offset: end };
 }

@@ -310,3 +310,58 @@ unobservable, and the reactive form is the simpler one.
 tier was answering for it — but it cannot answer a lowercased name that still
 carries its extension (`printerpix — ai engineer.txt`). A test for that was
 added and the mutation now fails as it should.
+
+## Deviations from the task list
+
+- **Task 1 (`c_drive_id`) was not done.** `path.ts:home_id` finds home by
+  `drive_segment(item) === 'c'` over the drives My Computer lists, so no new
+  constant was needed and the id literal was not moved. The plan's claim that
+  extracting it would remove the duplicate was wrong anyway —
+  `scripts/generate-vfs.ts:20` and `scripts/vfs-base.json` keep their own
+  copies, so one of three would have moved.
+- **Task 2 said "types.ts — no change expected"**; it gained `to_hard_drive`.
+  The strict lint set forbids asserting parsed JSON into `HardDrive`
+  (`no-unsafe-type-assertion`), so the test fixtures needed a real narrowing
+  boundary. It sits beside `required` and `full_vfs_item`, which exist for the
+  same reason at other boundaries.
+
+# Gate-6 corrections (fresh-context implementation red team)
+
+Four defects found, all reproduced before fixing:
+
+1. **The bell re-armed the wrapped-redraw bug.** `write()` was documented as
+   "every write resets the cursor row", but the bell is a ZERO-MOTION write:
+   Tab with no match, or Ctrl+D mid-line, zeroed the row while the cursor
+   stayed on a wrapped line's second row, and the next keystroke reprinted the
+   prompt there — the exact failure the preceding commit fixed. `bell()` now
+   writes the byte without touching the offsets.
+2. **Every other write assumed the cursor was at the line's END.** After Home
+   or a left-arrow it is not, so `write(CRLF)` on submit, `^C`, and the
+   candidate listing all landed in the middle of what the visitor had typed.
+   `render_line` now returns `end_offset` as well, and `leave_input_line()`
+   steps down to it before any non-redraw write.
+3. **A resize mid-edit invalidated the stored row.** The window is resizable
+   and xterm reflows the wrapped line, so a row measured at the old width made
+   the next redraw climb into the previous output. The state is now a column
+   OFFSET, which survives the reflow — the row is `row_of(offset, cols)`.
+4. **D10 was half-implemented.** The stale-cwd fallback lived only inside
+   `resolve()`, so with a deleted working directory `cd` recovered while `ls`
+   printed nothing and `pwd` claimed `~` — verified by execution. Worse, a
+   test asserted `'~'` as correct and locked it in. There is now one fallback
+   at the top of `run_fs`.
+
+Also fixed: `ls /` and Tab printed `C:` while `pwd` printed `/c` (the shell
+teaching the wrong vocabulary for its own path model); `cd <Tab>` hid
+shortcuts-to-folders that `cd` accepts; `dir nope` answered `ls: nope: ...`;
+`strip_quotes('"')` returned an empty string; and `complete.ts`'s doc block
+still claimed the whole module matched case-sensitively.
+
+**Tests that could not fail, replaced:** the `cat` E2E asserted `'AI Engineer'`,
+a substring of the filename `ls` had printed two commands earlier and left on
+screen — it passed whether or not `cat` ran. `complete.test.ts`'s "only
+completes to a real command" compared two expressions that became the same
+array once `DEFERRED_COMMANDS` was deleted; it now compares Tab's offers against
+what `help` independently prints. `registry.test.ts`'s `toContain('ls')` was
+satisfied by the `ls` inside "skills". A test named "survives a python session"
+never started python; the real round-trip now lives in `e2e/python.spec.ts`,
+where a runtime exists.

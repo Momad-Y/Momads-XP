@@ -12,13 +12,24 @@
  *   - no progress    -> the caller lists the candidates
  *   - none           -> the caller rings the bell
  *
- * Matching is case-SENSITIVE, like `find_command`. §3.2 asks for bash, not
- * cmd.exe, and a completer that accepts `HEL` while the shell rejects `HELP`
- * would be advertising a command that does not run.
+ * COMMAND matching is case-SENSITIVE, like `find_command`. §3.2 asks for bash,
+ * not cmd.exe, and a completer that accepts `HEL` while the shell rejects
+ * `HELP` would be advertising a command that does not run.
+ *
+ * PATH matching is case-INSENSITIVE, like `path.ts`'s resolver — the drive
+ * underneath is NTFS, and a completer stricter than the command it completes
+ * for would refuse to finish a name `cd` would have accepted.
  */
 import { COLOR_RESET } from './color';
 import { command_names } from './registry';
-import { children_of, is_dir, resolve } from './path';
+import {
+    children_of,
+    deref,
+    drive_segment,
+    is_dir,
+    resolve,
+    ROOT,
+} from './path';
 import type { HardDrive } from '../types';
 
 /** Commands whose argument is a path rather than free text. */
@@ -157,6 +168,14 @@ function terminated(name: string, directory: boolean): string {
     return directory ? `${name}/` : `${name} `;
 }
 
+/** True when following this item's shortcut lands on a directory. */
+function enterable(id: string, drive: HardDrive): boolean {
+    const target = deref(id, drive);
+    if (target === id) return false;
+    const item = drive[target];
+    return item != null && is_dir(item);
+}
+
 /** Everything that could follow the partial word under the cursor. */
 export function candidates_for(
     buffer: string,
@@ -168,13 +187,25 @@ export function candidates_for(
         const target = path_target(buffer, cursor, cwd, drive);
         if (target != null) {
             const folded = target.prefix.toLowerCase();
+            const at_root = target.base === ROOT;
             return children_of(target.base, drive, true)
+                .map((item) => ({
+                    // At the root, offer the PATH segment (`c/`), not the
+                    // Explorer name — `pwd` prints `/c` and `cd /c` is what
+                    // works, so completing `/c` into `/C:` would rewrite the
+                    // visitor's correct path into the wrong vocabulary.
+                    label: at_root ? drive_segment(item) : item.name,
+                    // A shortcut to a folder is enterable — `resolve` derefs
+                    // it, so `cd Link.lnk` works. Filtering on the shortcut's
+                    // own type made completion refuse what the command allows.
+                    directory: is_dir(item) || enterable(item.id, drive),
+                }))
                 .filter(
-                    (item) =>
-                        (!target.only_dirs || is_dir(item)) &&
-                        item.name.toLowerCase().startsWith(folded),
+                    (entry) =>
+                        (!target.only_dirs || entry.directory) &&
+                        entry.label.toLowerCase().startsWith(folded),
                 )
-                .map((item) => terminated(item.name, is_dir(item)));
+                .map((entry) => terminated(entry.label, entry.directory));
         }
     }
 

@@ -61,9 +61,10 @@ describe('ls', () => {
         expect(out('ls', 'nope')).toBe('ls: nope: No such file or directory');
     });
 
-    it('lists the drives at the root', () => {
-        expect(out('ls', '/')).toContain('C:/');
-        expect(out('ls', '/')).toContain('F:/');
+    it('lists the drives by their PATH segment, not their Explorer name', () => {
+        // `pwd` prints `/c` and `cd /c` is what works, so listing `C:` here
+        // would teach the wrong vocabulary for the shell's own path model.
+        expect(out('ls', '/')).toBe('c/  d/  f/');
     });
 });
 
@@ -122,8 +123,12 @@ describe('pwd', () => {
         expect(out('pwd', '', ROOT)).toBe('/');
     });
 
-    it('answers even from a directory that has been deleted underneath it', () => {
-        expect(out('pwd', '', 'deleted-id')).toBe('~');
+    it('falls back home when the directory was deleted underneath it', () => {
+        // One fallback, before dispatch. With it only inside `resolve`, `cd`
+        // recovered while `ls` printed an empty directory and `pwd` claimed
+        // `~` — three surfaces disagreeing about where the shell was.
+        expect(out('pwd', '', 'deleted-id')).toBe('/c');
+        expect(out('ls', '', 'deleted-id')).toContain('Experience/');
     });
 });
 

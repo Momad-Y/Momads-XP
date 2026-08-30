@@ -167,6 +167,22 @@ describe('help', () => {
         // with them or `help` prints an empty "coming in a later update" list.
         expect(plain('help').toLowerCase()).not.toContain('later update');
     });
+
+    it('lists the filesystem commands with their summaries', () => {
+        // A POSITIVE assertion, because the negative one above passes on an
+        // empty help screen. Matched at the start of a line so `ls` cannot be
+        // satisfied by the `ls` inside "skills" — which is how the existing
+        // every-command check was quietly passing.
+        const lines = plain('help').split('\n');
+        for (const name of ['ls', 'cd', 'pwd', 'cat', 'dir']) {
+            const row = lines.find((l) => l.trimStart().startsWith(`${name} `));
+            expect(row, `help does not list ${name}`).toBeDefined();
+            expect(
+                row?.trim().length,
+                `${name} has no summary`,
+            ).toBeGreaterThan(name.length + 4);
+        }
+    });
 });
 
 describe('the filesystem commands', () => {
