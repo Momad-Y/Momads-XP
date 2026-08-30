@@ -341,6 +341,50 @@ export function is_full_vfs_item(item: Partial<VfsItem>): item is VfsItem {
 }
 
 /**
+ * Narrow parsed JSON into a `HardDrive`.
+ *
+ * The seed arrives as `unknown` and the strict lint set forbids asserting it
+ * into shape (`no-unsafe-type-assertion`), so the narrowing is a real check:
+ * every entry must carry the fields `VfsItem` declares as required, and
+ * anything else throws with the offending id rather than surfacing as an
+ * `undefined` field three call frames later.
+ */
+export function to_hard_drive(value: unknown): HardDrive {
+    if (typeof value !== 'object' || value === null) {
+        throw new Error('hard drive payload is not an object');
+    }
+    const drive: HardDrive = {};
+    for (const [id, item] of Object.entries<unknown>({ ...value })) {
+        if (!is_vfs_item(item)) {
+            throw new Error(`hard drive entry ${id} is not a VfsItem`);
+        }
+        drive[id] = item;
+    }
+    return drive;
+}
+
+/** Structural check for every field `VfsItem` declares as required. */
+function is_vfs_item(value: unknown): value is VfsItem {
+    if (typeof value !== 'object' || value === null) return false;
+    const item: Record<string, unknown> = { ...value };
+    return (
+        typeof item.id === 'string' &&
+        (item.type === 'file' ||
+            item.type === 'folder' ||
+            item.type === 'drive' ||
+            item.type === 'removable_storage') &&
+        typeof item.name === 'string' &&
+        typeof item.basename === 'string' &&
+        typeof item.ext === 'string' &&
+        Array.isArray(item.children) &&
+        typeof item.date_created === 'number' &&
+        typeof item.date_modified === 'number' &&
+        typeof item.sort_option === 'number' &&
+        typeof item.sort_order === 'number'
+    );
+}
+
+/**
  * Narrow a `ProgramLaunchRequest.fs_item` payload to a full `VfsItem` at the
  * work_space → program boundary. Programs other than my_computer always
  * receive full items (the untyped base crashed later on partial ones; this

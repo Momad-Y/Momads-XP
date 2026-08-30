@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { columns, indent, MAX_COLS, wrap, wrap_items } from './format';
+import { accent, columns, indent, MAX_COLS, wrap, wrap_items } from './format';
 import { strip_ansi, visible_length } from '../term/ansi';
 
 describe('wrap', () => {
@@ -106,5 +106,16 @@ describe('wrap_items', () => {
         // So a reader can tell a wrapped list from a finished one.
         const lines = wrap_items(['aaaa', 'bbbb'], 6);
         expect(lines[0]).toBe('aaaa,');
+    });
+});
+
+describe('wrap_items measures visible width', () => {
+    it('packs coloured items by their printable width, not their bytes', () => {
+        // Three 10-column items fit on one 40-column line. Counting the escape
+        // bytes would make each look ~19 wide and break after the second.
+        const items = ['aaaaaaaaaa', 'bbbbbbbbbb', 'cccccccccc'].map((i) =>
+            accent(i),
+        );
+        expect(wrap_items(items, 40, '  ')).toHaveLength(1);
     });
 });

@@ -291,3 +291,22 @@ snapshot at first import (`finder.ts:17`), which is a drive frozen at boot —
 the exact opposite of D1.
 
 Accepted without change: D1, D3, D6, D8, and the M-list items folded above.
+
+---
+
+# Implementation findings
+
+**A reactive prompt is one flush too late.** `cd` assigns `cwd` and calls
+`prompt()` in the same synchronous block; a Svelte `$:` statement does not run
+until the flush AFTER that, so the first implementation printed the directory
+the shell had just LEFT. Every unit test passed — only a real component has a
+flush to be late for, and only the E2E could see it. `shell_prompt()`,
+`location()` and `current_dir()` are therefore functions. The window TITLE
+stays reactive on purpose: a taskbar label updating one tick late is
+unobservable, and the reactive form is the simpler one.
+
+**Mutation testing found a hole the suite had papered over.** Dropping
+`path.ts`'s case-folded-name tier broke no test, because the extension-less
+tier was answering for it — but it cannot answer a lowercased name that still
+carries its extension (`printerpix — ai engineer.txt`). A test for that was
+added and the mutation now fails as it should.

@@ -70,11 +70,14 @@ test('opens with the §3.2 banner and a prompt', async ({ page }) => {
     expect(text).toContain("Type 'help' to see available commands.");
     expect(text).toContain('momad@xp:~$');
 
-    // The banner must NOT advertise the Phase 6 filesystem commands. §3.2's
-    // original third line said "try 'ls' or 'cd experience'", which would have
-    // pointed every visitor at two commands that answer "not available yet".
-    expect(text).not.toContain("try 'ls'");
-    expect(text).not.toContain('cd experience');
+    // §3.2's original third line, restored now that `ls` and `cd` run. It was
+    // amended for Phase 3 precisely because pointing visitors at two commands
+    // that answered "not available yet" made the first screen a dead end.
+    expect(text).toContain("try 'ls'");
+    expect(text).toContain('cd experience');
+
+    // And the joke that explains why a Command Prompt takes Linux commands.
+    expect(text).toContain("That's 'ls', not 'dir'.");
 });
 
 test('runs commands and sources their output from profile.json', async ({
@@ -108,15 +111,145 @@ test('an unknown command answers in bash wording, not cmd.exe', async ({
     expect(await screen(page)).not.toContain('is not recognized');
 });
 
-test('deferred filesystem commands say so instead of failing', async ({
+test('navigates the real filesystem with ls, cd, pwd and cat', async ({
     page,
 }) => {
     await bootToDesktop(page);
     await openCmd(page);
 
     await run(page, 'ls');
-    await expect.poll(async () => screen(page)).toContain('not available yet');
-    expect(await screen(page)).not.toContain('command not found');
+    await expect.poll(async () => screen(page)).toContain('Experience/');
+    // The Explorer's own hidden set, so the two views agree about what exists.
+    expect(await screen(page)).not.toContain('Recycle Bin');
+    expect(await screen(page)).not.toContain('not available yet');
+
+    await run(page, 'ls -a');
+    await expect.poll(async () => screen(page)).toContain('Recycle Bin/');
+
+    // §3.2's own example, and what the banner now promises.
+    await run(page, 'cd experience');
+    await expect
+        .poll(async () => promptLine(page))
+        .toBe('momad@xp:~/Experience$');
+
+    await run(page, 'pwd');
+    // pwd prints the real path, never the ~ the prompt shows.
+    await expect.poll(async () => screen(page)).toContain('/c/Experience');
+
+    await run(page, 'ls');
+    await expect
+        .poll(async () => screen(page))
+        .toContain('Printerpix — AI Engineer.txt');
+
+    await run(page, 'cat Printerpix — AI Engineer.txt');
+    await expect.poll(async () => screen(page)).toContain('AI Engineer');
+
+    await run(page, 'cd ..');
+    await expect.poll(async () => promptLine(page)).toBe('momad@xp:~$');
+});
+
+test('the working directory is per window and survives a python session', async ({
+    page,
+}) => {
+    await bootToDesktop(page);
+    await openCmd(page);
+
+    await run(page, 'cd projects');
+    await expect
+        .poll(async () => promptLine(page))
+        .toBe('momad@xp:~/Projects$');
+
+    // `clear` wipes the screen, not the session.
+    await run(page, 'clear');
+    await expect
+        .poll(async () => promptLine(page))
+        .toBe('momad@xp:~/Projects$');
+
+    // A second terminal starts at home: two shells, two working directories,
+    // exactly as `color` is per window.
+    await openCmd(page);
+    await expect.poll(async () => promptLine(page)).toBe('momad@xp:~$');
+});
+
+test('cd and cat answer a missing path in bash wording', async ({ page }) => {
+    await bootToDesktop(page);
+    await openCmd(page);
+
+    await run(page, 'cd nowhere');
+    await expect
+        .poll(async () => screen(page))
+        .toContain('cd: nowhere: No such file or directory');
+    // The failed cd must not have moved anything.
+    expect(await promptLine(page)).toBe('momad@xp:~$');
+
+    await run(page, 'cat Experience');
+    await expect
+        .poll(async () => screen(page))
+        .toContain('cat: Experience: Is a directory');
+
+    await run(page, 'dir');
+    await expect
+        .poll(async () => screen(page))
+        .toContain('this shell only speaks Linux');
+    expect(await screen(page)).toContain('Experience/');
+});
+
+test('Tab completes a path containing spaces, and a directory keeps going', async ({
+    page,
+}) => {
+    await bootToDesktop(page);
+    await openCmd(page);
+
+    // The gesture the whole feature rests on, and the one the old word
+    // splitter could not perform: it split on the last space, so a name with a
+    // space in it could never be completed.
+    await page.locator('.xterm-helper-textarea').last().fill('');
+    await page.keyboard.type('cd My Mu');
+    await page.keyboard.press('Tab');
+    await expect
+        .poll(async () => promptLine(page))
+        .toBe('momad@xp:~$ cd My Music/');
+
+    // A directory completes with a slash, never a trailing space, so the next
+    // segment is still part of the same path.
+    await page.keyboard.press('Enter');
+    await expect
+        .poll(async () => promptLine(page))
+        .toBe('momad@xp:~/My Music$');
+
+    await run(page, 'cd ~');
+    await page.keyboard.type('cat Experience/Print');
+    await page.keyboard.press('Tab');
+    await expect
+        .poll(async () => promptLine(page))
+        .toContain('Printerpix — AI Engineer.txt');
+});
+
+test('the terminal sees a folder created on the desktop', async ({ page }) => {
+    // The single assertion the "walk the REAL drive" decision rests on. A
+    // synthetic tree built from profile.json would pass every other test in
+    // this file and fail this one.
+    await bootToDesktop(page);
+
+    const workspace = page.locator('#work-space');
+    await workspace.click({ button: 'right', position: { x: 700, y: 300 } });
+    await page.getByText('New', { exact: true }).hover();
+    await page.getByText('Folder', { exact: true }).click();
+    // Spawns in rename mode; Enter commits the default name.
+    await page.keyboard.press('Enter');
+    await workspace.click({ position: { x: 900, y: 500 } });
+    await expect(
+        page.locator('#work-space p', { hasText: 'New Folder' }),
+    ).toBeVisible();
+
+    await openCmd(page);
+    // The desktop right-click creates inside the Desktop folder, which `ls`
+    // hides for the same reason Explorer does — so name it directly.
+    await run(page, 'ls Desktop');
+    await expect.poll(async () => screen(page)).toContain('New Folder/');
+
+    await run(page, 'cd Desktop');
+    await expect.poll(async () => promptLine(page)).toBe('momad@xp:~/Desktop$');
 });
 
 test('history recall and line editing work through real keystrokes', async ({

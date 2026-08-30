@@ -3,12 +3,18 @@
 <script lang="ts">
     import { onDestroy, tick, unmount } from 'svelte';
     import Window from '../../../lib/components/xp/Window.svelte';
-    import { runningPrograms } from '../../../lib/store';
+    import { hardDrive, runningPrograms } from '../../../lib/store';
     import { required } from '../../../lib/types';
     import Terminal from '../../../lib/components/xp/Terminal.svelte';
     import { profile } from '../../../lib/profile';
     import { execute, normalise_spacing } from '../../../lib/cmd/registry';
     import { complete } from '../../../lib/cmd/complete';
+    import {
+        FS_COMMANDS,
+        remainder,
+        run_fs,
+    } from '../../../lib/cmd/fs_commands';
+    import { display_path, home_id, ROOT } from '../../../lib/cmd/path';
     import { MAX_COLS, wrap_items } from '../../../lib/cmd/format';
     import { DEFAULT_ACCENT, run_color } from '../../../lib/cmd/color';
     import { feed, initial_state, set_line } from '../../../lib/term/readline';
@@ -114,7 +120,50 @@
         resizable: true,
     };
 
-    const PROMPT = colour('momad@xp', FG_BRIGHT_GREEN) + ':~$ ';
+    /**
+     * This window's working directory, as a VFS id — `null` meaning "home",
+     * so there is no boolean latch waiting for the drive to seed.
+     *
+     * PER WINDOW, like `accent` below and unlike anything in a store: two
+     * terminals are a shipped behaviour, and a shared cwd would move both when
+     * you `cd` in one. It survives `clear` and a whole `python` session, as a
+     * real shell's does.
+     */
+    let cwd: string | null = null;
+
+    /**
+     * FUNCTIONS, not `$:` values.
+     *
+     * `cd` assigns `cwd` and calls `prompt()` in the same synchronous block,
+     * and a reactive statement does not run until the flush AFTER that — so a
+     * reactive prompt printed the directory the shell had just LEFT. Caught by
+     * the E2E, invisible to the unit tests, because only a real Svelte
+     * component has a flush to be late for.
+     */
+    function current_dir(): string {
+        return cwd ?? ($hardDrive == null ? ROOT : home_id($hardDrive));
+    }
+
+    function location(): string {
+        return $hardDrive == null
+            ? '~'
+            : display_path(current_dir(), $hardDrive);
+    }
+
+    function shell_prompt(): string {
+        return colour('momad@xp', FG_BRIGHT_GREEN) + `:${location()}$ `;
+    }
+
+    // The TITLE may lag a flush — nobody can see a taskbar label update one
+    // tick late — so it stays reactive and simply tracks cwd and the drive.
+    $: title_location =
+        $hardDrive == null
+            ? '~'
+            : display_path(cwd ?? home_id($hardDrive), $hardDrive);
+
+    // Real terminals retitle themselves as they navigate. Guarded on mode so
+    // it cannot overwrite the interpreter's title mid-session.
+    $: if (mode === 'shell') window?.update_title(`momad@xp:${title_location}`);
 
     let term: TerminalHandle | undefined;
     let state: ReadlineState = initial_state();
@@ -212,7 +261,7 @@
     }
 
     function prompt() {
-        write(PROMPT);
+        write(shell_prompt());
     }
 
     /**
@@ -232,7 +281,7 @@
      */
     function redraw() {
         const line = mode === 'python' ? py_line : state;
-        const p = mode === 'python' ? prompt_text(py) : PROMPT;
+        const p = mode === 'python' ? prompt_text(py) : shell_prompt();
         const rendered = render_line({
             prompt: p,
             buffer: line.buffer,
@@ -314,7 +363,9 @@
         // runtime per session the visitor ever opened.
         mode = 'shell';
         py = initial_repl_state();
-        window?.update_title(SHELL_TITLE);
+        // The directory the shell was in is still the directory it is in, so
+        // the title comes back with the path rather than a hardcoded `~`.
+        window?.update_title(`momad@xp:${title_location}`);
         prompt();
     }
 
@@ -544,6 +595,23 @@
             return;
         }
 
+        // The filesystem commands need the drive and this window's working
+        // directory, so they are dispatched here for the same reason `color`
+        // and `python` are — it keeps `registry.ts` pure. One membership test
+        // rather than four more branches.
+        if ((FS_COMMANDS as readonly string[]).includes(name)) {
+            const result = run_fs(name, remainder(line), {
+                drive: $hardDrive,
+                cwd: current_dir(),
+            });
+            if (result.cwd != null) cwd = result.cwd;
+            write_lines(
+                normalise_spacing(result.lines, result.blank_after ?? false),
+            );
+            prompt();
+            return;
+        }
+
         write_lines(execute(line, profile));
         prompt();
     }
@@ -553,7 +621,10 @@
      * only draws the outcome.
      */
     function on_complete() {
-        const result = complete(state.buffer, state.cursor);
+        const result = complete(state.buffer, state.cursor, {
+            drive: $hardDrive,
+            cwd: current_dir(),
+        });
 
         if (result.buffer !== state.buffer) {
             state = set_line(state, result.buffer, result.cursor);
@@ -627,15 +698,25 @@
     });
 
     function on_ready() {
-        // §3.2's startup banner. The third line was amended for Phase 3: the
-        // original told visitors to try `ls` and `cd experience`, which are
-        // Phase 6 commands — so the terminal's own first screen would have
-        // advertised two commands that answer "not available yet".
+        // §3.2's startup banner. The third line is the ORIGINAL one, restored:
+        // it was amended for Phase 3 because `ls` and `cd` answered "not
+        // available yet", and it comes back now that they run.
+        //
+        // The aside underneath is the answer to the obvious question — the
+        // title bar says Command Prompt and the shell inside it takes `ls`.
+        // Saying so up front is also what makes `dir` a joke rather than a
+        // dead end.
         write_lines([
             colour("Welcome to Momad's XP Terminal", FG_BRIGHT_GREEN),
             "Type 'help' to see available commands.",
+            "Navigate my portfolio like a filesystem — try 'ls' or 'cd experience'.",
+            '',
             colour(
-                "Type 'about' to start, or 'projects' to see what I have built.",
+                "That's 'ls', not 'dir'. The title bar says Command Prompt; the",
+                FG_GREY,
+            ),
+            colour(
+                'shell inside it disagrees, and I sided with the shell.',
                 FG_GREY,
             ),
             '',

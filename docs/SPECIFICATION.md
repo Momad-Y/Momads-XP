@@ -210,30 +210,31 @@ All image paths are defined in the JSON data file under each entry's `images` ar
 
 - Linux-style terminal (bash emulation, not Windows cmd)
 - Black background, white/green monospace text
-- Title bar: "momad@xp:~"
+- Title bar: "momad@xp:~", following the working directory as the prompt does
+  (`momad@xp:~/Experience` once `cd experience` has run), the way a real
+  terminal retitles itself
 - Functional terminal powered by xterm.js
 - **On startup**, echoes a short intro/help message.
-
-    **Phase 3 (shipped):**
 
     ```
     Welcome to Momad's XP Terminal
     Type 'help' to see available commands.
-    Type 'about' to start, or 'projects' to see what I have built.
-    ```
-
-    **Phase 6**, once the filesystem commands below land, restores the original
-    third line:
-
-    ```
     Navigate my portfolio like a filesystem — try 'ls' or 'cd experience'.
+
+    That's 'ls', not 'dir'. The title bar says Command Prompt; the
+    shell inside it disagrees, and I sided with the shell.
     ```
 
-    > The third line is phase-dependent on purpose. `ls` and `cd` are Phase 6
-    > commands (see below), so shipping that line in Phase 3 would have made the
-    > terminal's own first screen advertise two commands that answer
-    > "not available yet". Caught by the Phase 3 gate-2 red team; see
-    > `docs/phase-3-spec.md` D-A6.
+    > The third line was amended during Phase 3 (to "Type 'about' to start...")
+    > because `ls` and `cd` were still deferred, and pointing every visitor at
+    > two commands that answered "not available yet" made the first screen a
+    > dead end. Caught by the Phase 3 gate-2 red team; see
+    > `docs/phase-3-spec.md` D-A6. The original line is restored now that the
+    > commands run.
+    >
+    > The dim aside underneath answers the question the window itself raises —
+    > it says Command Prompt and takes Linux commands — and is what makes
+    > `dir` a joke rather than a dead end (see below).
 - **Core commands (Phase 3):**
     - `help` — list available commands
     - `about` — print bio
@@ -248,13 +249,23 @@ All image paths are defined in the JSON data file under each entry's `images` ar
     - `whoami` — prints "momad"
     - `uname -a` — prints fake XP system info
     - Easter eggs: `matrix`, `hack` (fake hacking animation), `sudo` (humorous denial)
-- **Filesystem navigation commands (Phase 6 — Polish):**
-    - `ls` — list contents of current directory (portfolio sections)
-    - `cd [dir]` — navigate into a section (e.g., `cd experience`, `cd projects`)
-    - `cd ..` — go up one level
-    - `pwd` — print current path (e.g., `/home/momad/experience`)
-    - `cat [file]` — display contents of a file (e.g., `cat printerpix` shows that experience entry)
-    - Directory structure mirrors the File Explorer folder tree from `profile.json`
+- **Filesystem navigation commands** (pulled forward from Phase 6; see
+  `docs/cmd-filesystem-plan.md`):
+    - `ls` — list the current directory; `ls -a` includes the entries Explorer
+      hides (Recycle Bin, Desktop, Wallpapers)
+    - `cd [dir]` — navigate into a section (e.g. `cd experience`, `cd projects`);
+      `cd ..` goes up, bare `cd` goes home
+    - `pwd` — print current path (e.g. `/c/Experience`)
+    - `cat [file]` — display a file (e.g. `cat Printerpix — AI Engineer.txt`
+      renders that experience entry; Tab completion supplies the name)
+    - `dir` — ribs the visitor for reaching for cmd.exe, then runs `ls`
+    - Directory structure IS the File Explorer folder tree — the commands walk
+      the same live `hardDrive` store Explorer renders, so a folder created in
+      one appears in the other. Paths are POSIX over the real drive
+      (`/c/Experience`, git-bash style) with `~` as the C: drive, because §3.2
+      line 1 specifies bash emulation while the filesystem underneath is a
+      Windows drive. Name matching is case-INSENSITIVE (an NTFS drive) even
+      though command matching stays case-sensitive (bash).
 - All command output data sourced from JSON
 
 #### Python REPL
@@ -1257,7 +1268,8 @@ surprised by it:
 - [ ] Start menu animation (slide up)
 - [ ] Selection box on desktop (drag to select multiple icons)
 - [ ] Taskbar balloon notifications ("Your system is protected" on first load)
-- [ ] CMD filesystem navigation: `ls`, `cd`, `pwd`, `cat` mapped to portfolio sections from `profile.json`
+- [x] CMD filesystem navigation: `ls`, `cd`, `pwd`, `cat` over the live Explorer
+      drive (pulled forward after Phase 3; `docs/cmd-filesystem-plan.md`)
 - [ ] Shut Down dialog → shutdown animation → return to login
 - [ ] Performance audit: lazy load all apps; code split per app; optimize images (WebP)
 - [ ] Preload critical assets; defer non-critical
