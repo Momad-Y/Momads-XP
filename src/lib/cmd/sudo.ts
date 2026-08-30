@@ -20,9 +20,6 @@ import { accent, dim_accent, wrap } from './format';
 const SUDOERS = (user: string) =>
     `${user} is not in the sudoers file. This incident will be reported.`;
 
-/** Shells and switches that mean "give me a root prompt". */
-const ROOT_SHELLS = ['su', 'bash', 'sh', '-i', '-s', 'zsh'];
-
 /**
  * EVERY branch returns through here.
  *
@@ -75,13 +72,6 @@ export function run_sudo(args: string[], user: string): string[] {
         );
     }
 
-    if (ROOT_SHELLS.includes(first)) {
-        return say(
-            'There is no root here.',
-            'There is barely a filesystem. You are one tab away from closing the entire operating system, which is arguably more power than root.',
-        );
-    }
-
     if (first === 'rm') {
         return say(
             SUDOERS(user),
@@ -91,6 +81,6 @@ export function run_sudo(args: string[], user: string): string[] {
 
     return say(
         SUDOERS(user),
-        `Reported to ${user}, who is regrettably also the only person who could do anything about it. They say they will look into it.`,
+        'There is no root here, there is barely a filesystem. You are one tab away from closing the entire operating system, which is arguably more power than root.',
     );
 }
