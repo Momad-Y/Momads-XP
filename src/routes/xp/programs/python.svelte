@@ -30,7 +30,7 @@
     } from '../../../lib/python/repl';
     import { feed, initial_state } from '../../../lib/term/readline';
     import type { ReadlineState } from '../../../lib/term/readline';
-    import { CLEAR_LINE_RIGHT, CR } from '../../../lib/term/ansi';
+    import { DEFAULT_COLS, render_line } from '../../../lib/term/render';
     import {
         TERMINAL_MIN_HEIGHT,
         TERMINAL_MIN_WIDTH,
@@ -84,8 +84,12 @@
     let line_state: ReadlineState = initial_state();
     let repl: ReplState = initial_repl_state();
 
+    /** See cmd.svelte: only `redraw` keeps a cursor row; every write resets it. */
+    let cursor_row = 0;
+
     function write(text: string) {
         term?.write(text);
+        cursor_row = 0;
     }
 
     function run_effects(effects: readonly ReplEffect[]) {
@@ -115,11 +119,22 @@
         run_effects(result.effects);
     }
 
+    /**
+     * Row arithmetic in `src/lib/term/render.ts`, shared with CMD. A traceback
+     * recalled from history, or any line longer than the window is wide, wraps
+     * — and the single-row redraw this replaced reprinted the prompt onto the
+     * last visual row every keystroke thereafter.
+     */
     function redraw() {
-        const p = prompt_text(repl);
-        write(CR + CLEAR_LINE_RIGHT + p + line_state.buffer);
-        const back = line_state.buffer.length - line_state.cursor;
-        if (back > 0) write(`\x1b[${String(back)}D`);
+        const rendered = render_line({
+            prompt: prompt_text(repl),
+            buffer: line_state.buffer,
+            cursor: line_state.cursor,
+            cols: term?.size().cols ?? DEFAULT_COLS,
+            prev_cursor_row: cursor_row,
+        });
+        term?.write(rendered.text);
+        cursor_row = rendered.cursor_row;
     }
 
     function on_runtime(message: FromRuntime) {

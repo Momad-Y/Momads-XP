@@ -669,6 +669,53 @@ test('sudo refuses, using the name from profile.json', async ({ page }) => {
         .toContain('is not in the sudoers file');
 });
 
+/**
+ * A line longer than the terminal is wide.
+ *
+ * The redraw used to be `\r` + erase-to-end-of-LINE, which is column 0 of the
+ * row the cursor is currently on. Once the input wrapped, every keystroke
+ * reprinted the prompt onto the last visual row and left the earlier rows
+ * behind, so the screen filled with prompts and the line could not be read
+ * back or edited. Filesystem navigation makes this routine — the longest
+ * seeded filename is 71 characters — but `echo` reached it already.
+ */
+test('an input line longer than the window redraws without duplicating the prompt', async ({
+    page,
+}) => {
+    await bootToDesktop(page);
+    await openCmd(page);
+
+    // Comfortably past the ~78 columns the default 720px window gives, and
+    // typed rather than filled so every keystroke goes through `redraw`.
+    const payload = 'w'.repeat(140);
+    await page.locator('.xterm-helper-textarea').last().fill('');
+    await page.keyboard.type(`echo ${payload}`);
+
+    const rows = await page
+        .locator('.xterm-rows')
+        .last()
+        .evaluate((root) =>
+            Array.from(root.children).map((r) =>
+                (r.textContent ?? '').trimEnd(),
+            ),
+        );
+    const joined = rows.join('');
+
+    // One prompt on screen: the one the banner left. The bug printed a fresh
+    // one per keystroke past the wrap.
+    expect(joined.split('momad@xp:~$').length - 1).toBe(1);
+    // And the line survives intact across the wrap, which is what makes it
+    // editable at all.
+    expect(joined).toContain(`echo ${payload}`);
+
+    // It still RUNS, and the output is whole rather than the tail of a line
+    // that lost its head.
+    await page.keyboard.press('Enter');
+    await expect
+        .poll(async () => (await screen(page)).replace(/\n/g, ''))
+        .toContain(payload);
+});
+
 test('two terminals can be open at once', async ({ page }) => {
     // CMD is deliberately multi-instance, unlike the Python REPL which owns a
     // multi-megabyte runtime.

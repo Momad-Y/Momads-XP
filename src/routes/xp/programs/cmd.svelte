@@ -12,9 +12,9 @@
     import { MAX_COLS, wrap_items } from '../../../lib/cmd/format';
     import { DEFAULT_ACCENT, run_color } from '../../../lib/cmd/color';
     import { feed, initial_state, set_line } from '../../../lib/term/readline';
+    import { DEFAULT_COLS, render_line } from '../../../lib/term/render';
     import type { ReadlineState } from '../../../lib/term/readline';
     import {
-        CLEAR_LINE_RIGHT,
         CLEAR_SCREEN,
         colour,
         CR,
@@ -195,8 +195,16 @@
         teardown();
     }
 
+    /**
+     * The row `redraw` last left the cursor on, relative to the input line's
+     * first row. Only `redraw` sets it; every other write resets it, because
+     * output and a fresh prompt both leave the cursor on a line of its own.
+     */
+    let cursor_row = 0;
+
     function write(text: string) {
         term?.write(text);
+        cursor_row = 0;
     }
 
     function write_lines(lines: string[]) {
@@ -207,19 +215,33 @@
         write(PROMPT);
     }
 
-    /** Redraw the current input line in place, cursor included. */
+    /**
+     * Redraw the current input line in place, cursor included.
+     *
+     * Mode-aware on BOTH counts: the prompt and the buffer come from whichever
+     * session is in the foreground. Reprinting the shell's prompt in front of a
+     * Python line is how a redraw desynchronises.
+     *
+     * The row arithmetic is in `src/lib/term/render.ts`, shared with the
+     * standalone REPL and unit-tested there — a line that wraps needs the
+     * cursor moved by row and column, and the single-row form this replaced
+     * corrupted every input longer than the window is wide.
+     *
+     * `term.write` directly, not `write`: this is the one caller that has to
+     * KEEP its cursor row rather than reset it.
+     */
     function redraw() {
-        // \r to column 0, clear right, reprint. Cheaper and steadier than
-        // tracking individual cursor moves, and it cannot desynchronise.
-        //
-        // Mode-aware on BOTH counts: the prompt and the buffer both come from
-        // whichever session is in the foreground. Reprinting the shell's
-        // prompt in front of a Python line is how a redraw desynchronises.
         const line = mode === 'python' ? py_line : state;
         const p = mode === 'python' ? prompt_text(py) : PROMPT;
-        write(CR + CLEAR_LINE_RIGHT + p + line.buffer);
-        const back = line.buffer.length - line.cursor;
-        if (back > 0) write(`\x1b[${String(back)}D`);
+        const rendered = render_line({
+            prompt: p,
+            buffer: line.buffer,
+            cursor: line.cursor,
+            cols: term?.size().cols ?? DEFAULT_COLS,
+            prev_cursor_row: cursor_row,
+        });
+        term?.write(rendered.text);
+        cursor_row = rendered.cursor_row;
     }
 
     // ---------------------------------------------------------------------
