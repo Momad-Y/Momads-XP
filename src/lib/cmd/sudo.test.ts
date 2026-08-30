@@ -72,10 +72,18 @@ describe('sudo branches', () => {
         expect(plain(['sudo', 'rm'])).toContain('heard you the first time');
     });
 
-    it('turns down every way of asking for a root shell', () => {
-        for (const shell of ['su', 'bash', 'sh', '-i', '-s', 'zsh']) {
+    it('answers a root-shell request with the default refusal', () => {
+        // There is no dedicated branch for `su`/`bash`/`-i` any more: the
+        // "no root here" line was promoted to the DEFAULT aside, so asking for
+        // a root shell gets the same answer as any other refused command.
+        // Asserted explicitly, because the previous version of this test named
+        // a branch that no longer exists and passed only because the phrase it
+        // looked for had moved into the default.
+        for (const shell of ['su', 'bash', '-i']) {
+            expect(plain([shell]), shell).toContain('is not in the sudoers');
             expect(plain([shell]), shell).toContain('no root here');
         }
+        expect(plain(['su'])).toBe(plain(['apt', 'install', 'linux']));
     });
 
     it('has a specific answer for rm, on top of the refusal', () => {
@@ -88,6 +96,7 @@ describe('sudo branches', () => {
         const out = plain(['apt', 'install', 'linux']);
         expect(out).toContain('is not in the sudoers file');
         expect(out).toContain('This incident will be reported.');
+        expect(out).toContain('no root here');
     });
 });
 
