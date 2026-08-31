@@ -15,12 +15,12 @@
  *
  * TWO TRAPS THIS SCRIPT EXISTS TO AVOID, both found at gate 4:
  *
- *   1. DO NOT delete `sessions.js`. It defines `window.new_local_session`,
- *      called UNGUARDED from `functions.js:805` (`open_from_image_info`, the
- *      path `paint.svelte` uses to open a VFS image) and `:923` (`file_new`).
- *      Removing the file leaves the reopened canvas blank — verified by
- *      mutation against `e2e/paint.spec.ts`, which goes red on it.
- *      So this script removes the two DANGEROUS BRANCHES inside it instead.
+ *   1. `sessions.js` must keep defining `window.new_local_session`. It is
+ *      called UNGUARDED from `functions.js` (`open_from_image_info`, the path
+ *      `paint.svelte` uses to open a VFS image, and `file_new`). Dropping the
+ *      SYMBOL leaves the reopened canvas blank — verified by mutation against
+ *      `e2e/paint.spec.ts`, which goes red on it. The file's contents are now
+ *      a no-op stub (step C); only that one symbol has to survive.
  *
  *   2. DO NOT "prune to what index.html loads". `index.html` references
  *      `styles/themes` ZERO times — `theme.js:5` builds the path at runtime and
@@ -180,78 +180,37 @@ if (html.includes('<div id="news" hidden>')) {
 }
 write('index.html', html);
 
-// ── C. sessions.js: remove #load: and the Firebase multi-user session ───────
-// KEEP the file, LocalSession and new_local_session — see the header.
-let sessions = read('src/sessions.js');
-
-// C1. Only `local:` sessions are recognised now. `#session:<id>` falls through
-// to the "no session ID" branch, which starts a fresh local session.
-if (sessions.includes('(session|local):')) {
-    sessions = sessions.replace(
-        'const session_match = location.hash.match(/^#?(?:.*,)?(session|local):(.*)$/i);',
-        'const session_match = location.hash.match(/^#?(?:.*,)?(local):(.*)$/i);',
-    );
-    changes.push('sessions.js: #session: (Firebase) hash no longer recognised');
-} else {
-    skipped.push('sessions.js session hash (already local-only)');
-}
-
-// C2. The `#load:<url>` branch — the phishing primitive. Removed whole.
-const loadStart = sessions.indexOf('\t\t} else if (load_from_url_match) {');
-if (loadStart >= 0) {
-    const loadEnd = sessions.indexOf('\t\t} else {', loadStart);
-    if (loadEnd < 0) die('#load: branch has no following else');
-    const block = sessions.slice(loadStart, loadEnd);
-    if (!block.includes('load_image_from_uri'))
-        die('#load: branch does not look like the expected code');
-    sessions =
-        sessions.slice(0, loadStart) + '\t\t' + sessions.slice(loadEnd + 2);
-    changes.push('sessions.js: #load:<url> branch (arbitrary URL render)');
-} else {
-    skipped.push('#load: branch (already removed)');
-}
-sessions = cut(
-    sessions,
-    '\t\tconst load_from_url_match = location.hash.match(/^#?(?:.*,)?(load):(.*)$/i);\n',
-    'sessions.js: load_from_url_match',
-    (s) => !s.includes('load_from_url_match'),
+// ── C. sessions.js: replaced wholesale with a no-op stub ───────────────────
+// Was: surgery on three branches inside the vendored file (the Firebase
+// `#session:` hash, the `#load:<url>` render, and the MultiUserSession class),
+// keeping LocalSession so jspaint's localStorage autosave carried on working.
+//
+// That last assumption was wrong, and a browser probe is what showed it.
+// paint.svelte loads index.html with no session in the hash, so the file minted
+// a FRESH RANDOM id on every open and wrote `image#<random>` without ever
+// reading the previous one back — two consecutive Paint windows produced two
+// unrelated keys. The autosave was write-only: one orphaned PNG data URL per
+// Paint window, accumulating against the localStorage quota forever.
+//
+// So nothing in the original is worth keeping except the one symbol
+// functions.js calls unguarded. Writing the stub is still a REMOVAL under spec
+// D-C2 (amended at gate 4 to permit removals whose symbols are still
+// referenced): everything goes except `window.new_local_session`.
+//
+// The stub is a real file rather than a template literal here because its own
+// comments are full of backticks.
+const sessions_stub = readFileSync(
+    join(import.meta.dirname, 'jspaint-sessions-stub.js'),
+    'utf8',
 );
-
-// C3. MultiUserSession is now unreachable — drop the construction and the class.
-if (sessions.includes('new MultiUserSession')) {
-    sessions = sessions.replace(
-        `				if (local) {
-					log(\`Starting a new LocalSession, ID: \${session_id}\`);
-					current_session = new LocalSession(session_id);
-				} else {
-					log(\`Starting a new MultiUserSession, ID: \${session_id}\`);
-					current_session = new MultiUserSession(session_id);
-				}`,
-        `				log(\`Starting a new LocalSession, ID: \${session_id}\`);
-				current_session = new LocalSession(session_id);`,
-    );
-    changes.push('sessions.js: MultiUserSession construction');
-} else {
-    skipped.push('MultiUserSession construction (already removed)');
-}
-
-const cls = sessions.indexOf('\tclass MultiUserSession {');
-if (cls >= 0) {
-    const clsEnd = sessions.indexOf('\n\t}\n', cls);
-    if (clsEnd < 0) die('MultiUserSession class has no close');
-    const block = sessions.slice(cls, clsEnd + 4);
-    if (!block.includes('firebaseio.com'))
-        die(
-            'MultiUserSession block does not contain the expected Firebase URL',
-        );
-    sessions = sessions.slice(0, cls) + sessions.slice(clsEnd + 4);
+if (read('src/sessions.js') !== sessions_stub) {
+    write('src/sessions.js', sessions_stub);
     changes.push(
-        `sessions.js: MultiUserSession class (${String(block.split('\n').length)} lines, Firebase + hardcoded API key)`,
+        'sessions.js: replaced with a no-op stub (Firebase + API key, #load:<url>, and the write-only localStorage autosave)',
     );
 } else {
-    skipped.push('MultiUserSession class (already removed)');
+    skipped.push('sessions.js stub (already applied)');
 }
-write('src/sessions.js', sessions);
 
 // ── D. menus.js: remove the two menu entries that reach the internet ────────
 let menus = read('src/menus.js');
@@ -420,6 +379,13 @@ for (const banned of [
     'firebaseio.com',
     'load_from_url_match',
     'MultiUserSession',
+    // Added when step C became a stub: the API-key prefix that tripped
+    // secret-scanning alert #1, and the two constructs that made the autosave
+    // a write-only localStorage leak. Matched as CODE, so the stub's own
+    // comments explaining what was removed do not trip them.
+    'AIzaSy',
+    'new LocalSession',
+    'storage.set(',
 ]) {
     if (finalSessions.includes(banned))
         die(`sessions.js still references ${banned}`);

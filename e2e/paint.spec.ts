@@ -246,3 +246,49 @@ test('the #load: hash no longer fetches an arbitrary URL (T2 hardening)', async 
     await page.waitForTimeout(1500);
     expect(requested).toBe(0);
 });
+
+/**
+ * jspaint's own localStorage autosave is gone, and must stay gone.
+ *
+ * It never worked in this app. `paint.svelte` loads jspaint with no session in
+ * the hash, so the vendored `sessions.js` minted a fresh random id on every
+ * open (`generate_session_id` is `Math.random()`) and wrote `image#<random>`
+ * without ever reading the previous one back — two Paint windows produced two
+ * unrelated keys. It was write-only: one orphaned PNG data URL per window,
+ * accumulating against the ~5 MB quota, with jspaint's own
+ * `storage_quota_exceeded` dialog at the end of it.
+ *
+ * `scripts/prune-jspaint.mjs` now replaces the file with a no-op stub. This is
+ * the guard: a re-vendor that restores the original brings the leak back, and
+ * nothing else in the suite would notice.
+ */
+test('Paint writes no localStorage image backups, however many times it is opened', async ({
+    page,
+}) => {
+    await bootToDesktop(page);
+
+    const imageKeys = async () =>
+        page.evaluate(() =>
+            Object.keys(localStorage).filter((k) => k.startsWith('image#')),
+        );
+
+    await openPaintFromStartMenu(page);
+    const frame = await paintFrame(page, 1);
+    expect(await imageKeys()).toEqual([]);
+
+    // Draw, so autosave would have something to store and a reason to fire.
+    const canvas = frame.locator('.main-canvas');
+    await canvas.hover({ position: { x: 40, y: 40 } });
+    await page.mouse.down();
+    await page.mouse.move(200, 200, { steps: 10 });
+    await page.mouse.up();
+    await page.waitForTimeout(1500);
+    expect(await imageKeys()).toEqual([]);
+
+    // A SECOND window is the half that proves the leak specifically: the old
+    // code wrote a new random key per open, so this is where they accumulated.
+    await openPaintFromStartMenu(page);
+    await paintFrame(page, 2);
+    await page.waitForTimeout(1500);
+    expect(await imageKeys()).toEqual([]);
+});
