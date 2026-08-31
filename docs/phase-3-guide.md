@@ -371,10 +371,13 @@ taskbar tile), the minimize animation target, and `calc_nudges`' sibling
 comparison. Omitting it silently broke all three for the new apps only, and two
 Command Prompts opened at *identical* coordinates.
 
-**jspaint after the prune.** `sessions.js` is **kept** — it defines
-`window.new_local_session`, called unguarded from `functions.js:805`/`:923`, so
-deleting it breaks every image open. Only the `#load:`/`#session:` router and
-the Firebase session were removed. The file deletions are an **explicit
+**jspaint after the prune.** `sessions.js` was **kept** in Phase 3 — it defines
+`window.new_local_session`, called unguarded from `functions.js`, so dropping
+that symbol breaks every image open. Only the `#load:`/`#session:` router and
+the Firebase session were removed then. **Superseded 2026-08-31:** the file is
+now a no-op stub keeping just that symbol, because its surviving `LocalSession`
+autosave turned out to be write-only and leaking localStorage — see
+SPECIFICATION.md §9 Phase 6. The file deletions are an **explicit
 allowlist**: `index.html` references `styles/themes` zero times (the theme is
 built by runtime string construction), so "prune to what index.html loads"
 deletes the only stylesheet Paint has. `verify-build.mjs` asserts

@@ -73,4 +73,11 @@ export default ts.config(
             globals: { console: 'readonly', process: 'readonly' },
         },
     },
+    // The jspaint sessions stub is BROWSER source that prune-jspaint.mjs copies
+    // into the vendored tree. It lives under scripts/ because that is the only
+    // thing that reads it, but it never runs in node.
+    {
+        files: ['scripts/jspaint-sessions-stub.js'],
+        languageOptions: { globals: { window: 'writable' } },
+    },
 );
