@@ -1,391 +1,391 @@
-# Python filesystem spec — a real `/c` inside the REPL (gate 1)
+# Python filesystem spec — a real `/c` inside the REPL (v2)
 
-**Status:** spec, pending gate-2 red team.
+**Status:** v2, rewritten after the gate-2 red team. Pending gate 3 (plan).
 **Owner request (2026-09-02):** let visitors save mini-projects from the Python
-REPL so they survive the session, and let them read the XP filesystem
-read-only, "without breaking it or deleting anything". Owner chose: mount at
-`/c` for consistency with CMD, keep it fresh rather than stale, and hide `/tmp`
-if cheap.
+REPL so they survive the session, and read the XP filesystem read-only,
+"without breaking it or deleting anything". Owner chose `/c` for consistency
+with CMD, fresh over stale, and `/tmp` hidden if cheap.
 
 ---
 
-## 0. The tension this spec exists to resolve
+## 0. What changed from v1, and why
 
-Everything that makes the REPL safe to offer rests on ONE property: **Python has
-no ambient authority.** The `<iframe sandbox="allow-scripts">` has no
-`allow-same-origin`, so `indexedDB` throws (measured, `protocol.ts:14-22`). The
-VFS is safe because it is UNREACHABLE, not because anything filters requests.
+The red team graded six sub-decisions **Wrong** and four **Weak**. Every
+finding I checked held up against the shipped code. v2 is **smaller** than v1,
+not bigger — most fixes delete scope rather than add it.
 
-This feature deliberately weakens that. It must therefore be designed under the
-assumption that **every line of Python is hostile** — there is no trusted
-caller, because the caller is a stranger's keyboard. "Read-only so they can't
-break it" is not a policy to enforce at a validator; it has to be structural.
+The three that reshaped the design:
 
-Second consequence, easy to miss: today `on_runtime_message` (`repl.ts:97`) can
-only ever emit `write` and `focus` effects, which is exactly WHY a forged
-message from Python is harmless. Any new message kind that reaches the VFS
-removes that property, and gate 2 should attack the replacement.
+**1. The writable directory was never a security boundary.** v1 built its whole
+write story on "Python writes into one MEMFS folder, we diff it". But v1's own
+verified-facts table recorded `hasattr(js, 'postMessage') → True`, and then
+never used that fact. Hostile Python skips the filesystem entirely:
+
+```python
+import js
+while True:
+    js.postMessage({'kind':'save','files':[{'name':'x.txt','text':'y'}]})
+```
+
+That bypasses MEMFS, the `chmod` layer, and any per-statement pacing. **The
+boundary is the MESSAGE, not the directory** — so every cap, every validator
+and a rate limit belong on the message channel, and the writable directory is
+demoted to pure ergonomics.
+
+It is worse than a hang. `desktop.svelte:57-62` persists the whole drive on a
+**1000 ms debounce that `clearInterval`s on every store notification**, fire-
+and-forget. A save flood re-arms that timer forever, so the drive is **never
+written to IndexedDB** while the app still looks alive — then the tab closes
+and everything since boot is gone.
+
+**2. There is no "VFS text tree" to mirror.** All 28 portfolio `.txt` items
+carry **no `storage_type` and no `url`** — verified: `p2ExpPrinterpixAIEngineer0`
+is `{storage_type: None, url: None, size: 1, portfolio_ref: {...}}`. They are
+pointers into `profile.json`, not files. v1's exit criterion 1 was therefore
+unsatisfiable by mirroring, and D-F4's "text files with content" described
+content that does not exist.
+
+**3. Mirroring the whole VFS would have created an exfiltration channel.** The
+seed is all public. Visitor *uploads* are not, and `netlify.toml` allows the
+sandbox `connect-src https://cdn.jsdelivr.net` — whose edge logs URLs. Today
+that channel is worthless because the sandbox holds nothing. A full mirror is
+exactly what would make it worth using, via a pasted script ("try this in the
+XP Python!"). v2 mirrors **only seed-authored content**, which closes the leak,
+removes the async IndexedDB reads, and removes the unbounded size problem, all
+at once.
+
+Also corrected: `.txt` is not the only association (`system.ts` lists
+thirteen); `authored: true` is not what makes visitor files survive a re-seed
+(`seed.ts:169` carries anything absent from the seed that is not a stale
+placeholder); and `protocol.ts` has no `ToRuntime` validator to "sit beside".
 
 ---
 
 ## 1. Scope
 
-- A read-only mirror of the VFS text tree inside the Pyodide MEMFS at `/c`,
-  refreshed when the drive changes.
-- One writable directory inside it. Files written there persist into the VFS as
-  real, visible, `authored` items.
-- `.py` opens in a viewer rather than the no-association dialog.
-- No new Python API is required for either. Plain `open()` is the interface.
+- A read-only `/c` inside the Pyodide MEMFS, synthesised from `profile.json` —
+  the portfolio folder structure and one plain-text file per entry.
+- One write-only outbox directory. Files written there persist into the VFS as
+  real, visible items under `C:\My Documents\Python`.
+- `.py` opens in a viewer with a sensible icon.
+- `cat` in CMD can read a saved file.
+- Plain `open()` is the entire interface. No `await`, no required imports.
 
 ### Exit criteria
 
 1. `open('/c/Experience/Printerpix — AI Engineer.txt').read()` returns that
-   entry's text, in a fresh session, with no imports and no `await`.
-2. `open('/c/Experience/anything','w')` raises `PermissionError` — not a silent
-   no-op, not a corrupted VFS.
-3. A file written to the writable directory appears in Explorer **and** in
-   CMD's `ls` without a reload, and survives `exit()`, a Ctrl+C restart, a page
-   reload, and a SEED_VERSION bump.
-4. A folder created in Explorer appears under `/c` in an already-open Python
-   session.
-5. A visitor cannot exhaust storage or item count: caps are enforced host-side
-   and breaching one produces a Python-visible error, not a broken app.
+   entry as text in a fresh session, no imports, no `await`.
+2. `open('/c/Experience/x','w')` raises `PermissionError`.
+3. `open('/c/My Documents/Python/main.py','w').write(code)` persists; the file
+   appears in Explorer and in CMD `ls`; `cat main.py` prints the code; it
+   survives `exit()`, Ctrl+C, reload and a SEED_VERSION bump.
+4. **Saving the same name twice updates one file** — no `main 2.py`.
+5. A forged `save` flood cannot stop the drive being persisted, and cannot
+   create unbounded items. Asserted by a test that posts messages directly,
+   not through the filesystem.
 6. Python still cannot reach `indexedDB`, `localStorage`, OPFS, `caches`, or
-   the network beyond the pinned CDN. The existing isolation E2E still passes
-   unchanged.
-7. The REPL starts in `/c`.
+   any network host beyond the pinned CDN. The existing isolation E2E passes
+   **unchanged**.
+7. Deleting `C:\My Documents\Python` in Explorer is impossible.
+8. The REPL starts in `/c`.
 
 ### Explicitly OUT of scope
 
-- The visitor's REAL machine. The only browser route is the File System Access
-  API behind a directory picker; it is Chromium-only, needs a permission prompt
-  on a portfolio site, and cannot run in the sandbox. Owner confirmed "XP file
-  system", so this is closed, not deferred.
-- Writing anywhere except the one writable directory. No `cd`-anywhere-and-save.
-- Binary files (`.jpg`, `.mp3`, `.pdf`) as readable bytes — see D-F4.
-- `pip`/`micropip` installs. `connect-src` already blocks PyPI and this spec
-  does not touch CSP.
-- Sharing anything between visitors. There is no server; there never is.
+- The visitor's real machine. Owner confirmed "XP file system"; closed.
+- Mirroring visitor-created files (§0 point 3). `/c` shows the portfolio and
+  the Python folder. Nothing else.
+- Binary files as readable bytes.
+- Deleting or renaming from Python. The outbox is write-only in both senses.
+- Two Python sessions sharing a live view of each other's saves — see D-F17.
 
 ---
 
-## 2. Verified facts this spec is built on
+## 2. Verified facts
 
-Every one measured in the live app, because the Phase 3 spec's worst failures
-were confident claims about code it had not read.
+Measured in the live app or read in the shipped tree. v1's biggest error was
+asserting content that does not exist, so this table now cites the check.
 
 | Claim | Evidence |
 |---|---|
-| MEMFS honours permissions | `os.chmod(d, 0o500)` then write → `PermissionError` |
-| `/c` is mountable and usable as cwd | `makedirs('/c/Experience')`, `chdir('/c')`, relative `open()` all OK |
-| `/tmp` can be removed | `shutil.rmtree('/tmp')` OK; `tempfile.mkstemp()` still works after (it recreates it) |
-| `/lib`, `/dev`, `/proc`, `/home` cannot | `/lib` holds the stdlib |
-| Top-level `await` works | `await asyncio.sleep(0)` OK — kept in reserve, not needed |
-| Python reaches worker globals | `hasattr(js, 'postMessage')` → True |
-| Nothing persists today | `/tmp/evil.txt` gone after `exit()` + reopen |
-| Storage APIs are absent, not merely denied | `opfs`/`caches`/`localStorage`/`cookie` → `AttributeError`; `indexedDB` → `JsException` |
-| `sqlite3`, `shelve`, `readline` are absent | `ModuleNotFoundError` |
-| `pickle` works | round-trips through MEMFS |
-| Portfolio text is tiny | ~7 KB of JSON across all sections |
-| `.txt` already renders plain text | `portfolio_viewer.svelte:85-92` falls back to a `<pre>` when `portfolio_ref` is absent |
-| Visitor files survive re-seeds | `seed.ts:35` — `authored === true` exempts an item from `is_stale_placeholder` |
-| `.py` has no association | `system.ts` associations list `.txt` only |
+| Portfolio `.txt` items hold NO bytes | `storage_type: None, url: None`, `portfolio_ref` set |
+| MEMFS honours permissions | `chmod(d,0o500)` then write → `PermissionError` |
+| `/c` mountable, usable as cwd | `makedirs`, `chdir`, relative `open()` all OK |
+| `/tmp` removable, `/lib` not | `rmtree('/tmp')` OK, `tempfile` recreates it |
+| Python can post to the host directly | `hasattr(js,'postMessage')` → True |
+| `new_fs_item_raw` renames on collision | `fs.ts:416-424`, `basename + ' ' + appendix` |
+| …and lowercases the extension | `fs.ts:394` |
+| `save_file` overwrites by id | `fs.ts:477-499` |
+| Drive persistence is debounced + fire-and-forget | `desktop.svelte:57-62`, `clearInterval` per notification |
+| The worker handles messages before Pyodide exists | `worker_source.ts:120-127`, no readiness guard |
+| `cat` never reads file bytes | `fs_commands.ts:189-205` → `described()` |
+| `path.ts` treats `.` as "stay here" | `path.ts:219` — a file named `.` is unreachable |
+| `portfolio_viewer` renders plain text without a ref | `portfolio_viewer.svelte:85-93`, `MAX_TEXT_BYTES` at `:36` |
+| Visitor files survive re-seed | `seed.ts:169`, not via `authored` |
+| Deleted seed ids are tombstoned forever | `seed.ts:200-208` |
 
 ---
 
 ## 3. Sub-decisions
 
-### D-F1 — How Python reads the VFS
+### D-F1 (v2) — What `/c` contains
 
-**Option A — an async capability API** (`await xp.read(path)`).
-*For:* nothing preloaded, so zero startup cost; the host validates each call
-individually and can refuse by size; naturally handles binary.
-*Against:* it is a new vocabulary a visitor must discover, `await` in a REPL
-surprises beginners, and `open()` — the thing anyone actually types — still
-fails. Worse for security: it puts a READ capability on the message channel,
-which then has to be scoped and path-validated, and path validation is where
-traversal bugs live.
+**Option A — mirror the VFS.** *Against, fatal:* the portfolio files have no
+bytes, so this cannot produce criterion 1 at all; visitor uploads make it an
+async IndexedDB walk with no size bound; and it opens the exfiltration channel
+in §0 point 3.
 
-**Option B — a read-only mirror in MEMFS.**
-*For:* zero new concepts — `open`, `os.walk`, `glob`, `pathlib` all work. And
-it makes the read surface DISAPPEAR rather than making it safe: the mirror is
-inert data inside the worker, so there is no read message to forge, no path to
-validate, and Python mutating its own copy changes nothing real. Payload is
-~7 KB.
-*Against:* goes stale without D-F5; binary files must be excluded or the tree
-lies about itself (D-F4); duplicates content in worker memory.
+**Option B — synthesise from `profile.json`: the six portfolio folders, one
+`.txt` per entry, rendered as plain text.** *For:* the content genuinely exists
+there; it is a few KB; it is synchronous and pure, so the builder is trivially
+unit-testable; and it contains only what is already published on the site, so
+there is nothing to exfiltrate. *Against:* `/c` is then a curated view, not the
+drive — `My Music`, `Wallpapers` and visitor files are absent, so `os.listdir`
+disagrees with Explorer.
 
-**Option C — mirror the structure, fetch content lazily.**
-*For:* `os.listdir` is instant, content costs nothing until read.
-*Against:* synchronous `open()` over an async fetch needs a custom Emscripten FS
-backend — substantial work, and it reintroduces exactly the read capability B
-deletes.
+**Verdict: B.** **Deciding factor:** A cannot satisfy criterion 1 under any
+amount of work short of synthesising the text anyway, and A is the version that
+turns a pasted script into a data-exfiltration tool. **Against, accepted:** `/c`
+is a portfolio view plus your own folder, and the guide must say so plainly
+rather than implying a full drive.
 
-**Verdict: B.** **Deciding factor:** it removes the read attack surface instead
-of defending it. A is defensible on ergonomics alone; B is better on ergonomics
-AND strictly smaller in attack surface, which is not a trade-off at all.
-**What B gives up:** live-accurate binary files, and ~7 KB of duplicated memory.
+### D-F1a — The renderer is SHARED with `cat` **(new)**
 
-### D-F2 — Mount point and starting directory
+`fs_commands.ts:135-138` states the rule this spec nearly broke: *"so `cat` and
+the block commands are one rendering rather than two that drift."* A third
+renderer of `profile.json` is exactly what that comment forbids.
 
-**Option A — `/xp`.** *For:* obviously ours, cannot collide with anything
-Emscripten owns. *Against:* a second vocabulary for one filesystem — CMD says
-`/c/Experience`, Python would say `/xp/Experience`.
+**Verdict:** extract the plain-text rendering of a `portfolio_ref` into one
+function used by the mirror builder **and** by `cat`. No alternatives — forced
+by a shipped invariant. **Consequence to accept:** this changes `cat`'s
+existing output for portfolio entries, so `e2e/cmd.spec.ts` assertions move in
+the same commit (CLAUDE.md rule).
 
-**Option B — `/c`, cwd set to `/c`.** *For:* one vocabulary across both apps;
-`pwd` in CMD and `os.getcwd()` in Python agree; relative `open('Experience/…')`
-works. *Against:* `/c` is our invention inside a POSIX-looking root, sitting
-beside `/lib` and `/proc`, which is a bit odd on inspection.
+### D-F2 — Mount point `/c`, cwd `/c` — **unchanged from v1.** Owner-requested;
+one vocabulary with CMD.
 
-**Verdict: B**, owner-requested and correct. **Deciding factor:** the CMD
-filesystem commands shipped two days ago and already teach `/c`; a second
-spelling would make the two windows contradict each other, which is the exact
-disagreement `path.ts` was written to prevent.
+### D-F3 — `chmod 0o500` on the read-only tree — **unchanged in mechanism,
+corrected in framing.** v1 called the real boundary "the host never accepts a
+path from Python". It is not: the boundary is that the host accepts only
+`{name, text}` on a validated, rate-limited channel (D-F13). chmod's job is to
+make a mistake fail loudly and locally. It is honesty, not security, and it
+cannot be either for the outbox.
 
-### D-F3 — How read-only is enforced
+### D-F4 (v2) — Sizes — **collapsed into D-F1.** With a synthesised,
+seed-only mirror there is no unbounded input: content comes from `profile.json`,
+which ships in the bundle. `portfolio_viewer.svelte:36`'s `MAX_TEXT_BYTES`
+truncation stays the model if any single entry ever grows absurd.
 
-**Option A — nothing; writes to the mirror simply do not persist.**
-*For:* no work. *Against:* silently misleading. A visitor writes a file, sees
-it in `os.listdir`, and it evaporates. That is worse than refusing.
+### D-F5 (v2) — Freshness
 
-**Option B — `chmod 0o500` on every mirrored directory except the writable one.**
-*For:* `PermissionError` at the point of the mistake, from the filesystem
-itself; it is the same error a real read-only mount gives, so it teaches the
-truth. Measured working.
-*Against:* Python can `os.chmod` it back — the mirror is its own memory, so
-this stops accidents, not determination.
+v1 chose "push on every `hardDrive` change" and was wrong four ways: torn
+intermediate trees (`fs.ts:440-452` registers then links in separate
+notifications), `2 + 2N` notifications per recursive delete, a push landing
+before Pyodide exists (`worker_source.ts:120-127` has no readiness guard) which
+kills the session with an offline message, and no push at all after a restart.
 
-**Option C — B, plus host-side rejection of any write outside the writable dir.**
-*For:* covers the determined case.
-*Against:* the host already only accepts writes for the one folder it owns
-(D-F6), so this is the same guarantee stated twice.
+**With D-F1(v2) the question mostly dissolves:** the mirror is derived from
+`profile.json`, which cannot change at runtime. It only needs building once.
 
-**Verdict: B**, with C's guarantee coming free from D-F6's design.
-**Deciding factor:** chmod cannot be a security boundary (Python owns that
-memory), and it does not need to be — the real boundary is that the host never
-accepts a path from Python at all. chmod's job is honesty, and it does that
-perfectly. **Against, accepted:** a determined visitor can chmod their own copy
-and write to it; nothing real changes, so this is cosmetic vandalism of a
-mirror.
+**What remains:** the outbox listing. **Verdict: build `/c` at session `ready`
+and never push again.** *For:* no store subscription, so all four failures are
+structurally impossible; the worker is provably initialised at `ready`.
+*Against:* a file saved in a *different* session, or created in Explorer, is
+not visible in an already-open session. **Deciding factor:** the only content
+that can change is the visitor's own outbox, and D-F17 shows a live view of it
+is what creates the amplification loop. **Against, accepted, and it goes in the
+guide:** `/c` is a snapshot taken when the session started.
 
-### D-F4 — What gets mirrored
+### D-F6 (v2) — How writes persist, and what identity they have
 
-**Option A — every VFS item, binaries as real bytes.**
-*For:* the tree is not a lie. *Against:* wallpapers, three MP3s and a 61 KB PDF
-would be megabytes shipped per session into worker memory, for a feature nobody
-asked for.
+v1 chose "diff the directory after each statement" and left create-vs-update
+undecided, which defaults to **destructive**: `new_fs_item_raw` always creates
+and dedupes (`fs.ts:416-424`), so iterating on `main.py` — the literal request —
+produces `main 2.py`, `main 3.py`, to the cap.
 
-**Option B — text files with content; non-text as ZERO-BYTE placeholders.**
-*For:* `os.walk` shows the true shape. *Against:* `open('Bliss.jpg','rb').read()`
-returning `b''` is a silent lie — worse than absence.
+**Verdict, three parts:**
 
-**Option C — text files with content; non-text OMITTED, with a note.**
-*For:* everything present is true; nothing present is a lie.
-*Against:* `os.listdir('/c/Wallpapers')` is empty, which is also a lie of a
-gentler kind.
+1. **The outbox is never a push target** (D-F5), so nothing writes into it
+   except Python.
+2. **The host keeps a per-session `Map<normalised_name, item_id>`.** Known name
+   → `save_file(id, blob)` (`fs.ts:477-499`, overwrites in place). New name →
+   `new_fs_item_raw`, and the returned id is recorded.
+3. **The name is normalised before it enters the map** — extension lowercased,
+   matching `fs.ts:394` — so MEMFS and the VFS agree on spelling and
+   `NOTES.TXT` cannot re-save itself every statement.
 
-**Verdict: C.** **Deciding factor:** a missing file makes a visitor look
-elsewhere; a zero-byte file makes them think the data is corrupt. Absence is
-the more honest failure. "Text" = the extensions the mirror can render as UTF-8
-(`.txt`, `.py`, `.md`, `.json`, `.csv`); the set lives in one constant.
-**Against, accepted:** the resume PDF is invisible to Python.
+*For:* criterion 4 becomes true; the file cap stops being a statement budget
+and starts meaning project size; `cat` gets a stable id to read.
+*Against:* the map is session-scoped, so a second session saving the same name
+creates a second item — accepted under D-F17.
 
-### D-F5 — Keeping the mirror fresh
+**Traversal remains inexpressible**, and the red team confirmed it after
+trying: the message has no path field, the regex is ASCII-only with a strict
+`$`, `sanitize_filename` strips separators, and the parent is a separate
+argument. That part of v1 stands.
 
-**Option A — snapshot once at session start.**
-*For:* trivial. *Against:* a file created in Explorer never appears; the
-terminal and Python disagree about what exists, which is the disagreement this
-project keeps paying to avoid.
+### D-F7 (v2) — The destination folder
 
-**Option B — push changes on every `hardDrive` store change.**
-*For:* `hardDrive` is already reactive and the host already subscribes; the
-payload is a few KB; it makes exit criterion 4 true.
-*Against:* while Python is executing, the worker thread is blocked and the
-update lands only when it finishes — so a mid-`while True:` change appears
-after the interrupt. Also, if Python has modified its own copy of a mirrored
-file, the push overwrites it.
+`C:\My Documents\Python`, as v1. **Two additions the red team forced:**
 
-**Verdict: B.** **Deciding factor:** the owner asked for it explicitly and the
-cost is a few KB on an event that already fires. **Against, accepted:** the
-blocked-worker lag, documented in the guide; and mirror-overwrites-local, which
-is correct precedence since the VFS is the source of truth.
+- **It goes in `protected_items`** (`system.ts:121-129`). Without it, one
+  right-click deletes it, `new_fs_item_raw` then throws on
+  `required(data[parent_id])` (`fs.ts:409`) into a message handler with no
+  catch, and `seed.ts:200-208` tombstones the id so it never returns — saving
+  is dead for that visitor across reloads *and* re-seeds. *Against:* protection
+  also removes Delete from the context menu for a folder that is arguably
+  theirs. **Deciding factor:** the failure is permanent and silent; the cost is
+  one greyed-out menu item.
+- **Its id must be generated, not hand-written.** `vfs_ids.ts` is generated and
+  CLAUDE.md forbids hand-editing it, while a literal in `src/lib/` can drift
+  from `vfs-base.json` with no gate. **Verdict:** extend
+  `scripts/generate-vfs.ts` to export `PYTHON_FOLDER_ID`, so the freshness gate
+  covers it.
 
-### D-F6 — How writes persist
+### D-F8 (v2) — Caps, and where they live
 
-**Option A — an explicit `await xp.save(name, text)`.**
-*For:* one obvious choke point; the persistence boundary is visible in the
-code the visitor wrote.
-*Against:* a new API to discover; `await` in a REPL; and `open(...,'w')` still
-silently fails to persist, which is D-F3's complaint again.
+They live on the **message**, since D-F6's directory is not a boundary.
 
-**Option B — after each REPL statement, the worker diffs the writable directory
-and reports changes; the host validates and persists.**
-*For:* plain `open(path,'w')` persists, which is what "let them save their mini
-projects" actually means; no new vocabulary; works with `pathlib`, `json.dump`,
-`pickle`.
-*Against:* a scan after every statement (bounded: one flat directory, capped at
-D-F8's file count); a statement that writes then crashes still persists the
-write, which is arguably correct but is a behaviour to state; and the host must
-treat the reported diff as hostile input.
-
-**Verdict: B.** **Deciding factor:** the request was "save their mini
-projects", and any design where the natural gesture silently does nothing has
-failed at that regardless of how good the alternative API is. **Against,
-accepted:** per-statement scan cost, and no undo.
-
-**Security shape, and it is the crux of this spec:** the diff message carries
-`{name, text}` only. It NEVER carries a path, a parent id, or an item id. The
-host hardcodes the destination folder and rejects any `name` containing `/`,
-`\`, or `..`. Traversal is therefore impossible by construction rather than by
-validation — there is no field in which to express it.
-
-### D-F7 — Where saved files live
-
-**Option A — `C:\My Documents\Python`.** *For:* `My Documents` is the XP-authentic
-home for a user's own files and the drive has no equivalent today; the `Python`
-subfolder keeps the REPL's output from colliding with anything later.
-*Against:* two new seed folders through `vfs-base.json` + `generate:vfs`, and
-the CI freshness gate.
-
-**Option B — the existing `Desktop` folder.** *For:* no new seed items.
-*Against:* `Desktop` is in `hidden_items`, so `ls` would not show saved files,
-and desktop icons would appear for every experiment.
-
-**Option C — a new top-level `Python` folder.** *For:* one new folder.
-*Against:* a bare `Python` folder at the root of C: is not something XP would
-have.
-
-**Verdict: A.** **Deciding factor:** exit criterion 3 requires the files to be
-visible and openable like any other file, and `My Documents` is where a visitor
-will look. **Against, accepted:** the seed regeneration and its CI gate.
-
-### D-F8 — Caps
-
-Enforced host-side, since the worker's numbers cannot be trusted:
-
-| Cap | Value | Why |
+| Cap | Value | Enforced |
 |---|---|---|
-| Bytes per file | 256 KB | A source file is kilobytes; this is generous and still 20× under a quota-threatening size |
-| Files in the folder | 100 | Keeps Explorer usable and the per-statement scan bounded |
-| Total bytes in the folder | 2 MB | IndexedDB quota is shared with the whole VFS |
+| Bytes per file | 256 KB | `TextEncoder().encode(text).length`, never `text.length` (3× under-count for CJK) |
+| Files per `save` message | 25 | reject the message, do not drop silently |
+| Live files in the folder | 100 | counted from the session map + the folder's children |
+| Saves per second | 5 | token bucket; excess dropped **before** touching the store |
+| Saves per session | 500 | hard stop |
 
-Breach → the host refuses that write and returns an error the worker raises in
-Python, so it is visible where it happened.
+The rate limit is the one v1 lacked entirely, and it is the one that matters:
+without it a forged flood clears `desktop.svelte`'s persist debounce forever.
+**The early reject must not touch `hardDrive`** — that is the whole point.
 
-*Alternative rejected:* no caps, trusting the visitor. A three-line `while True:
-open(f'{i}.txt','w').write('x'*10**6)` fills IndexedDB and breaks the app for
-that visitor permanently, since the VFS is what the desktop is built from.
+*Alternative rejected:* trusting the worker's own pacing. The worker is the
+attacker.
 
-### D-F9 — Opening a saved file
+### D-F14 (v2) — Error delivery, honestly
 
-**Verdict: associate `.py` with `portfolio_viewer`** — no alternatives
-considered on the VIEWER itself, forced by fact: it is the only text renderer
-in the app, and it already handles a missing `portfolio_ref` by rendering the
-raw text in a `<pre>` (`portfolio_viewer.svelte:85-92`), so `.txt` already
-works. Notepad is unbuilt and listed under Stretch.
+v1 promised an `OSError` "visible where it happened". **That is impossible**
+and the red team is right to call it the sharpest internal conflict: with a
+post-hoc diff the `open()` call has already returned, and there is no
+`ToRuntime` path that raises at the write site.
 
-*The choice that IS open:* whether to also let `.py` files be saved at all, or
-force `.txt`. **For `.py`:** it is what a Python file is called, and `os.listdir`
-showing `.txt` for a script is a small lie. **Against:** one more association
-entry. **Verdict: allow `.py`,** deciding factor being that the feature is
-"save your mini project" and a project is `.py`.
+**Verdict: a `stderr` line before the next prompt**, e.g.
+`xp: 'main.py' not saved — file limit reached (100)`. *For:* deliverable, and
+it lands where the visitor is looking. *Against:* one statement late.
+**Deciding factor:** the only unacceptable option is silence, and every
+deliverable option is one statement late.
 
-### D-F10 — Root tidiness
+Quota is worse and gets its own honesty: the write that loses data is
+`desktop.svelte`'s debounced `set('hard_drive', …)`, which the host cannot
+await and which already surfaces its own "Write Fault Error" dialog. **This
+spec does not claim to catch it.** Stated in the guide as a known limitation:
+files saved in the last second before a tab closes may not persist.
 
-**Verdict: remove `/tmp` at session start; leave `/lib`, `/dev`, `/proc`,
-`/home`.** *For:* `os.listdir('/')` gets shorter and `/c` is the obvious place.
-*Against:* it is cosmetic — `tempfile` recreates `/tmp` on first use, measured —
-and the other four cannot go without breaking imports. **Deciding factor:** the
-owner asked for `/c` to be "the main thing", and cwd + one fewer distraction
-achieves that; a truly single-directory root is not available at any price
-worth paying. **Honest limitation for the guide:** `/` still shows Emscripten's
-plumbing.
+### D-F16 (v2) — `cat` on a saved file **(v1 was wrong)**
 
-### D-F11 — What survives what
+v1 claimed CMD sees saved files "for free". `ls` does. **`cat` does not** —
+`run_cat` never reads bytes; it prints `described()`, i.e.
+`main.py: 1 KB PY file — open it from My Computer to view it`
+(`fs_commands.ts:189-205`). The exact command a visitor tries first after
+saving.
 
-| Event | Mirror | Writable folder |
-|---|---|---|
-| `exit()` / Ctrl+C restart | rebuilt from the VFS | untouched — it lives in the VFS |
-| Page reload | rebuilt | survives (IndexedDB) |
-| SEED_VERSION bump | rebuilt | survives — items are stamped `authored: true` (`seed.ts:35`) |
-| Explorer delete | reflected on next push | gone, as the visitor asked |
+**Option A — leave it.** *Against:* the terminal tells you to leave the
+terminal, for a file the terminal can see.
+**Option B — make `run_cat` async for `storage_type: 'local'`.** *Against:*
+`fs_commands.ts` is deliberately pure and synchronous; that is what keeps it
+unit-testable without a browser.
+**Option C — keep `run_fs` pure; let `cmd.svelte` handle the async read**, as
+it already does for `python`, `matrix` and `hack`. `run_cat` returns a
+`{ kind: 'read_file', id }` request the component fulfils.
 
-No alternatives — forced by the existing seed architecture.
+**Verdict: C.** **Deciding factor:** it preserves the purity invariant that the
+whole command layer is built on while making the honest behaviour possible;
+the component already owns every other async command.
 
-### D-F12 — Is there an `xp` module at all?
+### D-F17 — Two Python sessions **(new — v1 never considered it)**
 
-**Option A — none.** *For:* the smallest possible surface; everything is
-`open()`. *Against:* no way to ask where things are, and no way to force a sync
-before a deliberate `exit()`.
+Python runs standalone *and* inside CMD, and both ship. v1's live-mirrored
+outbox would ping-pong between them: A saves `a.txt` → pushed into B's outbox →
+B's diff reports a file B never wrote → `a 2.txt` → pushed to A → `a 3.txt`,
+unbounded, with nobody typing.
 
-**Option B — a tiny module: `xp.saved_dir`, `xp.sync()`, `xp.limits`.**
-*For:* three read-only conveniences, no new authority — `sync()` triggers the
-same diff a statement boundary already triggers.
-*Against:* a module to document and test.
+**Verdict:** the outbox is per-session, never a push target (D-F5), and the
+name→id map is per-session. Two sessions writing the same name produce two
+items, the second deduped by `fs.ts`. *For:* no shared mutable state, so the
+loop cannot form. *Against:* session B does not see session A's saves until B
+restarts. **Deciding factor:** an unbounded amplification loop that fires with
+no user input is categorically worse than a stale view.
 
-**Verdict: B, minimal.** **Deciding factor:** `xp.sync()` costs nothing because
-the machinery exists for D-F6, and without it a visitor whose last statement is
-long-running has no way to flush deliberately. **Explicitly NOT in it:** any
-read, delete, rename, or path-taking function.
+### D-F9 (v2) — Opening a saved file
 
-### D-F13 — Protocol extension and its validation
+`.py` associates with `portfolio_viewer` (the only text renderer; it already
+falls back to a `<pre>`). **Additions the red team forced:** `system.ts`'s
+`icons` map has no `.py`, and `new_fs_item_raw:396` defaults the icon to
+`ApplicationWindow.png` — the *executable* icon — so saved scripts would look
+like programs in the folder the spec argues visitors will go to. The host sets
+`icon` explicitly and `.py` gets an icons entry. Names are additionally
+rejected if the basename is empty (`.py`), or if the name is `.` or `..`, both
+of which pass the v1 regex and produce items `path.ts` can never address.
 
-Two new message kinds, both validated in `protocol.ts` beside the others:
+### D-F10 (v2) — Root tidiness and session init
 
-- `ToRuntime`: `{ kind: 'mirror'; tree: MirrorEntry[] }` — host → worker.
-- `FromRuntime`: `{ kind: 'save'; files: { name: string; text: string }[] }` —
-  worker → host.
+Unchanged in intent: remove `/tmp`, leave `/lib`, `/dev`, `/proc`, `/home`,
+`chdir('/c')`. **Correction:** v1 implied this was free. It is not — the only
+pre-banner hook is `run_source(greeting, true)` (`worker_source.ts:74-78`), a
+single line through `PyodideConsole`. This needs a `pyodide.runPython(...)`
+block in `worker_source.ts` before `send({kind:'ready'})`, which is also where
+`/c` is built so that criterion 8 holds on the first prompt.
 
-`parse_from_runtime` gains a `save` case validating: array shape, every `name`
-a string matching `/^[A-Za-z0-9 ._-]{1,64}$/` with no `..`, every `text` a
-string, and the array length ≤ the file cap. Anything else returns `null` and
-is dropped, exactly as today.
+### D-F12 (v2) — The `xp` module
 
-*Alternative rejected:* reusing `stdout` with a magic prefix. It would make
-every `print()` a potential file write, which is the worst possible coupling.
+`xp.saved_dir`, `xp.limits`. **`xp.sync()` is dropped:** the red team is right
+that its stated purpose was fictional — `exit`/`quit` are intercepted host-side
+(`repl.ts:93-95`) and never reach the runtime, so there is nothing to flush
+before. Mid-loop flushing is the only real use, and with per-statement diffing
+plus the rate limit it is not worth the surface.
 
-### D-F14 — When IndexedDB is full
+### D-F13 (v2) — Protocol and relays
 
-**Verdict: the host catches the write failure and returns an error the worker
-raises as `OSError` in Python.** *For:* it is the errno a full disk gives, so
-it needs no explanation. *Against:* the visitor cannot free space from Python
-(no delete API, D-F12) and must use Explorer. **Deciding factor:** silently
-dropping the save is the one unacceptable option; anything visible beats it.
+**Corrections:** `protocol.ts` has exactly one validator, `parse_from_runtime` —
+there is nothing "beside" it for the inbound direction. Three files need cases:
+`protocol.ts` (validate `save`), `python-sandbox.html` (relay `mirror`; it
+currently forwards only `init`/`exec`/`terminate`), and `worker_source.ts`
+(handle `mirror`, **guarded on Pyodide being ready** — today `self.onmessage`
+has no such guard and a message arriving during the ~10 s load throws into
+`worker.onerror` and kills the session with "Try again once you are back
+online").
 
-### D-F15 — Test strategy
+`python-sandbox.html` lives in `static/` and is **outside ESLint, prettier and
+coverage** by its own header. Its new relay case is therefore covered by E2E
+only, and that must be deliberate rather than discovered.
 
-- **Unit (`vitest`):** the mirror builder (VFS → tree), the name validator, the
-  cap enforcement, and `parse_from_runtime`'s `save` case. All pure.
-- **E2E hermetic:** the existing stubbed-runtime specs must keep passing
-  untouched — that is the regression signal for the isolation boundary.
-- **E2E `@online`:** the round trip. Write from Python → assert it appears in
-  Explorer AND in CMD `ls` → reload → assert it is still there.
-- **Mutation-verify** every new test, per the standing rule.
+### D-F15 (v2) — Tests
 
-*Alternative rejected:* testing the round trip only in unit tests with a fake
-drive. Phase 3 gate 4 showed that shape is vacuous — the hermetic suite
-substitutes a stub runtime that cannot execute Python at all.
+Unit (all genuinely pure now): the profile→text renderer shared with `cat`, the
+mirror tree builder, name validation, cap arithmetic with `TextEncoder`, the
+token bucket, and `parse_from_runtime`'s `save` case.
 
-### D-F16 — CMD sees saved files for free
+E2E hermetic: existing isolation specs pass **unchanged** — the regression
+signal.
 
-No decision — a consequence. `ls`/`cat` walk the live `hardDrive` store
-(`path.ts`), so a file saved from Python appears in `ls '/c/My Documents/Python'`
-with no work. Exit criterion 3 asserts it, because a consequence nobody tests
-is a coincidence.
+E2E `@online`, each one a red-team finding made executable:
+- write → Explorer → `ls` → `cat` → reload → still there
+- save the same name twice → **one** file, updated
+- `NOTES.TXT` then any statement → no second file
+- a forged `js.postMessage` flood → app still responsive, drive still persisted,
+  item count bounded
+- a `mirror` message during Pyodide startup → session survives
+- `C:\My Documents\Python` cannot be deleted
+
+Every new test mutation-verified.
 
 ---
 
-## 4. What gate 2 should attack hardest
+## 4. What gate 4 (the plan red team) should attack
 
-1. **D-F6's diff channel.** It is the only path from hostile code to persistent
-   storage. Is `{name, text}` really enough to make traversal inexpressible?
-   What about a name that is valid but collides with something meaningful?
-2. **D-F5's push racing D-F6's diff.** A store change arriving between a write
-   and its scan.
-3. **Caps as the wrong shape.** Per-file and total bytes are checked host-side —
-   but the host learns sizes from the worker's message. Is anything trusting a
-   number the worker chose?
-4. **The mirror as an information leak.** It ships every text file into a
-   context the visitor fully controls. Is anything in the VFS not already
-   public on the website?
-5. **Whether this breaks the CMD filesystem work** shipped two days ago.
+1. **Ordering.** D-F1a changes shipped `cat` output; does that land before or
+   after the mirror depends on it?
+2. **The token bucket's clock.** Where does it live so two sessions cannot each
+   get a full bucket?
+3. **`worker_source.ts` is a `String.raw` template** — the init block is
+   untyped, unlinted, uncovered Python-in-JS-in-a-string. How is it tested?
+4. **The generator change** for `PYTHON_FOLDER_ID` versus the CI freshness gate.
+5. **Whether `protected_items` membership breaks any existing Explorer E2E.**
