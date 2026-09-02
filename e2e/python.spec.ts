@@ -6,9 +6,12 @@ import { bootToDesktop } from './helpers';
  * The Python REPL (SPECIFICATION.md §3.2) and — more importantly — the
  * isolation that makes it safe to offer at all.
  *
- * The default suite is HERMETIC: the Pyodide origin is route-stubbed, so no
- * spec here reaches the internet. Real execution lives in the `@online`
- * project, which `npx playwright test` does not run.
+ * The `default` project is HERMETIC: the Pyodide origin is route-stubbed, so
+ * no spec running there reaches the internet. Real execution lives in the
+ * `@online` project.
+ *
+ * A bare `npx playwright test` runs BOTH projects — use `--project=default`
+ * for a hermetic run. (An earlier version of this comment said the opposite.)
  */
 
 const PYODIDE_GLOB = '**/cdn.jsdelivr.net/**';
