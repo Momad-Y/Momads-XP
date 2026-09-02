@@ -35,6 +35,13 @@ export const LIMITS = {
     min_interval_ms: 2000,
     /** A hard stop per runtime, after which the worker is terminated. */
     max_per_runtime: 200,
+    /**
+     * Refused saves before the runtime is killed.
+     *
+     * A flood consists only of refusals, so a budget counting ACCEPTED saves
+     * alone can never end one.
+     */
+    max_refusals: 50,
 } as const;
 
 /**
@@ -110,23 +117,44 @@ export function rejection_text(name: string, reason: Rejection): string {
 export class SaveGate {
     private last = -Infinity;
     private used = 0;
+    private refused = 0;
+    private terminated = false;
 
     /** True when this save may proceed now. */
     allow(now: number): boolean {
         if (this.used >= LIMITS.max_per_runtime) return false;
-        if (now - this.last < LIMITS.min_interval_ms) return false;
+        if (now - this.last < LIMITS.min_interval_ms) {
+            // Counted, because a flood is made ENTIRELY of refusals: without
+            // this, `used` never rises and the runtime is never terminated,
+            // so a `while True: js.postMessage(...)` loop just paints refusal
+            // lines into the terminal for ever.
+            this.refused += 1;
+            return false;
+        }
         this.last = now;
         this.used += 1;
         return true;
     }
 
-    /** The budget is spent; the caller should terminate the runtime. */
+    /** True once, the first time the budget is spent. */
+    claim_termination(): boolean {
+        if (!this.exhausted() || this.terminated) return false;
+        this.terminated = true;
+        return true;
+    }
+
+    /** The budget is spent, or refusals have become a flood. */
     exhausted(): boolean {
-        return this.used >= LIMITS.max_per_runtime;
+        return (
+            this.used >= LIMITS.max_per_runtime ||
+            this.refused >= LIMITS.max_refusals
+        );
     }
 
     reset(): void {
         this.last = -Infinity;
         this.used = 0;
+        this.refused = 0;
+        this.terminated = false;
     }
 }

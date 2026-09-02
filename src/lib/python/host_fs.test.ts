@@ -31,7 +31,7 @@ vi.mock('../fs', () => ({
 }));
 
 const { hardDrive } = await import('../store');
-const { apply_save, create_save_gate } = await import('./host_fs');
+const { apply_save, reset_save_gate, save_gate } = await import('./host_fs');
 const { LIMITS } = await import('./save_limits');
 const { PYTHON_FOLDER_ID } = await import('../generated/vfs_ids');
 
@@ -65,6 +65,10 @@ const file = (id: string, name: string, url = `blob-${id}`) => ({
 });
 
 beforeEach(() => {
+    // The gate is a per-TAB singleton, so tests must reset it or they leak
+    // into each other — which is also the property that makes three terminal
+    // windows share one rate limit.
+    reset_save_gate();
     deleted.length = 0;
     saved.length = 0;
     created.length = 0;
@@ -73,7 +77,7 @@ beforeEach(() => {
 
 describe('apply_save', () => {
     it('creates a new file in the folder the HOST chose', () => {
-        const gate = create_save_gate();
+        const gate = save_gate();
         return apply_save({ files: [{ name: 'a.py', text: 'x' }] }, gate).then(
             (out) => {
                 expect(out.lines).toEqual([]);
@@ -95,7 +99,7 @@ describe('apply_save', () => {
         });
         await apply_save(
             { files: [{ name: 'a.py', text: 'v2' }] },
-            create_save_gate(),
+            save_gate(),
         );
         expect(created).toHaveLength(0);
         expect(saved).toEqual([{ id: 'old', text: 'v2' }]);
@@ -109,7 +113,7 @@ describe('apply_save', () => {
         });
         await apply_save(
             { files: [{ name: 'a.py', text: 'again' }] },
-            create_save_gate(),
+            save_gate(),
         );
         expect(saved.map((s) => s.id)).toEqual(['old']);
     });
@@ -121,7 +125,7 @@ describe('apply_save', () => {
         });
         await apply_save(
             { files: [{ name: 'NOTES.TXT', text: 'x' }] },
-            create_save_gate(),
+            save_gate(),
         );
         expect(created).toHaveLength(0);
         expect(saved.map((s) => s.id)).toEqual(['old']);
@@ -136,7 +140,7 @@ describe('apply_save', () => {
         });
         await apply_save(
             { files: [{ name: 'a.py', text: 'v2' }] },
-            create_save_gate(),
+            save_gate(),
         );
         expect(deleted).toEqual(['blob-original']);
     });
@@ -144,7 +148,7 @@ describe('apply_save', () => {
     it('reports every rejection and saves nothing for it', async () => {
         const out = await apply_save(
             { files: [{ name: '../evil.py', text: 'x' }] },
-            create_save_gate(),
+            save_gate(),
         );
         expect(created).toHaveLength(0);
         expect(out.lines[0]).toContain('../evil.py');
@@ -160,14 +164,14 @@ describe('apply_save', () => {
         });
         const out = await apply_save(
             { files: [{ name: 'new.py', text: 'x' }] },
-            create_save_gate(),
+            save_gate(),
         );
         expect(created).toHaveLength(0);
         expect(out.lines[0]).toContain('full');
     });
 
     it('refuses a second save inside the rate window, without touching the store', async () => {
-        const gate = create_save_gate();
+        const gate = save_gate();
         await apply_save({ files: [{ name: 'a.py', text: 'x' }] }, gate);
         const before = get(hardDrive);
         const out = await apply_save(
@@ -181,14 +185,14 @@ describe('apply_save', () => {
     });
 
     it('asks for termination once the budget is spent', async () => {
-        const gate = create_save_gate();
+        const gate = save_gate();
         for (let i = 0; i < LIMITS.max_per_runtime; i++) gate.allow(i * 1e6);
         const out = await apply_save(
             { files: [{ name: 'a.py', text: 'x' }] },
             gate,
         );
         expect(out.terminate).toBe(true);
-        expect(out.lines[0]).toContain('restart Python');
+        expect(out.lines[0]).toContain('restarting the interpreter');
         expect(created).toHaveLength(0);
     });
 
@@ -196,9 +200,124 @@ describe('apply_save', () => {
         hardDrive.set(null);
         const out = await apply_save(
             { files: [{ name: 'a.py', text: 'x' }] },
-            create_save_gate(),
+            save_gate(),
         );
         expect(created).toHaveLength(0);
         expect(out.lines[0]).toContain('starting up');
+    });
+});
+
+describe('gate-6 regressions', () => {
+    it('is ONE gate per tab, not one per terminal window', () => {
+        // Three Command Prompts each with their own gate could each save at
+        // the permitted rate, keep desktop.svelte's 1000ms whole-drive persist
+        // re-armed for ever, and the drive would never reach IndexedDB — with
+        // no hostile code at all.
+        expect(save_gate()).toBe(save_gate());
+    });
+
+    it('stores a dotless name unchanged', async () => {
+        // `lastIndexOf('.')` is -1 and `slice(-1)` is the LAST CHARACTER, so
+        // README became READMe with ext "e", never matched again, and
+        // duplicated on every save to the file cap.
+        await apply_save(
+            { files: [{ name: 'README', text: 'x' }] },
+            save_gate(),
+        );
+        expect(created[0]?.name).toBe('README');
+        expect(created[0]?.basename).toBe('README');
+        expect(created[0]?.ext).toBe('');
+    });
+
+    it('does not settle a rate-limited save, so it is retried', async () => {
+        const gate = save_gate();
+        await apply_save({ files: [{ name: 'a.py', text: 'x' }] }, gate);
+        const out = await apply_save(
+            { files: [{ name: 'b.py', text: 'x' }] },
+            gate,
+        );
+        // Settling it would make it permanently unsavable: the file is
+        // unchanged, so it never appears in a later scan.
+        expect(out.settled).toEqual([]);
+    });
+
+    it('DOES settle a refusal that retrying cannot fix', async () => {
+        const out = await apply_save(
+            { files: [{ name: '../evil.py', text: 'x' }] },
+            save_gate(),
+        );
+        // Otherwise the same refusal prints after every statement, for ever.
+        expect(out.settled).toEqual(['../evil.py']);
+    });
+
+    it('settles a successful save', async () => {
+        const out = await apply_save(
+            { files: [{ name: 'a.py', text: 'x' }] },
+            save_gate(),
+        );
+        expect(out.settled).toEqual(['a.py']);
+    });
+
+    it('terminates on a flood of REFUSALS, not just accepted saves', async () => {
+        // A flood is made entirely of refusals, so a budget counting accepted
+        // saves alone could never end one.
+        const gate = save_gate();
+        let terminated = false;
+        for (let i = 0; i < LIMITS.max_refusals + 2; i++) {
+            const out = await apply_save(
+                { files: [{ name: `f${String(i)}.py`, text: 'x' }] },
+                gate,
+            );
+            terminated ||= out.terminate;
+        }
+        expect(terminated).toBe(true);
+    });
+
+    it('asks to terminate ONCE, then stays quiet', async () => {
+        // Resetting the gate when we kill a flooder would hand it a fresh
+        // budget every cycle: terminate, reset, one more file, terminate. Only
+        // ending the session deliberately clears it.
+        const gate = save_gate();
+        let terminations = 0;
+        let noisy = 0;
+        for (let i = 0; i < LIMITS.max_refusals + 20; i++) {
+            const out = await apply_save(
+                { files: [{ name: `f${String(i)}.py`, text: 'x' }] },
+                gate,
+            );
+            if (out.terminate) terminations += 1;
+            if (out.lines.length > 0) noisy += 1;
+        }
+        expect(terminations).toBe(1);
+        // And it stops printing a refusal line per message, which was one
+        // unthrottled terminal write per forged message on the UI thread.
+        expect(noisy).toBeLessThan(LIMITS.max_refusals + 5);
+    });
+
+    it('keeps `size` honest when a file grows', async () => {
+        hardDrive.set({
+            [PYTHON_FOLDER_ID]: folder(['old']),
+            old: { ...file('old', 'a.py'), size: 1 },
+        });
+        await apply_save(
+            { files: [{ name: 'a.py', text: 'y'.repeat(5000) }] },
+            save_gate(),
+        );
+        expect(get(hardDrive)?.old?.size).toBe(5);
+    });
+
+    it('never hands a FOLDER to save_file', async () => {
+        // Explorer > New > Folder named `main.py` inside the Python folder
+        // would otherwise get `url` and `storage_type` stamped onto it.
+        hardDrive.set({
+            [PYTHON_FOLDER_ID]: folder(['dir']),
+            dir: { ...folder([]), id: 'dir', name: 'main.py' },
+        });
+        await apply_save(
+            { files: [{ name: 'main.py', text: 'x' }] },
+            save_gate(),
+        );
+        expect(saved).toHaveLength(0);
+        expect(created).toHaveLength(1);
     });
 });

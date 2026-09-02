@@ -170,6 +170,43 @@ if (!existsSync(BUILD)) {
     }
 }
 
+// ── 3b. The Python sandbox host ─────────────────────────────────────────────
+// `static/html/python-sandbox.html` is the ONLY logic in this feature outside
+// ESLint, prettier and coverage — its own header says so. It relays three
+// message kinds to the worker, and a silent regression there breaks the REPL
+// with no test anywhere to catch it.
+{
+    const sandbox = join('build', 'html', 'python-sandbox.html');
+    if (!existsSync(sandbox)) {
+        fail(
+            'build/html/python-sandbox.html is MISSING — the Python REPL ' +
+                'iframe would 404 and no unit test covers that file',
+        );
+    } else {
+        const html = readFileSync(sandbox, 'utf8');
+        const relays = ['init', 'exec', 'terminate', 'saved'];
+        const missing = relays.filter(
+            (kind) => !html.includes(`data.kind === '${kind}'`),
+        );
+        if (missing.length > 0) {
+            fail(
+                `python-sandbox.html no longer relays: ${missing.join(', ')} — ` +
+                    'the runtime would silently stop receiving those messages',
+            );
+        } else if (!html.includes('mirror: data.mirror')) {
+            fail(
+                'python-sandbox.html no longer forwards `mirror` on init — ' +
+                    '/c would be empty and the REPL would start in a directory ' +
+                    'that does not exist',
+            );
+        } else {
+            ok(
+                'python-sandbox.html relays every message kind, mirror included',
+            );
+        }
+    }
+}
+
 // ── 4. Rollup code-splitting warning ────────────────────────────────────────
 const log_path = process.argv[2];
 if (!log_path) {

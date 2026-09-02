@@ -286,6 +286,54 @@ above, not a percentage that was never measured.
 
 ---
 
+## 9b. The Python filesystem (added 2026-09-02)
+
+The REPL has a filesystem. Spec and plan: `docs/python-fs-spec.md`,
+`docs/python-fs-plan.md`; both carry their red-team corrections.
+
+```python
+>>> import os; os.getcwd()          # '/c'
+>>> open('Experience/Printerpix — AI Engineer.txt').read()
+>>> open('My Documents/Python/fib.py','w').write(code)   # persists
+```
+
+**What `/c` is, and is not.** It is SYNTHESISED from `profile.json` — the six
+portfolio folders, one `.txt` per entry — plus the empty
+`My Documents/Python`. It is **not** a mirror of the drive. Two reasons: the
+portfolio `.txt` items in the seed hold no bytes at all (they are
+`portfolio_ref` pointers), and mirroring the whole VFS would put the visitor's
+own uploads inside a sandbox that may reach `cdn.jsdelivr.net`, whose edge logs
+URLs — turning a pasted "try this in the XP Python!" script into an
+exfiltration tool.
+
+**Known limitations, all deliberate:**
+
+- `/c` is a SNAPSHOT taken when the session starts. It is built from the
+  bundle, so it cannot go stale — but a folder created in Explorer does not
+  appear in an already-open session.
+- **Python cannot read back its own saved files.** The outbox starts empty
+  every session, because the mirror never reads the drive. CMD's `ls` and `cat`
+  show them; `open()` does not until you save again.
+- The outbox scan is **non-recursive**. `os.makedirs` inside it works, but
+  nested files are never saved — a nested name contains `/`, which the host
+  refuses, so recursing would print one refusal per statement for ever.
+- `/` still shows `dev`, `home`, `lib`, `proc`. `/tmp` is removed at startup,
+  but `tempfile` recreates it on demand and the rest is Emscripten's stdlib.
+- Read-only is `chmod 0o555`. That is **honesty, not security** — MEMFS is the
+  worker's own memory, so Python can chmod it back. The real boundary is that
+  the host accepts only `{name, text}` on a validated, rate-limited channel.
+- Saving is limited to **one file every 2 seconds per tab**. Not comfort:
+  `desktop.svelte` persists the whole drive on a 1000 ms debounce it re-arms on
+  every store change, so a faster rate means the drive never reaches IndexedDB
+  while the app still looks alive.
+- A file saved in the last second before a tab closes may not persist. That
+  write belongs to `desktop.svelte`'s debounce, which the host cannot await.
+
+**This feature bumped `SEED_VERSION`** (the `My Documents\Python` folders), so
+every returning visitor re-seeds once on their next load. Safe because
+`children` is not in `seed.ts`'s `USER_FIELDS`: their C: takes the new children
+array while the carry loop re-links their own files.
+
 ## 10. Notes & gotchas
 
 **A module worker cannot be constructed from an opaque origin.** Measured in a

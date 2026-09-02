@@ -928,8 +928,9 @@ test('cat prints a file the visitor made, and an empty one prints nothing', asyn
 }) => {
     await bootToDesktop(page);
 
-    // Explorer's File > New > Text Document creates a `local` item with NO
-    // payload, which is exactly the shape `get_file` throws on.
+    // Explorer's File > New > Text Document creates a `local` item whose
+    // payload is an EMPTY file (`fs.ts` fetches /empty/empty.txt), so this is
+    // the zero-byte path rather than the throwing one.
     const workspace = page.locator('#work-space');
     await workspace.click({ button: 'right', position: { x: 700, y: 300 } });
     await page.getByText('New', { exact: true }).hover();
@@ -943,9 +944,9 @@ test('cat prints a file the visitor made, and an empty one prints nothing', asyn
     await openCmd(page);
     await run(page, 'cat Desktop/New Text Document.txt');
 
-    // It prints nothing and the prompt comes back. The failure this guards is
-    // an unhandled rejection out of `get_file` leaving the terminal wedged
-    // with no prompt at all.
+    // It prints nothing and the prompt comes back — the reading_file latch
+    // must release and reissue the prompt even when there is no output. The
+    // failure this guards is a terminal wedged with no prompt at all.
     await expect
         .poll(async () => (await rows(page)).split('momad@xp:~$').length - 1)
         .toBe(2);

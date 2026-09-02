@@ -30,10 +30,16 @@ export interface SaveOutcome {
     lines: string[];
     /** The budget is spent — the caller must terminate the runtime. */
     terminate: boolean;
+    /**
+     * Names the runtime should stop offering: saved, or refused for a reason
+     * retrying cannot fix. Anything absent is retried after the next
+     * statement.
+     */
+    settled: string[];
 }
 
 /**
- * Find the existing file by NAME, derived from the drive每 time.
+ * Find the existing file by NAME, derived from the drive every time.
  *
  * Deliberately not a remembered `Map<name, id>`. That map loses data on four
  * ordinary gestures: `exit()` then `python`, or a reload, empties it so the
@@ -47,9 +53,22 @@ function existing_id(drive: HardDrive, name: string): string | null {
     const folder = drive[PYTHON_FOLDER_ID];
     if (folder == null) return null;
     for (const child_id of folder.children) {
-        if (drive[child_id]?.name === name) return child_id;
+        const child = drive[child_id];
+        // Type-checked: a FOLDER named `main.py` (Explorer > New > Folder) would
+        // otherwise be handed to `save_file`, which stamps `url` and
+        // `storage_type` onto it and leaves an item that is both.
+        if (child?.type === 'file' && child.name === name) return child_id;
     }
     return null;
+}
+
+/** KB, matching `new_fs_item_raw`'s own rounding. */
+function update_size(id: string, bytes: number): void {
+    hardDrive.update((drive) => {
+        const item = drive?.[id];
+        if (item != null) item.size = Math.ceil(bytes / 1024);
+        return drive;
+    });
 }
 
 function child_count(drive: HardDrive): number {
@@ -68,8 +87,26 @@ function icon_for(name: string): string {
         : '/images/xp/icons/TXT.png';
 }
 
-export function create_save_gate(): SaveGate {
-    return new SaveGate();
+/**
+ * ONE gate per tab, not per window.
+ *
+ * The resource it protects is global: `desktop.svelte` persists the WHOLE
+ * drive on a 1000 ms debounce that it re-arms on every store notification. A
+ * gate per terminal meant three Command Prompts — a shipped, tested,
+ * multi-instance behaviour — could each save at the permitted rate, keep that
+ * debounce re-armed for ever, and the drive would never reach IndexedDB while
+ * the app still looked alive. No hostile code required.
+ */
+const gate = new SaveGate();
+
+/** The tab's gate. A parameter only so tests can inject a fresh one. */
+export function save_gate(): SaveGate {
+    return gate;
+}
+
+/** Called when the runtime is terminated, so a restart really does continue. */
+export function reset_save_gate(): void {
+    gate.reset();
 }
 
 /**
@@ -86,31 +123,45 @@ export async function apply_save(
     gate: SaveGate,
 ): Promise<SaveOutcome> {
     const lines: string[] = [];
+    const settled: string[] = [];
 
     // Refused BEFORE the store is touched. `desktop.svelte` re-arms a 1000 ms
     // whole-drive persist on every notification, so work done here is what
     // starves it.
     if (!gate.allow(Date.now())) {
-        return {
-            lines: gate.exhausted()
-                ? [
-                      'xp: save limit reached for this interpreter — restart Python to continue',
-                  ]
-                : ['xp: saving too fast — one file every 2 seconds'],
-            terminate: gate.exhausted(),
-        };
+        // Terminate ONCE. The gate deliberately stays exhausted afterwards:
+        // resetting it here would hand a flood a fresh budget every time we
+        // killed the runtime, so it would cycle — terminate, reset, one more
+        // file, terminate — instead of stopping. Only ending the session
+        // deliberately clears it.
+        //
+        // And once claimed we fall silent, because a line per refused message
+        // is one unthrottled terminal write per forged message, on the UI
+        // thread.
+        const terminate = gate.claim_termination();
+        const lines = gate.exhausted()
+            ? terminate
+                ? ['xp: save limit reached — restarting the interpreter']
+                : []
+            : ['xp: saving too fast — retrying in a moment'];
+        // NOTHING settles: every file here is offered again next statement.
+        return { lines, terminate, settled: [] };
     }
 
     for (const file of message.files) {
         const drive = get(hardDrive);
         if (drive == null) {
+            // Not settled: this one is worth retrying once seeding finishes.
             lines.push('xp: the filesystem is still starting up');
             break;
         }
 
         const reason = reject_reason(file);
         if (reason != null) {
+            // Settled: retrying an illegal name or an oversized file would
+            // print the same refusal every statement, for ever.
             lines.push(rejection_text(file.name, reason));
+            settled.push(file.name);
             continue;
         }
 
@@ -131,9 +182,14 @@ export async function apply_save(
             // re-save orphans up to 256 KB that Explorer cannot show.
             const previous = drive[found]?.url;
             await save_file(found, blob);
+            // `save_file` does not touch `size`, so a script grown from 1 KB
+            // to 200 KB would show 1 KB in Explorer and in `cat`'s fallback
+            // for ever.
+            update_size(found, blob.size);
             if (previous != null && previous !== get(hardDrive)?.[found]?.url) {
                 await del(previous);
             }
+            settled.push(file.name);
             continue;
         }
 
@@ -141,22 +197,29 @@ export async function apply_save(
             lines.push(
                 `xp: '${file.name}' not saved — the Python folder is full (${String(LIMITS.max_files)} files)`,
             );
+            settled.push(file.name);
             continue;
         }
 
+        // `lastIndexOf` is -1 for a dotless name, and `slice(-1)` is the LAST
+        // CHARACTER — so `README` was stored as `READMe` with ext "e", never
+        // matched again, and duplicated on every save to the file cap.
+        const dot = name.lastIndexOf('.');
+        const has_ext = dot > 0;
         await new_fs_item_raw(
             {
                 type: 'file',
                 name,
-                basename: name.slice(0, name.lastIndexOf('.')) || name,
-                ext: name.slice(name.lastIndexOf('.')),
+                basename: has_ext ? name.slice(0, dot) : name,
+                ext: has_ext ? name.slice(dot) : '',
                 icon: icon_for(name),
                 authored: true,
                 file: blob,
             },
             PYTHON_FOLDER_ID,
         );
+        settled.push(file.name);
     }
 
-    return { lines, terminate: false };
+    return { lines, terminate: false, settled };
 }
