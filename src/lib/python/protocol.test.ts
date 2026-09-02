@@ -165,3 +165,50 @@ describe('PYTHON_WORKER_SOURCE', () => {
         expect(PYTHON_WORKER_SOURCE).toContain('syntax_check');
     });
 });
+
+describe('parse_from_runtime — save', () => {
+    const save = (files: unknown) =>
+        parse_from_runtime({ kind: 'save', files });
+
+    it('accepts a well-formed request', () => {
+        expect(save([{ name: 'a.py', text: 'x' }])).toEqual({
+            kind: 'save',
+            files: [{ name: 'a.py', text: 'x' }],
+        });
+    });
+
+    it('drops anything that is not an array of {name, text} strings', () => {
+        expect(save('nope')).toBeNull();
+        expect(save([null])).toBeNull();
+        expect(save(['a.py'])).toBeNull();
+        expect(save([{ name: 'a.py' }])).toBeNull();
+        expect(save([{ name: 1, text: 'x' }])).toBeNull();
+        expect(save([{ name: 'a.py', text: 2 }])).toBeNull();
+        expect(parse_from_runtime({ kind: 'save' })).toBeNull();
+    });
+
+    it('refuses an oversized batch rather than truncating it', () => {
+        // Silently dropping the extras would lose files the visitor believes
+        // they wrote; refusing the message is reported and actionable.
+        const many = Array.from({ length: 26 }, (_, i) => ({
+            name: `f${String(i)}.py`,
+            text: 'x',
+        }));
+        expect(save(many)).toBeNull();
+        expect(save(many.slice(0, 25))).not.toBeNull();
+    });
+
+    it('carries no path, parent or id — traversal is inexpressible', () => {
+        // The shape itself is the boundary: there is no field in which to
+        // write a destination, so the host's hardcoded parent cannot be
+        // redirected.
+        const parsed = parse_from_runtime({
+            kind: 'save',
+            files: [{ name: 'a.py', text: 'x', parent: 'evil', id: 'evil' }],
+        });
+        expect(parsed).toEqual({
+            kind: 'save',
+            files: [{ name: 'a.py', text: 'x' }],
+        });
+    });
+});

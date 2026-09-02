@@ -134,6 +134,13 @@ and the command layer is synchronous by design (D3); an async `cat` would
 change the shape of every command for a file type no shipped app can even
 create text in (Notepad is unbuilt, listed under Stretch).
 
+**Superseded 2026-09-02 (T3 of `docs/python-fs-plan.md`).** The deciding factor
+above turned out to be answerable without breaking anything: `run_fs` stays
+pure and synchronous and returns a `read_file` REQUEST, which `cmd.svelte`
+fulfils — the same split it already uses for `python`, `matrix` and `hack`. The
+"no shipped app can create text in it" half was also about to become false, since
+the Python REPL saves `.py` and `.txt` files into `My Documents\Python`.
+
 ## D8 — `dir`
 
 `dir` runs `ls` after one dim line ribbing the visitor for reaching for cmd.exe.

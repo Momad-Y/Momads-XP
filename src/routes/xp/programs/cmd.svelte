@@ -10,12 +10,14 @@
     import { execute, normalise_spacing } from '../../../lib/cmd/registry';
     import { complete } from '../../../lib/cmd/complete';
     import {
+        described,
         FS_COMMANDS,
         remainder,
         run_fs,
     } from '../../../lib/cmd/fs_commands';
+    import { get_file } from '../../../lib/fs';
     import { display_path, home_id, ROOT } from '../../../lib/cmd/path';
-    import { MAX_COLS, wrap_items } from '../../../lib/cmd/format';
+    import { dim, MAX_COLS, wrap_items } from '../../../lib/cmd/format';
     import { DEFAULT_ACCENT, run_color } from '../../../lib/cmd/color';
     import { feed, initial_state, set_line } from '../../../lib/term/readline';
     import {
@@ -35,6 +37,7 @@
         ETX,
         FG_BRIGHT_GREEN,
         FG_GREY,
+        FG_YELLOW,
         HIDE_CURSOR,
         SHOW_CURSOR,
     } from '../../../lib/term/ansi';
@@ -52,6 +55,12 @@
         SANDBOX_URL,
     } from '../../../lib/python/client';
     import type { PythonClient } from '../../../lib/python/client';
+    import {
+        apply_save,
+        reset_save_gate,
+        save_gate,
+    } from '../../../lib/python/host_fs';
+    import type { SaveRequest } from '../../../lib/python/save_limits';
     import type { FromRuntime } from '../../../lib/python/protocol';
     import {
         initial_repl_state,
@@ -218,6 +227,31 @@
 
     let animation_generation = 0;
     let animation_running = false;
+
+    /**
+     * A `cat` of a visitor-owned file is in flight.
+     *
+     * Its own generation counter, for the same reason the animations have one:
+     * a boolean latch mutated from another closure narrows to `false` and the
+     * guard becomes dead code the linter then rejects.
+     */
+    let reading_file = false;
+    let read_generation = 0;
+
+    /**
+     * Caps for `cat`, deliberately far below `portfolio_viewer`'s 1 MB.
+     *
+     * That viewer paints into a scrollable `<pre>`; this writes line by line
+     * into xterm, where a megabyte locks the window. 64 KB and 500 lines is
+     * more than any script a visitor writes here and still instant.
+     */
+    const CAT_MAX_BYTES = 64 * 1024;
+    const CAT_MAX_LINES = 500;
+
+    function described_file(id: string): string[] {
+        const item = $hardDrive?.[id];
+        return item == null ? [] : described(item);
+    }
 
     /**
      * Returns the terminal to a usable state and reissues the prompt.
@@ -395,12 +429,18 @@
         await tick();
         if (py_frame == null || term?.is_disposed() === true) return;
         py_client = create_python_client(py_frame, {
+            on_save: (message) => {
+                void handle_save(message);
+            },
             on_message: on_python_message,
             greeting: PYTHON_GREETING,
         });
     }
 
     function stop_python() {
+        // A session the visitor ended deliberately gets a fresh budget; one
+        // we killed for flooding does not.
+        reset_save_gate();
         py_client?.dispose();
         py_client = undefined;
         // Dropping `mode` unmounts the iframe, which takes the worker and the
@@ -596,6 +636,97 @@
         finish_animation(generation);
     }
 
+    /**
+     * The one command whose output is not ready when it returns.
+     *
+     * `cat` on a file the visitor owns has to read IndexedDB, and everything
+     * here exists because that read can be interrupted. Without the
+     * `reading_file` latch the visitor can press Enter mid-read, get a fresh
+     * prompt, and then watch the file land underneath it.
+     */
+    async function read_and_print(request: { id: string; name: string }) {
+        const generation = ++read_generation;
+        const superseded_read = () =>
+            generation !== read_generation || term?.is_disposed() === true;
+        reading_file = true;
+        try {
+            const file = await get_file(request.id);
+            const bytes = await file.arrayBuffer();
+
+            if (superseded_read()) return;
+
+            if (bytes.byteLength > CAT_MAX_BYTES) {
+                write_lines([
+                    dim(
+                        `cat: ${request.name}: too large to print (${String(
+                            Math.ceil(bytes.byteLength / 1024),
+                        )} KB) — open it from My Computer`,
+                    ),
+                ]);
+                return;
+            }
+
+            // `fatal`, because `file.text()` does NOT throw on binary — it
+            // substitutes replacement characters, so a mis-typed `cat` would
+            // stream raw bytes, every 0x1b included, straight into xterm.
+            let text: string;
+            try {
+                text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+            } catch {
+                write_lines(described_file(request.id));
+                return;
+            }
+
+            const lines = text.replace(/\r\n?/g, '\n').split('\n');
+            write_lines(
+                lines.length > CAT_MAX_LINES
+                    ? [
+                          ...lines.slice(0, CAT_MAX_LINES),
+                          dim(
+                              `… ${String(
+                                  lines.length - CAT_MAX_LINES,
+                              )} more lines`,
+                          ),
+                      ]
+                    : lines,
+            );
+        } catch {
+            // `get_file` throws for a `local` item with no payload — exactly
+            // what Explorer's File > New > Text Document creates. An empty
+            // file prints nothing, as `cat` does everywhere else.
+        } finally {
+            reading_file = false;
+            if (!superseded_read()) prompt();
+        }
+    }
+
+    /**
+     * A `save` from the runtime. Refusals are printed, not raised: by the time
+     * this runs the visitor's `open()` has already returned, so nothing can
+     * throw into it. One statement late beats silence, which is the only
+     * unacceptable option.
+     */
+    async function handle_save(message: { files: SaveRequest[] }) {
+        const outcome = await apply_save(message, save_gate());
+        // A late save from a session that has already ended must not paint
+        // over the shell prompt — the same guard `on_python_message` carries.
+        if (mode !== 'python' || term?.is_disposed() === true) return;
+
+        for (const line of outcome.lines) {
+            write(colour(line, FG_YELLOW) + CRLF);
+        }
+        // The `result` message has already printed the prompt, so anything
+        // written after it leaves the visitor with no prompt until they press
+        // a key. Reissue it, as `read_and_print` does.
+        if (outcome.lines.length > 0) prompt();
+
+        if (outcome.settled.length > 0) py_client?.settle(outcome.settled);
+
+        if (outcome.terminate) {
+            py_client?.restart();
+        }
+    }
+
     function submit(line: string) {
         write(CRLF);
         const name = line.trim().split(/\s+/)[0] ?? '';
@@ -654,6 +785,10 @@
             write_lines(
                 normalise_spacing(result.lines, result.blank_after ?? false),
             );
+            if (result.read_file != null) {
+                void read_and_print(result.read_file);
+                return;
+            }
             prompt();
             return;
         }
@@ -699,6 +834,18 @@
             // key skips it.
             if (animation_needs_ctrl_c && data !== ETX) return;
             cancel_animation();
+            return;
+        }
+
+        // A file read is in flight: there is no prompt on screen to type at,
+        // so everything is swallowed except the interrupt.
+        if (reading_file) {
+            if (data === ETX) {
+                read_generation++;
+                reading_file = false;
+                write('^C' + CRLF);
+                prompt();
+            }
             return;
         }
 

@@ -21,6 +21,20 @@ const C_DRIVE = 'cTbkbrM4qjwF3UfmCoFkEK';
 const DESKTOP = 'nt1QdU9Sws26H26UNQZcQU';
 const MY_MUSIC = 'tjhEdnks6c4wPBWcqyoWQz';
 const MY_COMPUTER_EXE = 'sWTYkZhdpSYCmXP7z6459v';
+
+/**
+ * `My Documents`, and the folder the Python REPL saves into.
+ *
+ * Generated here rather than hand-written into `scripts/vfs-base.json`,
+ * because `src/` needs the Python folder's id at runtime and CLAUDE.md forbids
+ * hand-editing `src/lib/generated/*`. Emitting it as `PYTHON_FOLDER_ID` puts
+ * it under the CI freshness gate; a typo in either literal is caught by the
+ * dangling parent/child validation below, which is the check that actually
+ * bites (the hash gate compares generator output to committed output, so it
+ * cannot see a literal that is wrong in both).
+ */
+const MY_DOCUMENTS = 'xpFolderMyDocuments0001';
+const PYTHON_FOLDER = 'xpFolderPythonScripts01';
 const IE_EXE = '2jpDfV5KSoYMArQnHgux5S';
 
 /** Flipped per slice as real programs land (spec D13). */
@@ -98,7 +112,14 @@ const c_drive = seed[C_DRIVE];
 if (c_drive == null) throw new Error('C: drive missing from base');
 seed[C_DRIVE] = {
     ...c_drive,
-    children: [...c_drive.children, ...built.folder_ids, built.resume_file_id],
+    // My Documents FIRST, as XP orders it — Explorer and `ls` both render this
+    // array verbatim, so the order here is the order a visitor sees.
+    children: [
+        MY_DOCUMENTS,
+        ...c_drive.children,
+        ...built.folder_ids,
+        built.resume_file_id,
+    ],
 };
 
 // ---- My Music: derived from the track manifest ------------------------
@@ -130,6 +151,41 @@ for (const track of TRACKS) {
 seed[MY_MUSIC] = {
     ...my_music,
     children: [...my_music.children, ...TRACKS.map((t) => t.id)],
+};
+
+// ---- My Documents \ Python --------------------------------------------
+// Where the Python REPL persists a visitor's saved scripts. `My Documents` is
+// the XP-authentic home for a visitor's own files and the drive had no
+// equivalent; the subfolder keeps saved scripts from colliding with anything
+// added later.
+seed[MY_DOCUMENTS] = {
+    id: MY_DOCUMENTS,
+    type: 'folder',
+    name: 'My Documents',
+    basename: 'My Documents',
+    ext: '',
+    icon: '/images/xp/icons/MyDocuments.png',
+    starting_point: true,
+    parent: C_DRIVE,
+    children: [PYTHON_FOLDER],
+    date_created: SEED_EPOCH,
+    date_modified: SEED_EPOCH,
+    sort_option: 0,
+    sort_order: 0,
+};
+seed[PYTHON_FOLDER] = {
+    id: PYTHON_FOLDER,
+    type: 'folder',
+    name: 'Python',
+    basename: 'Python',
+    ext: '',
+    icon: '/images/xp/icons/FolderClosed.png',
+    parent: MY_DOCUMENTS,
+    children: [],
+    date_created: SEED_EPOCH,
+    date_modified: SEED_EPOCH,
+    sort_option: 0,
+    sort_order: 0,
 };
 
 const desktop = seed[DESKTOP];
@@ -181,7 +237,9 @@ writeFileSync(
         `export const PORTFOLIO_FOLDER_IDS: string[] = ${JSON.stringify(built.folder_ids)};\n` +
         `export const PORTFOLIO_ENTRY_IDS: string[] = ${JSON.stringify(built.entry_ids)};\n` +
         `export const PROJECTS_FOLDER_ID = '${built.projects_folder_id}';\n` +
-        `export const RESUME_FILE_ID = '${built.resume_file_id}';\n`,
+        `export const RESUME_FILE_ID = '${built.resume_file_id}';\n` +
+        `export const MY_DOCUMENTS_ID = '${MY_DOCUMENTS}';\n` +
+        `export const PYTHON_FOLDER_ID = '${PYTHON_FOLDER}';\n`,
 );
 execSync(
     'npx prettier --write src/lib/generated/seed_version.ts src/lib/generated/vfs_ids.ts',

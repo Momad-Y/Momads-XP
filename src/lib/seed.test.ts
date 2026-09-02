@@ -7,7 +7,10 @@ import {
     shouldReseed,
     snapshot_seed_fields,
 } from './seed';
+import { to_hard_drive } from './types';
 import type { HardDrive, VfsItem } from './types';
+import { MY_DOCUMENTS_ID, PYTHON_FOLDER_ID } from './generated/vfs_ids';
+import { protected_items } from './system';
 
 describe('seed versioning', () => {
     it('exposes a non-empty content-hash version', () => {
@@ -519,5 +522,37 @@ describe('merge_on_reseed — carried fields are type-checked', () => {
         expect(merge_on_reseed(cached, seed_drive(), before).f?.name).toBe(
             'Renamed.txt',
         );
+    });
+});
+
+describe('My Documents \\ Python (the REPL save folder)', () => {
+    const drive = to_hard_drive(
+        JSON.parse(readFileSync('static/json/hard_drive.json', 'utf-8')),
+    );
+
+    it('exists, is linked both ways, and sits under C:', () => {
+        const docs = drive[MY_DOCUMENTS_ID];
+        const python = drive[PYTHON_FOLDER_ID];
+        expect(docs?.name).toBe('My Documents');
+        expect(python?.name).toBe('Python');
+        // Both directions, because the generator's dangling-child check only
+        // proves the ids resolve, not that the tree agrees with itself.
+        expect(drive['cTbkbrM4qjwF3UfmCoFkEK']?.children).toContain(
+            MY_DOCUMENTS_ID,
+        );
+        expect(docs?.children).toContain(PYTHON_FOLDER_ID);
+        expect(python?.parent).toBe(MY_DOCUMENTS_ID);
+        expect(docs?.parent).toBe('cTbkbrM4qjwF3UfmCoFkEK');
+    });
+
+    it('protects the Python folder from deletion, but not its contents', () => {
+        // Deleting it is UNRECOVERABLE: the host saves by id, and seed.ts's
+        // tombstone pass would keep it deleted through every future re-seed.
+        expect(protected_items).toContain(PYTHON_FOLDER_ID);
+        expect(protected_items).toContain(MY_DOCUMENTS_ID);
+    });
+
+    it('starts empty, so nothing ships inside it', () => {
+        expect(drive[PYTHON_FOLDER_ID]?.children).toEqual([]);
     });
 });

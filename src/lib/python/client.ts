@@ -11,6 +11,8 @@ import {
 } from './protocol';
 import { PYTHON_WORKER_SOURCE } from './worker_source';
 import { PYODIDE_CDN_BASE } from './version';
+import { build_mirror } from './mirror';
+import type { SaveRequest } from './save_limits';
 
 /** Where the isolation host lives. Served from static/, never bundled. */
 export const SANDBOX_URL = '/html/python-sandbox.html';
@@ -72,6 +74,15 @@ export interface MessageBus {
 
 export interface PythonClientOptions {
     on_message: (message: FromRuntime) => void;
+    /**
+     * A `save` arrived from the runtime.
+     *
+     * Intercepted HERE, before `on_message`, so `repl.ts`'s pure state machine
+     * never sees a message that could reach storage — the invariant the whole
+     * isolation argument rests on. `repl.ts` still carries an empty `save`
+     * case, because its switch must stay exhaustive.
+     */
+    on_save?: (message: { files: SaveRequest[] }) => void;
     /** §3.2's pre-loaded greeting, run before the banner is announced. */
     greeting?: string;
     /** Defaults to the real window; overridden in tests. */
@@ -83,6 +94,8 @@ export interface PythonClient {
     exec: (source: string) => void;
     /** Ctrl+C — terminates and respawns. Destroys the session's variables. */
     restart: () => void;
+    /** Tell the runtime which names it may stop offering. */
+    settle: (settled: string[]) => void;
     dispose: () => void;
 }
 
@@ -116,6 +129,10 @@ export function create_python_client(
             kind: 'init',
             index_url: PYODIDE_CDN_BASE,
             greeting: options.greeting ?? '',
+            // Synthesised from profile.json, so this is a pure function of
+            // the bundle — no VFS read, no IndexedDB, nothing of the
+            // visitor's.
+            mirror: build_mirror(),
             // The driver is authored in src/ and handed over here, so the
             // static host page stays free of logic.
             worker_source: PYTHON_WORKER_SOURCE,
@@ -143,6 +160,10 @@ export function create_python_client(
             send_init();
             return;
         }
+        if (message.kind === 'save') {
+            options.on_save?.({ files: message.files });
+            return;
+        }
         options.on_message(message);
     };
 
@@ -168,6 +189,11 @@ export function create_python_client(
             if (disposed) return;
             post({ kind: 'exec', source });
         },
+        settle(settled: string[]) {
+            if (disposed) return;
+            post({ kind: 'saved', settled });
+        },
+
         restart() {
             if (disposed) return;
             post({ kind: 'terminate' });

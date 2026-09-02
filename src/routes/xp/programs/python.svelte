@@ -12,6 +12,12 @@
         SANDBOX_URL,
     } from '../../../lib/python/client';
     import type { PythonClient } from '../../../lib/python/client';
+    import {
+        apply_save,
+        reset_save_gate,
+        save_gate,
+    } from '../../../lib/python/host_fs';
+    import type { SaveRequest } from '../../../lib/python/save_limits';
     import type { FromRuntime } from '../../../lib/python/protocol';
     import {
         initial_repl_state,
@@ -30,7 +36,7 @@
     } from '../../../lib/python/repl';
     import { feed, initial_state } from '../../../lib/term/readline';
     import type { ReadlineState } from '../../../lib/term/readline';
-    import { CR, CSI } from '../../../lib/term/ansi';
+    import { colour, CR, CRLF, CSI, FG_YELLOW } from '../../../lib/term/ansi';
     import {
         DEFAULT_COLS,
         render_line,
@@ -54,6 +60,9 @@
     export let exec_path: string | undefined = undefined;
 
     export function destroy() {
+        // A session the visitor ended deliberately gets a fresh budget; one
+        // we killed for flooding does not.
+        reset_save_gate();
         runningPrograms.update((programs) =>
             programs.filter((p) => p != get_self()),
         );
@@ -174,6 +183,34 @@
      * — and the single-row redraw this replaced reprinted the prompt onto the
      * last visual row every keystroke thereafter.
      */
+
+    /**
+     * A `save` from the runtime. Refusals are printed, not raised: by the time
+     * this runs the visitor's `open()` has already returned, so nothing can
+     * throw into it. One statement late beats silence, which is the only
+     * unacceptable option.
+     */
+    async function handle_save(message: { files: SaveRequest[] }) {
+        const outcome = await apply_save(message, save_gate());
+        // A late save from a session that has already ended must not paint
+        // over the shell prompt — the same guard `on_python_message` carries.
+        if (term?.is_disposed() === true) return;
+
+        for (const line of outcome.lines) {
+            write(colour(line, FG_YELLOW) + CRLF);
+        }
+        // The `result` message has already printed the prompt, so anything
+        // written after it leaves the visitor with no prompt until they press
+        // a key. Reissue it, as `read_and_print` does.
+        if (outcome.lines.length > 0) prompt();
+
+        if (outcome.settled.length > 0) client?.settle(outcome.settled);
+
+        if (outcome.terminate) {
+            client?.restart();
+        }
+    }
+
     function redraw() {
         const rendered = render_line({
             prompt: prompt_text(repl),
@@ -225,6 +262,9 @@
         write(PYTHON_LOADING);
         if (frame != null) {
             client = create_python_client(frame, {
+                on_save: (message) => {
+                    void handle_save(message);
+                },
                 on_message: on_runtime,
                 greeting: PYTHON_GREETING,
             });

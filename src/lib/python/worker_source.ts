@@ -39,13 +39,120 @@
  * Built as a function body rather than a bare template literal so editors
  * still highlight it and a syntax error is at least visible on review.
  */
+/**
+ * The Python that builds `/c` before the banner appears.
+ *
+ * Hoisted out of the worker template and interpolated with `JSON.stringify`,
+ * because that template is a `String.raw` — an escaped backtick inside it
+ * survives as a literal backslash and the emitted worker stops being valid
+ * JavaScript. (It did; `new Function(source)` caught it.)
+ */
+import { LIMITS } from './save_limits';
+
+const XP_FS_INIT = `
+import os, shutil, pathlib
+
+_tree = _xp_mirror.to_py()
+
+# /tmp is Emscripten's, not ours, and its presence makes / look like a real
+# machine's root. tempfile recreates it on demand if anything needs it.
+shutil.rmtree('/tmp', ignore_errors=True)
+
+os.makedirs('/c', exist_ok=True)
+_writable = []
+for _entry in _tree:
+    _path = '/c/' + _entry['path']
+    if 'text' in _entry and _entry['text'] is not None:
+        os.makedirs(os.path.dirname(_path), exist_ok=True)
+        pathlib.Path(_path).write_text(_entry['text'])
+    else:
+        os.makedirs(_path, exist_ok=True)
+        if _entry.get('writable'):
+            _writable.append(_path)
+
+# Read-only, deepest first, so chmod-ing a parent cannot block writing its
+# children. This is HONESTY, not security: MEMFS is the worker's own memory
+# and Python can chmod it back. It exists so a mistake fails loudly and
+# locally instead of looking like it worked.
+for _dir, _, _files in os.walk('/c', topdown=False):
+    if any(_dir == w or _dir.startswith(w + '/') for w in _writable):
+        continue
+    for _f in _files:
+        os.chmod(os.path.join(_dir, _f), 0o444)
+    os.chmod(_dir, 0o555)
+
+os.chdir('/c')
+
+# Cleaned by NAME, because loop variables do not exist when the loop never ran
+# — an empty tree (or one whose entries all failed to resolve) raised NameError
+# here and killed the session before the banner.
+for _name in ['_tree', '_writable', '_entry', '_path', '_dir', '_dirs',
+              '_files', '_f', '_name']:
+    globals().pop(_name, None)
+`;
+
+/**
+ * Reports what changed in the outbox since the last statement.
+ *
+ * NON-RECURSIVE on purpose: `os.makedirs` inside the outbox works in MEMFS,
+ * but a nested name contains `/`, which the host's validator rejects — so
+ * recursing would produce one refusal line per statement, forever. Files
+ * directly in the folder are saved; subdirectories are not, and the guide
+ * says so.
+ *
+ * Content-hashed rather than mtime-compared so an unchanged file is not
+ * re-sent every statement.
+ */
+const XP_FS_SCAN = `
+import hashlib, json, os
+
+def _xp_scan():
+    out = []
+    seen = {}
+    try:
+        names = os.listdir('/c/My Documents/Python')
+    except OSError:
+        return '[]'
+    for _n in sorted(names):
+        _p = '/c/My Documents/Python/' + _n
+        if not os.path.isfile(_p):
+            continue
+        try:
+            _t = open(_p, encoding='utf-8').read()
+        except (OSError, UnicodeDecodeError):
+            continue
+        _h = hashlib.sha256(_t.encode('utf-8')).hexdigest()
+        seen[_n] = _h
+        if _xp_sent.get(_n) != _h:
+            out.append({'name': _n, 'text': _t})
+    # Forget files that no longer exist, but do NOT commit what is being sent:
+    # the host has not accepted it yet. Committing here made every refusal —
+    # rate-limited, folder full, drive not seeded — permanent, because the
+    # unchanged file never appeared in a later scan.
+    for _gone in [k for k in _xp_sent if k not in seen]:
+        del _xp_sent[_gone]
+    _xp_pending.clear()
+    _xp_pending.update({e['name']: seen[e['name']] for e in out})
+    return json.dumps(out)
+
+
+def _xp_settle(names):
+    """Commit only what the host says it has finished with."""
+    for _n in names:
+        if _n in _xp_pending:
+            _xp_sent[_n] = _xp_pending[_n]
+`;
+
+/** Kept in step with `LIMITS.max_files_per_message`, which the host enforces. */
+const MAX_FILES_PER_MESSAGE = LIMITS.max_files_per_message;
+
 export const PYTHON_WORKER_SOURCE = String.raw`
 let pyodide = null;
 let console_obj = null;
 
 const send = (msg) => { self.postMessage(msg); };
 
-async function init(index_url, greeting) {
+async function init(index_url, greeting, mirror) {
     try {
         send({ kind: 'loading', detail: 'Fetching runtime' });
         // importScripts, not import(): a module worker cannot exist on an
@@ -70,6 +177,19 @@ async function init(index_url, greeting) {
         console_obj.stderr_callback = (text) => { send({ kind: 'stderr', text }); };
 
         const banner = String(mod_console.BANNER || '');
+
+        // Build /c BEFORE the banner, so the first prompt already has a
+        // filesystem under it.
+        //
+        // The tree crosses the JS->Python boundary through globals.set +
+        // to_py, NEVER string interpolation: the shipped names contain an
+        // apostrophe (Momad's XP.txt), an em dash, an en dash and a middle
+        // dot, any of which breaks generated source.
+        pyodide.globals.set('_xp_mirror', mirror || []);
+        pyodide.runPython(${JSON.stringify(XP_FS_INIT)});
+        pyodide.globals.delete('_xp_mirror');
+        pyodide.runPython('_xp_sent = {}; _xp_pending = {}');
+        pyodide.runPython(${JSON.stringify(XP_FS_SCAN)});
 
         if (greeting) {
             // §3.2's pre-loaded greeting. Pushed through the console so it
@@ -115,14 +235,40 @@ async function run_source(source, quiet) {
         status = 'complete';
     }
     if (!quiet) send({ kind: 'result', repr, status });
+
+    // What the statement wrote to the outbox. Reported AFTER the result, so a
+    // statement that writes and then raises still persists what it wrote.
+    if (status === 'complete') {
+        try {
+            const changed = JSON.parse(pyodide.runPython('_xp_scan()'));
+            // Chunked, because the host REFUSES an oversized batch outright.
+            // A loop writing 30 files in one statement used to lose all 30
+            // with no message at all; now it takes two statements' worth of
+            // messages and loses nothing.
+            for (let i = 0; i < changed.length; i += ${String(MAX_FILES_PER_MESSAGE)}) {
+                send({
+                    kind: 'save',
+                    files: changed.slice(i, i + ${String(MAX_FILES_PER_MESSAGE)}),
+                });
+            }
+        } catch (error) {
+            // A broken scan must never take the REPL down with it.
+        }
+    }
 }
 
 self.onmessage = (event) => {
     const data = event.data || {};
     if (data.kind === 'init') {
-        void init(data.index_url, data.greeting);
+        void init(data.index_url, data.greeting, data.mirror);
     } else if (data.kind === 'exec') {
         void run_source(data.source, false);
+    } else if (data.kind === 'saved') {
+        if (pyodide) {
+            pyodide.globals.set('_xp_settled', data.settled || []);
+            pyodide.runPython('_xp_settle(_xp_settled.to_py())');
+            pyodide.globals.delete('_xp_settled');
+        }
     }
 };
 `;
