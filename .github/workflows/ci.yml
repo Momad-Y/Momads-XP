@@ -72,7 +72,20 @@ jobs:
             - name: Install Playwright browsers
               run: npx playwright install --with-deps chromium
 
-            - name: E2E smoke tests
-              run: npx playwright test
+            # Hermetic. Nothing here touches the network, so it cannot go red
+            # because a CDN did.
+            - name: E2E (hermetic)
+              run: npx playwright test --project=default
+              env:
+                  CI: 'true'
+
+            # Real Pyodide, ~5 MB from jsDelivr per spec. Run where production
+            # risk actually is — the cutover into `main`, and `main` itself —
+            # rather than on every PR into `dev`. Phase 3 shipped two bugs that
+            # ONLY a real runtime could catch (a module worker on an opaque
+            # origin, and the sandbox CSP), so this must not simply be dropped.
+            - name: E2E (real Pyodide — cutovers into main)
+              if: github.ref == 'refs/heads/main' || github.base_ref == 'main'
+              run: npx playwright test --project=online
               env:
                   CI: 'true'
