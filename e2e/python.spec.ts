@@ -479,6 +479,63 @@ async function lastLine(page: Page): Promise<string> {
     return lines[lines.length - 1] ?? '';
 }
 
+/**
+ * `/c` — the read-only portfolio filesystem, built before the first prompt.
+ *
+ * Shipped inside the `init` payload rather than as a later message precisely
+ * so this is true at the first prompt: a message cannot arrive before `ready`,
+ * because `ready` is how the host learns the runtime exists.
+ */
+test('/c is mounted, readable, and read-only @online', async ({ page }) => {
+    test.setTimeout(180_000);
+    await bootToDesktop(page);
+    await openPython(page);
+    await expect
+        .poll(async () => cmdScreen(page), { timeout: 120_000 })
+        .toContain('Python 3.13');
+
+    // The session STARTS here — no cd, no imports, nothing typed first.
+    await type(page, 'import os; print("CWD", os.getcwd())');
+    await expect
+        .poll(async () => cmdScreen(page), { timeout: 30_000 })
+        .toContain('CWD /c');
+
+    // Emscripten's own /tmp is gone, so `/` is the portfolio and not a
+    // half-real machine root.
+    await type(page, 'print("ROOT", sorted(os.listdir("/")))');
+    await expect
+        .poll(async () => cmdScreen(page), { timeout: 30_000 })
+        .toContain("'c'");
+    expect(await cmdScreen(page)).not.toContain("'tmp'");
+
+    // Plain open(), relative to the working directory, no await, no imports.
+    await type(
+        page,
+        'print("READ", open("Experience/Printerpix — AI Engineer.txt").read()[:20])',
+    );
+    await expect
+        .poll(async () => cmdScreen(page), { timeout: 30_000 })
+        .toContain('READ AI Engineer');
+
+    // Read-only fails LOUDLY. This is honesty, not a security boundary —
+    // MEMFS is the worker's own memory — but a silent no-op would be worse
+    // than either.
+    await type(
+        page,
+        'try:\n    open("Experience/x.txt","w")\nexcept PermissionError:\n    print("DENIED")',
+    );
+    await type(page, '');
+    await expect
+        .poll(async () => cmdScreen(page), { timeout: 30_000 })
+        .toContain('DENIED');
+
+    // The outbox is writable, and empty until T5 wires saving.
+    await type(page, 'print("OUTBOX", os.listdir("My Documents/Python"))');
+    await expect
+        .poll(async () => cmdScreen(page), { timeout: 30_000 })
+        .toContain('OUTBOX []');
+});
+
 test('the shell and the interpreter keep separate line histories @online', async ({
     page,
 }) => {

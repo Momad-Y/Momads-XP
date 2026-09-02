@@ -11,6 +11,7 @@ import {
 } from './protocol';
 import { PYTHON_WORKER_SOURCE } from './worker_source';
 import { PYODIDE_CDN_BASE } from './version';
+import { build_mirror } from './mirror';
 
 /** Where the isolation host lives. Served from static/, never bundled. */
 export const SANDBOX_URL = '/html/python-sandbox.html';
@@ -116,6 +117,10 @@ export function create_python_client(
             kind: 'init',
             index_url: PYODIDE_CDN_BASE,
             greeting: options.greeting ?? '',
+            // Synthesised from profile.json, so this is a pure function of
+            // the bundle — no VFS read, no IndexedDB, nothing of the
+            // visitor's.
+            mirror: build_mirror(),
             // The driver is authored in src/ and handed over here, so the
             // static host page stays free of logic.
             worker_source: PYTHON_WORKER_SOURCE,

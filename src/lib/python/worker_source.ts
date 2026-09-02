@@ -39,13 +39,57 @@
  * Built as a function body rather than a bare template literal so editors
  * still highlight it and a syntax error is at least visible on review.
  */
+/**
+ * The Python that builds `/c` before the banner appears.
+ *
+ * Hoisted out of the worker template and interpolated with `JSON.stringify`,
+ * because that template is a `String.raw` — an escaped backtick inside it
+ * survives as a literal backslash and the emitted worker stops being valid
+ * JavaScript. (It did; `new Function(source)` caught it.)
+ */
+const XP_FS_INIT = `
+import os, shutil, pathlib
+
+_tree = _xp_mirror.to_py()
+
+# /tmp is Emscripten's, not ours, and its presence makes / look like a real
+# machine's root. tempfile recreates it on demand if anything needs it.
+shutil.rmtree('/tmp', ignore_errors=True)
+
+os.makedirs('/c', exist_ok=True)
+_writable = []
+for _entry in _tree:
+    _path = '/c/' + _entry['path']
+    if 'text' in _entry and _entry['text'] is not None:
+        os.makedirs(os.path.dirname(_path), exist_ok=True)
+        pathlib.Path(_path).write_text(_entry['text'])
+    else:
+        os.makedirs(_path, exist_ok=True)
+        if _entry.get('writable'):
+            _writable.append(_path)
+
+# Read-only, deepest first, so chmod-ing a parent cannot block writing its
+# children. This is HONESTY, not security: MEMFS is the worker's own memory
+# and Python can chmod it back. It exists so a mistake fails loudly and
+# locally instead of looking like it worked.
+for _dir, _, _files in os.walk('/c', topdown=False):
+    if any(_dir == w or _dir.startswith(w + '/') for w in _writable):
+        continue
+    for _f in _files:
+        os.chmod(os.path.join(_dir, _f), 0o444)
+    os.chmod(_dir, 0o555)
+
+os.chdir('/c')
+del _tree, _writable, _entry, _path, _dir, _files, _f
+`;
+
 export const PYTHON_WORKER_SOURCE = String.raw`
 let pyodide = null;
 let console_obj = null;
 
 const send = (msg) => { self.postMessage(msg); };
 
-async function init(index_url, greeting) {
+async function init(index_url, greeting, mirror) {
     try {
         send({ kind: 'loading', detail: 'Fetching runtime' });
         // importScripts, not import(): a module worker cannot exist on an
@@ -70,6 +114,17 @@ async function init(index_url, greeting) {
         console_obj.stderr_callback = (text) => { send({ kind: 'stderr', text }); };
 
         const banner = String(mod_console.BANNER || '');
+
+        // Build /c BEFORE the banner, so the first prompt already has a
+        // filesystem under it.
+        //
+        // The tree crosses the JS->Python boundary through globals.set +
+        // to_py, NEVER string interpolation: the shipped names contain an
+        // apostrophe (Momad's XP.txt), an em dash, an en dash and a middle
+        // dot, any of which breaks generated source.
+        pyodide.globals.set('_xp_mirror', mirror || []);
+        pyodide.runPython(${JSON.stringify(XP_FS_INIT)});
+        pyodide.globals.delete('_xp_mirror');
 
         if (greeting) {
             // §3.2's pre-loaded greeting. Pushed through the console so it
@@ -120,7 +175,7 @@ async function run_source(source, quiet) {
 self.onmessage = (event) => {
     const data = event.data || {};
     if (data.kind === 'init') {
-        void init(data.index_url, data.greeting);
+        void init(data.index_url, data.greeting, data.mirror);
     } else if (data.kind === 'exec') {
         void run_source(data.source, false);
     }

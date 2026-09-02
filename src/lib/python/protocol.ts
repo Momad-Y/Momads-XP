@@ -25,6 +25,8 @@
  * inherits the frame's opaque origin and therefore its powerlessness.
  */
 
+import type { MirrorEntry } from './mirror';
+
 /** Messages the host page (and its worker) send OUT to the app. */
 export type FromRuntime =
     | { kind: 'loading'; detail: string }
@@ -36,7 +38,21 @@ export type FromRuntime =
 
 /** Messages the app sends IN to the runtime. */
 export type ToRuntime =
-    | { kind: 'init'; index_url: string; greeting: string }
+    | {
+          kind: 'init';
+          index_url: string;
+          greeting: string;
+          /**
+           * The read-only `/c` tree, shipped WITH init rather than as a later
+           * message.
+           *
+           * The worker must build, chmod and chdir into `/c` BEFORE it sends
+           * `ready`, or the first prompt appears over a directory that does
+           * not exist yet. A separate message cannot arrive before `ready` —
+           * the host only learns the runtime exists by receiving it.
+           */
+          mirror: MirrorEntry[];
+      }
     | { kind: 'exec'; source: string };
 
 /**
