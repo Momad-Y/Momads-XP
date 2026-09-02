@@ -48,6 +48,16 @@ export interface FsResult {
     /** Set ONLY by `cd`, and only when it succeeded. */
     cwd?: string;
     blank_after?: boolean;
+    /**
+     * `cat` found a file whose bytes live in IndexedDB and must be read
+     * asynchronously.
+     *
+     * Returned as a REQUEST rather than performed here, because this module is
+     * pure and synchronous and that is what keeps the whole command surface
+     * testable without a browser. The component fulfils it, exactly as it
+     * already does for `python`, `matrix` and `hack`.
+     */
+    read_file?: { id: string; name: string };
 }
 
 /** Answer for anything asked before the drive exists. */
@@ -174,8 +184,31 @@ function portfolio_lines(item: VfsItem): string[] | null {
     ];
 }
 
+/**
+ * Extensions `cat` will try to read as text.
+ *
+ * A deliberate allowlist, not a denylist: the fallback for everything else is
+ * `described()`, which is honest, whereas guessing wrong streams raw bytes —
+ * escape sequences included — into the terminal.
+ */
+const READABLE_EXTS = new Set([
+    '.txt',
+    '.py',
+    '.md',
+    '.json',
+    '.csv',
+    '.log',
+    '.html',
+    '.css',
+    '.js',
+    '.ts',
+    '.xml',
+    '.yml',
+    '.yaml',
+]);
+
 /** What a file that has no text to print says about itself. */
-function described(item: VfsItem): string[] {
+export function described(item: VfsItem): string[] {
     const kind =
         item.ext === '' ? 'file' : `${item.ext.slice(1).toUpperCase()} file`;
     const size = item.size == null ? '' : `${String(item.size)} KB `;
@@ -199,9 +232,14 @@ function run_cat(rest: string, drive: HardDrive, cwd: string): FsResult {
         return { lines: [`cat: ${path}: Is a directory`] };
     }
     const portfolio = portfolio_lines(item);
-    return portfolio == null
-        ? { lines: described(item) }
-        : { lines: portfolio, blank_after: true };
+    if (portfolio != null) return { lines: portfolio, blank_after: true };
+
+    // A file the visitor actually owns. Its bytes are in IndexedDB, so the
+    // read is asynchronous and belongs to the component.
+    if (item.storage_type === 'local' && READABLE_EXTS.has(item.ext)) {
+        return { lines: [], read_file: { id: item.id, name: item.name } };
+    }
+    return { lines: described(item) };
 }
 
 export function run_fs(

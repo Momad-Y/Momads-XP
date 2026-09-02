@@ -184,6 +184,64 @@ describe('cat', () => {
     });
 });
 
+describe('cat on a visitor-owned file', () => {
+    const local = (over: Partial<HardDrive[string]> = {}): HardDrive => {
+        const root = required(drive[C], 'seed root');
+        return {
+            ...drive,
+            [C]: { ...root, children: [...root.children, 'own'] },
+            own: {
+                ...required(drive[PRINTERPIX], 'seed entry'),
+                id: 'own',
+                name: 'main.py',
+                basename: 'main',
+                ext: '.py',
+                parent: C,
+                children: [],
+                storage_type: 'local',
+                url: 'blob-key',
+                portfolio_ref: undefined,
+                ...over,
+            },
+        };
+    };
+
+    it('asks the component to read it, rather than describing it', () => {
+        // The bytes are in IndexedDB, so the read is async and belongs to the
+        // component. This module stays pure — that is what keeps the whole
+        // command surface testable without a browser.
+        const result = run_fs('cat', 'main.py', { drive: local(), cwd: C });
+        expect(result.read_file).toEqual({ id: 'own', name: 'main.py' });
+        expect(result.lines).toEqual([]);
+    });
+
+    it('still describes a file it cannot read as text', () => {
+        const result = run_fs('cat', 'main.bin', {
+            drive: local({ name: 'main.bin', basename: 'main', ext: '.bin' }),
+            cwd: C,
+        });
+        expect(result.read_file).toBeUndefined();
+        expect(result.lines.map(strip_ansi)[0]).toContain('BIN file');
+    });
+
+    it("still describes a REMOTE file — those are not the visitor's", () => {
+        const result = run_fs('cat', 'main.py', {
+            drive: local({ storage_type: 'remote' }),
+            cwd: C,
+        });
+        expect(result.read_file).toBeUndefined();
+    });
+
+    it('prefers the portfolio rendering when the file has a ref', () => {
+        const result = run_fs('cat', 'Printerpix — AI Engineer.txt', {
+            drive,
+            cwd: EXPERIENCE,
+        });
+        expect(result.read_file).toBeUndefined();
+        expect(result.lines.length).toBeGreaterThan(1);
+    });
+});
+
 describe('run_fs', () => {
     it('answers every command it claims before the drive is seeded', () => {
         for (const name of FS_COMMANDS) {

@@ -914,6 +914,48 @@ test('Home on a wrapped line does not let output land mid-line', async ({
     expect(joined).toContain(`echo ${payload}`);
 });
 
+/**
+ * `cat` on a file the VISITOR owns.
+ *
+ * Its bytes are in IndexedDB, so this is the one command whose output is not
+ * ready when the command returns. `run_fs` stays pure and hands back a
+ * request; the component does the read. Before this, `cat` on such a file
+ * printed "open it from My Computer" — the terminal telling you to leave the
+ * terminal, for a file the terminal could already list.
+ */
+test('cat prints a file the visitor made, and an empty one prints nothing', async ({
+    page,
+}) => {
+    await bootToDesktop(page);
+
+    // Explorer's File > New > Text Document creates a `local` item with NO
+    // payload, which is exactly the shape `get_file` throws on.
+    const workspace = page.locator('#work-space');
+    await workspace.click({ button: 'right', position: { x: 700, y: 300 } });
+    await page.getByText('New', { exact: true }).hover();
+    await page.getByText('Text Document', { exact: true }).click();
+    await page.keyboard.press('Enter');
+    await workspace.click({ position: { x: 900, y: 500 } });
+    await expect(
+        page.locator('#work-space p', { hasText: 'New Text Document' }),
+    ).toBeVisible();
+
+    await openCmd(page);
+    await run(page, 'cat Desktop/New Text Document.txt');
+
+    // It prints nothing and the prompt comes back. The failure this guards is
+    // an unhandled rejection out of `get_file` leaving the terminal wedged
+    // with no prompt at all.
+    await expect
+        .poll(async () => (await rows(page)).split('momad@xp:~$').length - 1)
+        .toBe(2);
+    expect(await screen(page)).not.toContain('open it from My Computer');
+
+    // And the terminal still works afterwards.
+    await run(page, 'echo alive');
+    await expect.poll(async () => screen(page)).toContain('alive');
+});
+
 test('two terminals can be open at once', async ({ page }) => {
     // CMD is deliberately multi-instance, unlike the Python REPL which owns a
     // multi-megabyte runtime.
