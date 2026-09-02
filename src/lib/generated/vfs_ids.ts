@@ -39,3 +39,5 @@ export const PORTFOLIO_ENTRY_IDS: string[] = [
 ];
 export const PROJECTS_FOLDER_ID = 'p2FolderProjects';
 export const RESUME_FILE_ID = 'p2FileResumePdf';
+export const MY_DOCUMENTS_ID = 'xpFolderMyDocuments0001';
+export const PYTHON_FOLDER_ID = 'xpFolderPythonScripts01';
