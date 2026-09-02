@@ -163,7 +163,13 @@ describe('completing a path', () => {
         const first = tab('cd My');
         expect(first.buffer).toBe('cd My ');
         const second = complete(first.buffer, first.buffer.length, ctx);
-        expect(second.candidates).toEqual(['My Music/', 'My Pictures/']);
+        // My Documents is now a C: child too, and it comes first because XP
+        // orders it first — Explorer and `ls` both render `children` verbatim.
+        expect(second.candidates).toEqual([
+            'My Documents/',
+            'My Music/',
+            'My Pictures/',
+        ]);
     });
 
     it('terminates a directory with / and a file with a space', () => {

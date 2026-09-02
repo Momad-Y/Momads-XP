@@ -1,5 +1,10 @@
 import type { ProgramDescriptor } from './types';
-import { PORTFOLIO_ENTRY_IDS, PORTFOLIO_FOLDER_IDS } from './generated/vfs_ids';
+import {
+    MY_DOCUMENTS_ID,
+    PORTFOLIO_ENTRY_IDS,
+    PORTFOLIO_FOLDER_IDS,
+    PYTHON_FOLDER_ID,
+} from './generated/vfs_ids';
 
 export interface DefaultWallpaper {
     name: string;
@@ -106,6 +111,9 @@ export const my_computer: string[] = [
     // Phase 2 (spec D9): portfolio folders render first in the root view's
     // "Files Stored on This Computer" section (drives filter separately).
     ...PORTFOLIO_FOLDER_IDS,
+    // Beside My Music and My Pictures, as XP has it — and so it inherits
+    // `protected_items` through the spread below, like they do.
+    MY_DOCUMENTS_ID,
     my_music_id, //my music
     my_pictures_id, //my pictures
 ];
@@ -126,6 +134,18 @@ export const protected_items: string[] = [
     // Phase 2 (spec F8): portfolio entry files ARE the product — visitors
     // keep full delete/rename freedom over their own files only.
     ...PORTFOLIO_ENTRY_IDS,
+    /**
+     * The Python REPL's save folder.
+     *
+     * Protected because deleting it is UNRECOVERABLE, not merely
+     * inconvenient: the host saves by this id, `new_fs_item_raw` throws on
+     * `required(data[parent_id])` once it is gone, and `seed.ts`'s tombstone
+     * pass infers "it was in your seed and is absent from your cache, so you
+     * deleted it" and keeps it deleted through every future re-seed. One
+     * right-click would end saving for that visitor permanently. Files INSIDE
+     * it stay fully deletable.
+     */
+    PYTHON_FOLDER_ID,
 ];
 
 export const hidden_items: string[] = [
