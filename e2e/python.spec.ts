@@ -535,7 +535,10 @@ test('/c is mounted, readable, and read-only @online', async ({ page }) => {
         .poll(async () => cmdScreen(page), { timeout: 30_000 })
         .toContain('DENIED');
 
-    // The outbox is writable, and empty until T5 wires saving.
+    // The outbox is writable, and empty in a fresh profile — the mirror is
+    // synthesised from profile.json and never reads the drive, so a returning
+    // visitor's saved files are visible to CMD's `ls` but not to Python until
+    // they save again.
     await type(page, 'print("OUTBOX", os.listdir("My Documents/Python"))');
     await expect
         .poll(async () => cmdScreen(page), { timeout: 30_000 })
@@ -629,9 +632,11 @@ test('a forged save flood cannot fill the drive or wedge the app', async ({
 
     // The drive reached IndexedDB at all...
     expect(saved).not.toBeNull();
-    // ...and the 500 forged saves did not become 500 files. The gate admits
-    // one every 2 s, so a 3-second burst can land only a couple.
-    expect(saved ?? 999).toBeLessThan(5);
+    // ...and the 500 forged saves became EXACTLY ONE file. A same-tick burst
+    // gets one through the gate and every other message is refused, so this
+    // is an exact number rather than a loose bound that would hold for any
+    // interval at all.
+    expect(saved).toBe(1);
 });
 
 /**

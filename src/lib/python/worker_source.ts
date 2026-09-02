@@ -47,6 +47,8 @@
  * survives as a literal backslash and the emitted worker stops being valid
  * JavaScript. (It did; `new Function(source)` caught it.)
  */
+import { LIMITS } from './save_limits';
+
 const XP_FS_INIT = `
 import os, shutil, pathlib
 
@@ -80,7 +82,13 @@ for _dir, _, _files in os.walk('/c', topdown=False):
     os.chmod(_dir, 0o555)
 
 os.chdir('/c')
-del _tree, _writable, _entry, _path, _dir, _files, _f
+
+# Cleaned by NAME, because loop variables do not exist when the loop never ran
+# — an empty tree (or one whose entries all failed to resolve) raised NameError
+# here and killed the session before the banner.
+for _name in ['_tree', '_writable', '_entry', '_path', '_dir', '_dirs',
+              '_files', '_f', '_name']:
+    globals().pop(_name, None)
 `;
 
 /**
@@ -117,10 +125,26 @@ def _xp_scan():
         seen[_n] = _h
         if _xp_sent.get(_n) != _h:
             out.append({'name': _n, 'text': _t})
-    _xp_sent.clear()
-    _xp_sent.update(seen)
+    # Forget files that no longer exist, but do NOT commit what is being sent:
+    # the host has not accepted it yet. Committing here made every refusal —
+    # rate-limited, folder full, drive not seeded — permanent, because the
+    # unchanged file never appeared in a later scan.
+    for _gone in [k for k in _xp_sent if k not in seen]:
+        del _xp_sent[_gone]
+    _xp_pending.clear()
+    _xp_pending.update({e['name']: seen[e['name']] for e in out})
     return json.dumps(out)
+
+
+def _xp_settle(names):
+    """Commit only what the host says it has finished with."""
+    for _n in names:
+        if _n in _xp_pending:
+            _xp_sent[_n] = _xp_pending[_n]
 `;
+
+/** Kept in step with `LIMITS.max_files_per_message`, which the host enforces. */
+const MAX_FILES_PER_MESSAGE = LIMITS.max_files_per_message;
 
 export const PYTHON_WORKER_SOURCE = String.raw`
 let pyodide = null;
@@ -164,7 +188,7 @@ async function init(index_url, greeting, mirror) {
         pyodide.globals.set('_xp_mirror', mirror || []);
         pyodide.runPython(${JSON.stringify(XP_FS_INIT)});
         pyodide.globals.delete('_xp_mirror');
-        pyodide.runPython('_xp_sent = {}');
+        pyodide.runPython('_xp_sent = {}; _xp_pending = {}');
         pyodide.runPython(${JSON.stringify(XP_FS_SCAN)});
 
         if (greeting) {
@@ -217,7 +241,16 @@ async function run_source(source, quiet) {
     if (status === 'complete') {
         try {
             const changed = JSON.parse(pyodide.runPython('_xp_scan()'));
-            if (changed.length > 0) send({ kind: 'save', files: changed });
+            // Chunked, because the host REFUSES an oversized batch outright.
+            // A loop writing 30 files in one statement used to lose all 30
+            // with no message at all; now it takes two statements' worth of
+            // messages and loses nothing.
+            for (let i = 0; i < changed.length; i += ${String(MAX_FILES_PER_MESSAGE)}) {
+                send({
+                    kind: 'save',
+                    files: changed.slice(i, i + ${String(MAX_FILES_PER_MESSAGE)}),
+                });
+            }
         } catch (error) {
             // A broken scan must never take the REPL down with it.
         }
@@ -230,6 +263,12 @@ self.onmessage = (event) => {
         void init(data.index_url, data.greeting, data.mirror);
     } else if (data.kind === 'exec') {
         void run_source(data.source, false);
+    } else if (data.kind === 'saved') {
+        if (pyodide) {
+            pyodide.globals.set('_xp_settled', data.settled || []);
+            pyodide.runPython('_xp_settle(_xp_settled.to_py())');
+            pyodide.globals.delete('_xp_settled');
+        }
     }
 };
 `;

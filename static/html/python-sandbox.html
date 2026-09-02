@@ -95,6 +95,12 @@
                     return;
                 }
 
+                // Which saved names the runtime may stop offering.
+                if (data.kind === 'saved' && worker) {
+                    worker.postMessage(data);
+                    return;
+                }
+
                 if (data.kind === 'terminate' && worker) {
                     // Ctrl+C. Terminating is the ONLY interrupt available:
                     // setInterruptBuffer needs SharedArrayBuffer, which needs

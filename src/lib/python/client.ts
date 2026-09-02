@@ -94,6 +94,8 @@ export interface PythonClient {
     exec: (source: string) => void;
     /** Ctrl+C — terminates and respawns. Destroys the session's variables. */
     restart: () => void;
+    /** Tell the runtime which names it may stop offering. */
+    settle: (settled: string[]) => void;
     dispose: () => void;
 }
 
@@ -187,6 +189,11 @@ export function create_python_client(
             if (disposed) return;
             post({ kind: 'exec', source });
         },
+        settle(settled: string[]) {
+            if (disposed) return;
+            post({ kind: 'saved', settled });
+        },
+
         restart() {
             if (disposed) return;
             post({ kind: 'terminate' });

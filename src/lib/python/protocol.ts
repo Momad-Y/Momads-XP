@@ -64,7 +64,18 @@ export type ToRuntime =
            */
           mirror: MirrorEntry[];
       }
-    | { kind: 'exec'; source: string };
+    | { kind: 'exec'; source: string }
+    /**
+     * Which names the host has finished with.
+     *
+     * `settled` are committed by the worker and never re-sent — either they
+     * were saved, or they were refused for a reason retrying cannot fix (a
+     * bad name, an oversized file). Anything the host does NOT list here — a
+     * rate-limited save, one dropped because the drive was not seeded — stays
+     * uncommitted and is offered again after the next statement, so a refusal
+     * is a delay rather than silent, permanent loss.
+     */
+    | { kind: 'saved'; settled: string[] };
 
 /**
  * What `PyodideConsole.push()` reported for the line.

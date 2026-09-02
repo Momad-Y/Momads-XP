@@ -47,6 +47,7 @@ describe('build_mirror', () => {
         // VFS: the sandbox may reach cdn.jsdelivr.net, whose edge logs URLs,
         // so shipping the visitor's own files in would make a pasted script an
         // exfiltration tool.
+        const all_text = mirror.map((e) => e.text ?? '').join('\n');
         for (const forbidden of [
             'Wallpapers',
             'My Music',
@@ -59,6 +60,9 @@ describe('build_mirror', () => {
             '.exe',
         ]) {
             expect(paths.join('\n'), forbidden).not.toContain(forbidden);
+            // The claim is about CONTENT as much as names — checking paths
+            // alone would pass on a mirror that embedded a visitor's file.
+            expect(all_text, forbidden).not.toContain(forbidden);
         }
     });
 
@@ -141,6 +145,21 @@ describe('the worker source', () => {
         expect(build_at).toBeGreaterThan(-1);
         expect(ready_at).toBeGreaterThan(-1);
         expect(build_at).toBeLessThan(ready_at);
+    });
+
+    it('cleans up by NAME, so an empty tree cannot raise NameError', () => {
+        // `del _entry, _f, ...` referenced loop variables that do not exist
+        // when the loop never ran — an empty mirror, or one whose entries all
+        // failed to resolve, killed the session before the banner.
+        expect(PYTHON_WORKER_SOURCE).toContain('globals().pop');
+        expect(PYTHON_WORKER_SOURCE).not.toMatch(/del _tree, _writable/);
+    });
+
+    it('does not commit a saved name until the host acknowledges it', () => {
+        // Committing inside the scan made every refusal permanent: the file
+        // is unchanged, so it never appears in a later scan.
+        expect(PYTHON_WORKER_SOURCE).toContain('_xp_pending');
+        expect(PYTHON_WORKER_SOURCE).toContain('_xp_settle');
     });
 
     it('crosses the JS/Python boundary without interpolating names', () => {

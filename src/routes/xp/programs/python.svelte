@@ -12,7 +12,11 @@
         SANDBOX_URL,
     } from '../../../lib/python/client';
     import type { PythonClient } from '../../../lib/python/client';
-    import { apply_save, create_save_gate } from '../../../lib/python/host_fs';
+    import {
+        apply_save,
+        reset_save_gate,
+        save_gate,
+    } from '../../../lib/python/host_fs';
     import type { SaveRequest } from '../../../lib/python/save_limits';
     import type { FromRuntime } from '../../../lib/python/protocol';
     import {
@@ -56,6 +60,9 @@
     export let exec_path: string | undefined = undefined;
 
     export function destroy() {
+        // A session the visitor ended deliberately gets a fresh budget; one
+        // we killed for flooding does not.
+        reset_save_gate();
         runningPrograms.update((programs) =>
             programs.filter((p) => p != get_self()),
         );
@@ -79,9 +86,6 @@
 
     let term: TerminalHandle | undefined;
     let frame: HTMLIFrameElement | undefined;
-    /** One rate/budget gate per terminal window. */
-    const save_gate = create_save_gate();
-
     let client: PythonClient | undefined;
 
     /**
@@ -187,13 +191,21 @@
      * unacceptable option.
      */
     async function handle_save(message: { files: SaveRequest[] }) {
-        const outcome = await apply_save(message, save_gate);
+        const outcome = await apply_save(message, save_gate());
+        // A late save from a session that has already ended must not paint
+        // over the shell prompt — the same guard `on_python_message` carries.
         if (term?.is_disposed() === true) return;
-        if (outcome.lines.length > 0) {
-            for (const line of outcome.lines) {
-                write(colour(line, FG_YELLOW) + CRLF);
-            }
+
+        for (const line of outcome.lines) {
+            write(colour(line, FG_YELLOW) + CRLF);
         }
+        // The `result` message has already printed the prompt, so anything
+        // written after it leaves the visitor with no prompt until they press
+        // a key. Reissue it, as `read_and_print` does.
+        if (outcome.lines.length > 0) prompt();
+
+        if (outcome.settled.length > 0) client?.settle(outcome.settled);
+
         if (outcome.terminate) {
             client?.restart();
         }

@@ -277,6 +277,15 @@ All image paths are defined in the JSON data file under each entry's `images` ar
 - Users can write and execute real Python code in the browser
 - Pre-loaded greeting: `print("Welcome to Momad's XP")`
 
+- **Filesystem** (added 2026-09-02; `docs/python-fs-spec.md`): the REPL starts
+  in `/c`, a read-only tree synthesised from `profile.json` — the portfolio
+  folders with one plain-text file per entry. Plain `open()` reads them; writing
+  there raises `PermissionError`. `/c/My Documents/Python` is writable and its
+  contents persist into the VFS, appearing in Explorer and in CMD's `ls`/`cat`.
+  Saving is rate-limited and capped host-side, because Pyodide exposes
+  `js.postMessage` and every line of Python is written by a stranger — the
+  message channel is the security boundary, not the directory.
+
 #### Paint
 
 - Classic MS Paint recreation
