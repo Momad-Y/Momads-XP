@@ -20,14 +20,17 @@ export default defineConfig({
     workers: process.env.CI ? undefined : 4,
     use: { viewport: { width: 1280, height: 800 } },
     /**
-     * Both projects are declared EXPLICITLY. Declaring only an `online`
-     * project would make a bare `npx playwright test` run every project,
-     * including the one that downloads ~5 MB from jsDelivr on a 2-core CI
-     * runner — breaking the standing rule that no spec in the default suite
-     * reaches the internet.
+     * Both projects are declared so each can be selected by name.
      *
-     * `@online` is for real-Pyodide verification and is run deliberately:
-     *     npx playwright test --project=online
+     * A BARE `npx playwright test` RUNS BOTH. That is Playwright's behaviour
+     * for any multi-project config, and the comment that stood here claimed
+     * the opposite — so CI ran the seven `@online` specs on every PR,
+     * downloading ~5 MB from jsDelivr per spec on a 2-core runner, for months.
+     *
+     * The hermetic guarantee is a property of `default`'s `grepInvert`, NOT of
+     * how the runner is invoked. Select explicitly:
+     *     npx playwright test --project=default   # hermetic
+     *     npx playwright test --project=online    # real Pyodide, needs the net
      */
     projects: [
         { name: 'default', grepInvert: /@online/ },
