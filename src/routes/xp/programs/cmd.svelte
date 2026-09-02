@@ -37,6 +37,7 @@
         ETX,
         FG_BRIGHT_GREEN,
         FG_GREY,
+        FG_YELLOW,
         HIDE_CURSOR,
         SHOW_CURSOR,
     } from '../../../lib/term/ansi';
@@ -54,6 +55,8 @@
         SANDBOX_URL,
     } from '../../../lib/python/client';
     import type { PythonClient } from '../../../lib/python/client';
+    import { apply_save, create_save_gate } from '../../../lib/python/host_fs';
+    import type { SaveRequest } from '../../../lib/python/save_limits';
     import type { FromRuntime } from '../../../lib/python/protocol';
     import {
         initial_repl_state,
@@ -217,6 +220,9 @@
     // Explicitly `string`: XP_CONSOLE_THEME is `as const`, so DEFAULT_ACCENT
     // narrows to its literal and would reject any other colour.
     let accent: string = DEFAULT_ACCENT;
+
+    /** One rate/budget gate per terminal window. */
+    const save_gate = create_save_gate();
 
     let animation_generation = 0;
     let animation_running = false;
@@ -422,6 +428,9 @@
         await tick();
         if (py_frame == null || term?.is_disposed() === true) return;
         py_client = create_python_client(py_frame, {
+            on_save: (message) => {
+                void handle_save(message);
+            },
             on_message: on_python_message,
             greeting: PYTHON_GREETING,
         });
@@ -684,6 +693,25 @@
         } finally {
             reading_file = false;
             if (!superseded_read()) prompt();
+        }
+    }
+
+    /**
+     * A `save` from the runtime. Refusals are printed, not raised: by the time
+     * this runs the visitor's `open()` has already returned, so nothing can
+     * throw into it. One statement late beats silence, which is the only
+     * unacceptable option.
+     */
+    async function handle_save(message: { files: SaveRequest[] }) {
+        const outcome = await apply_save(message, save_gate);
+        if (term?.is_disposed() === true) return;
+        if (outcome.lines.length > 0) {
+            for (const line of outcome.lines) {
+                write(colour(line, FG_YELLOW) + CRLF);
+            }
+        }
+        if (outcome.terminate) {
+            py_client?.restart();
         }
     }
 
