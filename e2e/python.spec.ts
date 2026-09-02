@@ -399,6 +399,12 @@ async function type(page: Page, line: string) {
     await page.keyboard.press('Enter');
 }
 
+async function cmdType(page: Page, line: string) {
+    await page.locator('.xterm-helper-textarea').last().fill('');
+    await page.keyboard.type(line);
+    await page.keyboard.press('Enter');
+}
+
 async function cmdScreen(page: Page): Promise<string> {
     return page.locator('.xterm-rows').last().innerText();
 }
@@ -534,6 +540,153 @@ test('/c is mounted, readable, and read-only @online', async ({ page }) => {
     await expect
         .poll(async () => cmdScreen(page), { timeout: 30_000 })
         .toContain('OUTBOX []');
+});
+
+/**
+ * A forged `save` flood, HERMETICALLY — no Pyodide, no CDN.
+ *
+ * This is the most important assertion in the feature and it deliberately does
+ * NOT go through Python. Pyodide exposes `js.postMessage`, so hostile code
+ * never has to touch the filesystem: it posts straight at the host. The
+ * writable directory is ergonomics; the message channel is the boundary. And
+ * putting the one test that proves the boundary behind a 5 MB CDN download is
+ * how it gets skipped the first time it flakes.
+ *
+ * What it must survive: `desktop.svelte` persists the whole drive on a 1000 ms
+ * debounce that it re-arms on EVERY store notification, so an accepted flood
+ * would mean the drive is never written to IndexedDB while the app still looks
+ * alive.
+ */
+test('a forged save flood cannot fill the drive or wedge the app', async ({
+    page,
+}) => {
+    await page.route(PYODIDE_GLOB, (route) => route.abort());
+    await bootToDesktop(page);
+    await openPython(page);
+
+    const frame = await sandboxFrame(page);
+
+    // 500 saves as fast as the thread allows, straight at the host.
+    await frame.evaluate(() => {
+        for (let i = 0; i < 500; i++) {
+            window.parent.postMessage(
+                {
+                    kind: 'save',
+                    files: [{ name: `f${String(i)}.py`, text: 'x' }],
+                },
+                '*',
+            );
+        }
+    });
+    await page.waitForTimeout(3000);
+
+    // The app is still responsive — a starved main thread fails this.
+    await expect(page.locator('#work-space .window')).toHaveCount(1);
+    await expect(page.locator('.xterm')).toHaveCount(1);
+
+    // And the drive was still WRITTEN. This is the failure the rate gate
+    // exists for: desktop.svelte re-arms its 1000 ms whole-drive persist on
+    // every store notification, so an accepted flood means IndexedDB is never
+    // updated while everything still looks fine.
+    const saved: number | null = await page.evaluate(
+        () =>
+            new Promise<number | null>((resolve) => {
+                const open_db = indexedDB.open('keyval-store');
+                open_db.onerror = () => resolve(null);
+                open_db.onsuccess = () => {
+                    const db = open_db.result;
+                    const read = db
+                        .transaction('keyval', 'readonly')
+                        .objectStore('keyval')
+                        .get('hard_drive');
+                    read.onerror = () => {
+                        resolve(null);
+                        db.close();
+                    };
+                    read.onsuccess = () => {
+                        const drive: unknown = read.result;
+                        db.close();
+                        if (typeof drive !== 'object' || drive === null) {
+                            resolve(null);
+                            return;
+                        }
+                        const folder: unknown = (
+                            drive as Record<string, unknown>
+                        )['xpFolderPythonScripts01'];
+                        if (typeof folder !== 'object' || folder === null) {
+                            resolve(null);
+                            return;
+                        }
+                        const children = (folder as Record<string, unknown>)
+                            .children;
+                        resolve(
+                            Array.isArray(children) ? children.length : null,
+                        );
+                    };
+                };
+            }),
+    );
+
+    // The drive reached IndexedDB at all...
+    expect(saved).not.toBeNull();
+    // ...and the 500 forged saves did not become 500 files. The gate admits
+    // one every 2 s, so a 3-second burst can land only a couple.
+    expect(saved ?? 999).toBeLessThan(5);
+});
+
+/**
+ * The whole point of the feature: a script written in Python is still there
+ * after the session ends.
+ */
+test('a saved script persists, updates in place, and CMD can read it @online', async ({
+    page,
+}) => {
+    test.setTimeout(240_000);
+    await bootToDesktop(page);
+    await openPython(page);
+    await expect
+        .poll(async () => cmdScreen(page), { timeout: 120_000 })
+        .toContain('Python 3.13');
+
+    // Plain open(), no new API.
+    await type(
+        page,
+        'open("My Documents/Python/fib.py","w").write("print(1)"); print("W1")',
+    );
+    await expect
+        .poll(async () => cmdScreen(page), { timeout: 30_000 })
+        .toContain('W1');
+
+    // Rewrite the SAME name. The gate admits one save every 2 s, so give it
+    // a beat, then confirm there is exactly ONE file — not fib 2.py.
+    await page.waitForTimeout(2500);
+    await type(
+        page,
+        'open("My Documents/Python/fib.py","w").write("print(2)"); print("W2")',
+    );
+    await expect
+        .poll(async () => cmdScreen(page), { timeout: 30_000 })
+        .toContain('W2');
+    await page.waitForTimeout(1500);
+
+    // Read it back through CMD — a completely different code path, and the
+    // one a visitor tries first.
+    await type(page, 'exit()');
+    await page.waitForTimeout(1000);
+    await openCmd(page);
+    await cmdType(page, 'ls "My Documents/Python"');
+    await expect
+        .poll(async () => cmdScreen(page), { timeout: 20_000 })
+        .toContain('fib.py');
+    // Exactly one file: iterating on a script must not leave a trail.
+    expect((await cmdScreen(page)).match(/fib/g)?.length).toBe(1);
+
+    await cmdType(page, 'cat "My Documents/Python/fib.py"');
+    await expect
+        .poll(async () => cmdScreen(page), { timeout: 20_000 })
+        .toContain('print(2)');
+    // The FIRST version is gone — save_file overwrote in place.
+    expect(await cmdScreen(page)).not.toContain('print(1)');
 });
 
 test('the shell and the interpreter keep separate line histories @online', async ({

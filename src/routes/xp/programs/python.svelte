@@ -12,6 +12,8 @@
         SANDBOX_URL,
     } from '../../../lib/python/client';
     import type { PythonClient } from '../../../lib/python/client';
+    import { apply_save, create_save_gate } from '../../../lib/python/host_fs';
+    import type { SaveRequest } from '../../../lib/python/save_limits';
     import type { FromRuntime } from '../../../lib/python/protocol';
     import {
         initial_repl_state,
@@ -30,7 +32,7 @@
     } from '../../../lib/python/repl';
     import { feed, initial_state } from '../../../lib/term/readline';
     import type { ReadlineState } from '../../../lib/term/readline';
-    import { CR, CSI } from '../../../lib/term/ansi';
+    import { colour, CR, CRLF, CSI, FG_YELLOW } from '../../../lib/term/ansi';
     import {
         DEFAULT_COLS,
         render_line,
@@ -77,6 +79,9 @@
 
     let term: TerminalHandle | undefined;
     let frame: HTMLIFrameElement | undefined;
+    /** One rate/budget gate per terminal window. */
+    const save_gate = create_save_gate();
+
     let client: PythonClient | undefined;
 
     /**
@@ -174,6 +179,26 @@
      * — and the single-row redraw this replaced reprinted the prompt onto the
      * last visual row every keystroke thereafter.
      */
+
+    /**
+     * A `save` from the runtime. Refusals are printed, not raised: by the time
+     * this runs the visitor's `open()` has already returned, so nothing can
+     * throw into it. One statement late beats silence, which is the only
+     * unacceptable option.
+     */
+    async function handle_save(message: { files: SaveRequest[] }) {
+        const outcome = await apply_save(message, save_gate);
+        if (term?.is_disposed() === true) return;
+        if (outcome.lines.length > 0) {
+            for (const line of outcome.lines) {
+                write(colour(line, FG_YELLOW) + CRLF);
+            }
+        }
+        if (outcome.terminate) {
+            client?.restart();
+        }
+    }
+
     function redraw() {
         const rendered = render_line({
             prompt: prompt_text(repl),
@@ -225,6 +250,9 @@
         write(PYTHON_LOADING);
         if (frame != null) {
             client = create_python_client(frame, {
+                on_save: (message) => {
+                    void handle_save(message);
+                },
                 on_message: on_runtime,
                 greeting: PYTHON_GREETING,
             });

@@ -165,6 +165,20 @@ export function on_runtime_message(
             };
         }
 
+        case 'save':
+            /**
+             * Handled BEFORE this function is ever called — `client.ts`
+             * intercepts it and routes it to `host_fs`.
+             *
+             * The case exists so the switch stays exhaustive (without it,
+             * TS2366: this function has no default and no trailing return),
+             * and it deliberately emits NOTHING. That is the invariant §0 of
+             * the spec is built on and this feature had to preserve: no
+             * message from the runtime can make this pure state machine reach
+             * storage. `repl.test.ts` asserts the emptiness.
+             */
+            return { state, effects: [] };
+
         case 'error': {
             // Close the block too: leaving it open renders a `...` prompt that
             // can never advance, because a submit returns early while !ready.

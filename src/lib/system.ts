@@ -212,6 +212,20 @@ export const doctypes: Record<string, ProgramDescriptor[]> = {
             name: 'PDF Viewer',
         },
     ],
+    /**
+     * Scripts saved from the Python REPL.
+     *
+     * `portfolio_viewer` is the app's only text renderer, and it already falls
+     * back to a plain `<pre>` when an item carries no `portfolio_ref` — which
+     * a saved script never does. Notepad is unbuilt (§9, Stretch).
+     */
+    '.py': [
+        {
+            path: './programs/portfolio_viewer.svelte',
+            icon: '/images/xp/icons/ScriptComponent.png',
+            name: 'Text Viewer',
+        },
+    ],
     // Phase 2: seeded portfolio entries (portfolio_ref-stamped .txt files).
     '.txt': [
         {
@@ -237,6 +251,7 @@ export const icons: Record<string, string> = {
     '.ttf': 'Font.png',
     '.bat': 'Bat.png',
     '.txt': 'TXT.png',
+    '.py': 'ScriptComponent.png',
     '.jpg': 'JPG.png',
     '.jpeg': 'JPG.png',
     '.png': 'TIFF.png',

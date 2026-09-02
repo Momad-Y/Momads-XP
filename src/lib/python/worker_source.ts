@@ -83,6 +83,45 @@ os.chdir('/c')
 del _tree, _writable, _entry, _path, _dir, _files, _f
 `;
 
+/**
+ * Reports what changed in the outbox since the last statement.
+ *
+ * NON-RECURSIVE on purpose: `os.makedirs` inside the outbox works in MEMFS,
+ * but a nested name contains `/`, which the host's validator rejects — so
+ * recursing would produce one refusal line per statement, forever. Files
+ * directly in the folder are saved; subdirectories are not, and the guide
+ * says so.
+ *
+ * Content-hashed rather than mtime-compared so an unchanged file is not
+ * re-sent every statement.
+ */
+const XP_FS_SCAN = `
+import hashlib, json, os
+
+def _xp_scan():
+    out = []
+    seen = {}
+    try:
+        names = os.listdir('/c/My Documents/Python')
+    except OSError:
+        return '[]'
+    for _n in sorted(names):
+        _p = '/c/My Documents/Python/' + _n
+        if not os.path.isfile(_p):
+            continue
+        try:
+            _t = open(_p, encoding='utf-8').read()
+        except (OSError, UnicodeDecodeError):
+            continue
+        _h = hashlib.sha256(_t.encode('utf-8')).hexdigest()
+        seen[_n] = _h
+        if _xp_sent.get(_n) != _h:
+            out.append({'name': _n, 'text': _t})
+    _xp_sent.clear()
+    _xp_sent.update(seen)
+    return json.dumps(out)
+`;
+
 export const PYTHON_WORKER_SOURCE = String.raw`
 let pyodide = null;
 let console_obj = null;
@@ -125,6 +164,8 @@ async function init(index_url, greeting, mirror) {
         pyodide.globals.set('_xp_mirror', mirror || []);
         pyodide.runPython(${JSON.stringify(XP_FS_INIT)});
         pyodide.globals.delete('_xp_mirror');
+        pyodide.runPython('_xp_sent = {}');
+        pyodide.runPython(${JSON.stringify(XP_FS_SCAN)});
 
         if (greeting) {
             // §3.2's pre-loaded greeting. Pushed through the console so it
@@ -170,6 +211,17 @@ async function run_source(source, quiet) {
         status = 'complete';
     }
     if (!quiet) send({ kind: 'result', repr, status });
+
+    // What the statement wrote to the outbox. Reported AFTER the result, so a
+    // statement that writes and then raises still persists what it wrote.
+    if (status === 'complete') {
+        try {
+            const changed = JSON.parse(pyodide.runPython('_xp_scan()'));
+            if (changed.length > 0) send({ kind: 'save', files: changed });
+        } catch (error) {
+            // A broken scan must never take the REPL down with it.
+        }
+    }
 }
 
 self.onmessage = (event) => {

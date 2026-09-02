@@ -240,3 +240,42 @@ describe('prompt_text', () => {
         expect(prompt_text({ ...READY, block_open: true })).toBe(PS2);
     });
 });
+
+describe('a save message reaches nothing', () => {
+    it('emits no effects at all', () => {
+        // The invariant the whole isolation argument rests on: no message
+        // from the runtime can make this pure state machine touch storage.
+        // `client.ts` intercepts `save` before this is called; the case exists
+        // only to keep the switch exhaustive (TS2366 without it).
+        const state = initial_repl_state();
+        const result = on_runtime_message(state, {
+            kind: 'save',
+            files: [{ name: 'a.py', text: 'x' }],
+        });
+        expect(result.effects).toEqual([]);
+        expect(result.state).toBe(state);
+    });
+
+    it('is the ONLY kind that emits nothing but write or focus', () => {
+        // Guards the invariant directly: if a future message kind gains an
+        // exec/exit/restart effect, this fails.
+        const allowed = new Set(['write', 'focus']);
+        const messages: Parameters<typeof on_runtime_message>[1][] = [
+            { kind: 'loading', detail: 'x' },
+            { kind: 'ready', banner: 'b' },
+            { kind: 'stdout', text: 'x' },
+            { kind: 'stderr', text: 'x' },
+            { kind: 'result', repr: null, status: 'complete' },
+            { kind: 'error', message: 'x' },
+            { kind: 'save', files: [] },
+        ];
+        for (const message of messages) {
+            for (const effect of on_runtime_message(
+                initial_repl_state(),
+                message,
+            ).effects) {
+                expect(allowed.has(effect.kind), message.kind).toBe(true);
+            }
+        }
+    });
+});
