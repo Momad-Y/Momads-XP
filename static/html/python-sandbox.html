@@ -75,6 +75,10 @@
                             kind: 'init',
                             index_url: data.index_url,
                             greeting: data.greeting,
+                            // The read-only /c tree. Carried on init rather
+                            // than as its own message so the worker can build
+                            // it before it reports ready.
+                            mirror: data.mirror,
                         });
                     } catch (error) {
                         toParent({
