@@ -783,6 +783,62 @@ test('a long-running statement tells you Ctrl+C exists @online', async ({
         .toContain('Python 3.13');
 });
 
+/**
+ * A runtime that CRASHES mid-session is diagnosed honestly and can be
+ * recovered.
+ *
+ * The trigger is an uncaught throw scheduled inside the worker's own JS
+ * context, which is what `worker.onerror` exists for. Before this:
+ *
+ *  - the sandbox reported "Python runtime failed to start" no matter when it
+ *    died, and the REPL added "Try again once you are back online" — a network
+ *    diagnosis for a crash with no network involved;
+ *  - `awaiting` is false in that state, so Ctrl+C took the IDLE branch and
+ *    handed back a prompt that could never accept input, because every submit
+ *    returns early while `!ready`. The only way out was closing the window.
+ */
+test('a crashed runtime says so, and Ctrl+C brings it back @online', async ({
+    page,
+}) => {
+    test.setTimeout(300_000);
+    await bootToDesktop(page);
+    await openPython(page);
+    await expect
+        .poll(async () => cmdScreen(page), { timeout: 180_000 })
+        .toContain('Python 3.13');
+
+    await type(
+        page,
+        'import js; js.eval("setTimeout(() => { throw new Error(\'boom\'); }, 50)")',
+    );
+
+    await expect
+        .poll(async () => cmdScreen(page), { timeout: 30_000 })
+        .toContain('stopped unexpectedly');
+    // The diagnosis is about the interpreter, not the visitor's connection.
+    const crashed = await cmdScreen(page);
+    expect(crashed).toContain('Press Ctrl+C to restart it');
+    expect(crashed).not.toContain('back online');
+
+    await page.locator('.xterm-helper-textarea').last().click();
+    await page.keyboard.press('Control+C');
+
+    // NOT `toContain('Python 3.13')`: the FIRST banner is still on screen, so
+    // that is satisfied before the restart has even begun — the trap the
+    // neighbouring restart test documents, and which I walked into anyway.
+    // Retrying a statement until a live interpreter answers proves recovery
+    // without racing anything.
+    await expect
+        .poll(
+            async () => {
+                await type(page, 'print("RECOVERED", 6 * 7)');
+                return cmdScreen(page);
+            },
+            { timeout: 240_000, intervals: [5_000] },
+        )
+        .toContain('RECOVERED 42');
+});
+
 test('the shell and the interpreter keep separate line histories @online', async ({
     page,
 }) => {
