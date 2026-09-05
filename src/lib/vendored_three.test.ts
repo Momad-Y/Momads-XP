@@ -12,6 +12,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { join, relative } from 'node:path';
 
 const VENDOR = 'static/js/three';
@@ -56,10 +57,19 @@ describe('vendored three.js', () => {
         ]);
     });
 
+    /*
+     * Compared by digest, not by buffer. `toEqual` on a Buffer is an
+     * element-by-element deep equality: three.module.js is 1.17MB, and that
+     * blew vitest's 5s default on CI's slower runner while passing locally.
+     * A hash is the same assertion, and a failure prints two digests rather
+     * than a megabyte of diff.
+     */
+    function digest(path: string): string {
+        return createHash('sha256').update(readFileSync(path)).digest('hex');
+    }
+
     it.each(files)('%s is byte-identical to the pinned package', (rel) => {
-        expect(readFileSync(join(VENDOR, rel))).toEqual(
-            readFileSync(upstream_of(rel)),
-        );
+        expect(digest(join(VENDOR, rel))).toBe(digest(upstream_of(rel)));
     });
 
     it('leaves `three` as the only bare specifier, so the import map suffices', () => {
