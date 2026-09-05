@@ -279,3 +279,54 @@ describe('a save message reaches nothing', () => {
         }
     });
 });
+
+describe('runtime text cannot scribble the terminal', () => {
+    const ESC = '\x1b';
+    const written = (message: Parameters<typeof on_runtime_message>[1]) =>
+        on_runtime_message(initial_repl_state(), message)
+            .effects.filter((e) => e.kind === 'write')
+            .map((e) => e.text)
+            .join('');
+
+    it('strips a screen clear from stdout, keeping the text', () => {
+        // Measured against the live REPL before this landed: the clear took
+        // everything above it out of the scrollback.
+        const out = written({
+            kind: 'stdout',
+            text: `${ESC}[2J${ESC}[Hhello`,
+        });
+        expect(out).toContain('hello');
+        expect(out).not.toContain('[2J');
+    });
+
+    it('keeps colour in stderr, because tracebacks rely on it', () => {
+        const out = written({
+            kind: 'stderr',
+            text: `${ESC}[31mTraceback${ESC}[0m`,
+        });
+        expect(out).toContain(`${ESC}[31m`);
+    });
+
+    it('sanitises the result repr too', () => {
+        const out = on_runtime_message(initial_repl_state(), {
+            kind: 'result',
+            repr: `${ESC}[2Jevil`,
+            status: 'complete',
+        })
+            .effects.filter((e) => e.kind === 'write')
+            .map((e) => e.text)
+            .join('');
+        expect(out).toContain('evil');
+        expect(out).not.toContain('[2J');
+    });
+
+    it('sanitises the banner and the error message', () => {
+        // Both are strings the runtime chooses, so both are attacker input.
+        expect(
+            written({ kind: 'ready', banner: `${ESC}[2JPython 3.13` }),
+        ).not.toContain('[2J');
+        expect(
+            written({ kind: 'error', message: `${ESC}]0;pwned\x07boom` }),
+        ).not.toContain('pwned');
+    });
+});

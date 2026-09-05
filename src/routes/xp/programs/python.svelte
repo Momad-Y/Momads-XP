@@ -26,6 +26,7 @@
         on_runtime_message,
         on_submit,
         prompt_text,
+        BUSY_HINT_TEXT,
         PYTHON_GREETING,
         PYTHON_LOADING,
     } from '../../../lib/python/repl';
@@ -36,7 +37,14 @@
     } from '../../../lib/python/repl';
     import { feed, initial_state } from '../../../lib/term/readline';
     import type { ReadlineState } from '../../../lib/term/readline';
-    import { colour, CR, CRLF, CSI, FG_YELLOW } from '../../../lib/term/ansi';
+    import {
+        colour,
+        CR,
+        CRLF,
+        CSI,
+        FG_GREY,
+        FG_YELLOW,
+    } from '../../../lib/term/ansi';
     import {
         DEFAULT_COLS,
         render_line,
@@ -264,6 +272,11 @@
             client = create_python_client(frame, {
                 on_save: (message) => {
                     void handle_save(message);
+                },
+                on_busy: () => {
+                    // The runtime is fine and the page is fine — the terminal
+                    // just had nothing to say. Tell the visitor Ctrl+C exists.
+                    write(colour(BUSY_HINT_TEXT, FG_GREY) + CRLF);
                 },
                 on_message: on_runtime,
                 greeting: PYTHON_GREETING,

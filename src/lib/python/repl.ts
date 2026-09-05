@@ -18,6 +18,7 @@
  * xterm handle, and what `exit` means. Everything else is decided here.
  */
 import { colour, CRLF, FG_GREY, FG_RED, FG_YELLOW } from '../term/ansi';
+import { sanitise_runtime_text } from './sanitise';
 import type { FromRuntime } from './protocol';
 
 /**
@@ -63,6 +64,18 @@ export interface ReplResult {
     readonly state: ReplState;
     readonly effects: readonly ReplEffect[];
 }
+
+/**
+ * How long a statement may run in silence before the terminal says something.
+ *
+ * Four seconds: long enough that ordinary work — `import numpy`, a few million
+ * loop iterations — finishes first, short enough that a visitor who typed an
+ * accidental infinite loop is not left staring at nothing.
+ */
+export const BUSY_HINT_MS = 4000;
+
+/** What the terminal says when a statement has gone quiet for too long. */
+export const BUSY_HINT_TEXT = 'still running — press Ctrl+C to stop it';
 
 export function initial_repl_state(): ReplState {
     return { ready: false, awaiting: false, block_open: false };
@@ -114,7 +127,7 @@ export function on_runtime_message(
             // leaves bare \n characters in the stream; xterm does not translate
             // those, so a bare \n moves down WITHOUT returning to column 0 and
             // the banner staircases across the screen.
-            const banner = message.banner
+            const banner = sanitise_runtime_text(message.banner)
                 .trimEnd()
                 .split('\n')
                 .map((l) => l.trimEnd());
@@ -133,7 +146,13 @@ export function on_runtime_message(
             return {
                 state,
                 effects: [
-                    { kind: 'write', text: message.text.replace(/\n/g, CRLF) },
+                    {
+                        kind: 'write',
+                        text: sanitise_runtime_text(message.text).replace(
+                            /\n/g,
+                            CRLF,
+                        ),
+                    },
                 ],
             };
 
@@ -143,7 +162,13 @@ export function on_runtime_message(
                 effects: [
                     {
                         kind: 'write',
-                        text: colour(message.text.replace(/\n/g, CRLF), FG_RED),
+                        text: colour(
+                            sanitise_runtime_text(message.text).replace(
+                                /\n/g,
+                                CRLF,
+                            ),
+                            FG_RED,
+                        ),
                     },
                 ],
             };
@@ -159,7 +184,9 @@ export function on_runtime_message(
             return {
                 state: next,
                 effects: [
-                    ...(message.repr != null ? [line(message.repr)] : []),
+                    ...(message.repr != null
+                        ? [line(sanitise_runtime_text(message.repr))]
+                        : []),
                     prompt(next),
                 ],
             };
@@ -192,7 +219,12 @@ export function on_runtime_message(
                 state: next,
                 effects: [
                     line(''),
-                    line(colour(message.message, FG_YELLOW)),
+                    line(
+                        colour(
+                            sanitise_runtime_text(message.message),
+                            FG_YELLOW,
+                        ),
+                    ),
                     line(
                         colour('Try again once you are back online.', FG_GREY),
                     ),
