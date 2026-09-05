@@ -259,6 +259,12 @@ All image paths are defined in the JSON data file under each entry's `images` ar
     - `cat [file]` — display a file (e.g. `cat Printerpix — AI Engineer.txt`
       renders that experience entry; Tab completion supplies the name)
     - `dir` — ribs the visitor for reaching for cmd.exe, then runs `ls`
+- **Commands added in Phase 6** (see the app entries below): `nano`, `vim` and
+  `node`. Each is dispatched from the component like `python`, because each owns
+  the window rather than producing lines. They are NOT pre-announced by `help`
+  until they work — the shell answering `command not found` is honest, whereas
+  advertising a command that refuses to run is the dead end §3.2's banner note
+  already records.
     - Directory structure IS the File Explorer folder tree — the commands walk
       the same live `hardDrive` store Explorer renders, so a folder created in
       one appears in the other. Paths are POSIX over the real drive
@@ -285,6 +291,72 @@ All image paths are defined in the JSON data file under each entry's `images` ar
   Saving is rate-limited and capped host-side, because Pyodide exposes
   `js.postMessage` and every line of Python is written by a stranger — the
   message channel is the security boundary, not the directory.
+
+#### Text editors — `nano` and `vim` (Phase 6)
+
+Both run **in the CMD window and as standalone apps**, the way the Python REPL
+does: one shared implementation, two hosts (`cmd.svelte` dispatches the command,
+`app_registry.ts` gives it a Start-menu entry and its own window).
+
+They are **not** REPLs and must not be built like one. A REPL is line-oriented
+and goes through `readline.ts`; an editor owns the whole screen and every
+keystroke. The precedent already in the tree is the `matrix` easter egg —
+`CLEAR_SCREEN` + `HIDE_CURSOR`, `term.size()` re-read every frame so a window
+drag reflows, and an `animation_running`-style guard in `on_data` that swallows
+input while the mode owns the keyboard.
+
+- **They must NOT go through `redraw()`.** That function is the wrapped-input-
+  line renderer (`src/lib/term/render.ts`); a full-screen editor paints its own
+  frame and would fight it.
+- **They edit REAL files.** The pieces exist: `run_cat`'s `read_file` request
+  reads a visitor's file asynchronously in the component, and
+  `src/lib/python/host_fs.ts` writes one back with the caps and rate limit
+  already enforced. An editor reuses both rather than opening a second write
+  path — a second unguarded path is how the save channel's guarantees would be
+  lost. `nano newfile.txt` must be able to CREATE, not only edit.
+- **`nano` is the real one.** Modeless, the on-screen `^O`/`^X` help bar, and a
+  small enough surface to finish. *For:* a visitor can actually use it without
+  knowing anything. *Against:* it is the less iconic of the two.
+- **`vim` is deliberately partial**, and the docs must say so rather than
+  implying otherwise: `i`, `Esc`, `hjkl`, `dd`, `:w`, `:q`, `:wq`, `:q!`. *For:*
+  the joke and the muscle memory both land, and "how do I exit vim" is the whole
+  gag. *Against:* anything beyond that subset silently does nothing, which is a
+  lie unless `:help` says what is implemented. **Verdict:** ship the subset with
+  an honest `:help`; a faithful vim is a project, not a phase item.
+
+#### Node REPL (Phase 6)
+
+`node` in the CMD window and as a standalone app, mirroring the Python REPL's
+two-host shape.
+
+**WebContainers is ruled out before anyone tries it.** StackBlitz's
+WebContainers needs `SharedArrayBuffer`, i.e. COOP/COEP cross-origin isolation —
+the same constraint §5 records for the multithreaded Stockfish build, and which
+breaks the Spotify embed and the js-dos assets. It is also why the Python REPL
+cannot use `setInterruptBuffer` and Ctrl+C is a restart rather than an
+interrupt.
+
+What is left is better anyway: **JavaScript already runs in the browser.** The
+sandbox iframe (`allow-scripts`, no `allow-same-origin`) and its blob worker
+already provide an opaque origin, so a `node` REPL is `eval` inside the existing
+isolation with **no WASM runtime and no CDN download** — it starts instantly,
+where Pyodide takes ~10 seconds.
+
+- **It is a JavaScript REPL wearing Node's name**, and `node --version` should
+  not claim a version it does not implement. Shim what is cheap and honest:
+  `console.*`, `process.version` (say what it really is), and `fs` mapped onto
+  the SAME `/c` mirror and `My Documents\Python` outbox Python uses, so both
+  languages see one filesystem. Anything else prints "not implemented in this
+  Node".
+- **Reuse is real but partial.** `client.ts`, `protocol.ts`, `sanitise.ts`,
+  `render.ts` and `readline.ts` are language-agnostic. `repl.ts` is NOT — its
+  continuation prompt comes from `PyodideConsole`/`codeop`, so a JS REPL needs
+  its own "is this statement complete?" (a `try { new Function(src) } catch`
+  round-trip), either by generalising `repl.ts` or as a sibling module.
+- **The security shape is non-negotiable and already built.** A second runtime
+  gets the same escape-sequence filter (`sanitise.ts`), the same save channel,
+  and the same per-tab rate limit — `save_gate()` is a module singleton
+  precisely so a second interpreter cannot double the write rate.
 
 #### Paint
 
@@ -1292,6 +1364,8 @@ surprised by it:
 
       270 lines are now a 32-line stub keeping only `window.new_local_session`, which `functions.js` calls unguarded from `open_from_image_info` and `file_new` — both for session bookkeeping only, so a no-op is correct while a missing symbol leaves the canvas blank. Saving was always this app's job: `paint.svelte` round-trips the canvas through the VFS (IndexedDB), untouched by any of it. `scripts/prune-jspaint.mjs` writes the stub on re-vendor and now refuses `AIzaSy`, `new LocalSession` and `storage.set(`; `e2e/paint.spec.ts` asserts no `image#` key is ever written, mutation-verified against the original file (3 keys vs 0).
 - [ ] **Resolve all `npm audit` findings** (13 as of 2026-07-19: 8 high / 2 moderate / 3 low — owner-requested explicit item). All remaining fixes are BREAKING upgrades, hence deferred: **axios ≤0.32.0 → 1.x** (the big CVE list; only used client-side for the same-origin seed fetch, so real exposure is low — either upgrade or replace with native `fetch` and drop the dep), **svelte-preprocess 5 → 6** (dev-only brace-expansion DoS chain), **@sveltejs/kit minor bump** (cookie CVE — server-side, touches the /api routes), **short-uuid 5 → 6+** (uuid bounds check). Each needs the full gate suite + E2E after upgrading; tighten CI with an `npm audit --audit-level=high` step once clean
+- [ ] **`nano` and `vim`** — text editors in the CMD window AND as standalone apps, the two-host shape the Python REPL uses (§3.2). Full-screen terminal UI on the `matrix` egg's model, NOT through `readline.ts` or `render.ts`'s line renderer. They edit real VFS files through the existing read (`run_cat`'s `read_file`) and write (`host_fs`) paths, caps included — never a second write path. `vim` ships a deliberate subset (`i`, `Esc`, `hjkl`, `dd`, `:w`, `:q`, `:wq`, `:q!`) with an honest `:help`
+- [ ] **`node` REPL** — in the CMD window AND standalone (§3.2). NOT WebContainers: it needs SharedArrayBuffer → COOP/COEP, which §5 records as breaking the Spotify embed and js-dos. Plain `eval` inside the EXISTING sandbox instead — no WASM, no CDN, instant start. Reuses `client.ts`/`protocol.ts`/`sanitise.ts`/`readline.ts`; needs its own completeness check because `repl.ts`'s comes from `PyodideConsole`. Same escape-sequence filter, same save channel, same per-tab rate limit
 - [ ] Cross-browser testing (Chrome, Firefox, Safari, Edge)
 - [ ] Deploy to Netlify with custom domain
 
