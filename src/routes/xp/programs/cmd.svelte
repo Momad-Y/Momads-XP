@@ -69,6 +69,7 @@
         on_runtime_message,
         on_submit as py_on_submit,
         prompt_text,
+        BUSY_HINT_TEXT,
         PYTHON_GREETING,
         PYTHON_LOADING,
     } from '../../../lib/python/repl';
@@ -431,6 +432,11 @@
         py_client = create_python_client(py_frame, {
             on_save: (message) => {
                 void handle_save(message);
+            },
+            on_busy: () => {
+                // The runtime is fine and the page is fine — the terminal
+                // just had nothing to say. Tell the visitor Ctrl+C exists.
+                write(colour(BUSY_HINT_TEXT, FG_GREY) + CRLF);
             },
             on_message: on_python_message,
             greeting: PYTHON_GREETING,
