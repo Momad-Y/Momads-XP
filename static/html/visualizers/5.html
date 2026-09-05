@@ -1,5 +1,13 @@
 <html>
     <head>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "/js/three/three.module.js"
+            }
+        }
+    </script>
+
         <style>
             html, body {
                 margin: 0;
@@ -22,8 +30,8 @@ https://codepen.io/alvalau/pen/ExLEEeK -->
     <body>
         <canvas class="webgl"></canvas>
         <script type="module">
-            import * as THREE from "https://cdn.skypack.dev/three@0.136.0";
-import {OrbitControls} from "https://cdn.skypack.dev/three@0.136.0/examples/jsm/controls/OrbitControls";
+            import * as THREE from "three";
+import {OrbitControls} from "/js/three/examples/jsm/controls/OrbitControls.js";
 
 const canvas = document.querySelector('canvas.webgl');
 

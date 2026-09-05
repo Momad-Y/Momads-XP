@@ -63,6 +63,21 @@
 #
 # KEEP THIS BLOCK LAST. Anything appended below that also sets
 # Content-Security-Policy for a matching path silently disables it again.
+# Vendored three.js, which replaced cdn.skypack.dev for the music-player
+# visualizers. Files under `static/` are copied into `build/` VERBATIM — Vite
+# only content-hashes `_app/immutable/*` — so without this they revalidate on
+# every visualizer load, and three.module.js is 1.17MB. Safe to pin hard: the
+# path carries the version implicitly (`three` is pinned exactly in
+# package.json and `vendored_three.test.ts` asserts the bytes match), so the
+# content at this URL cannot change without a deliberate re-vendor.
+#
+# Declared BEFORE the block below on purpose — see its KEEP THIS BLOCK LAST
+# note. This rule names only Cache-Control, so the `/*` CSP still applies.
+[[headers]]
+  for = "/js/three/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
 # The Pyodide host page. Runs on an OPAQUE origin (sandbox without
 # allow-same-origin), so `'self'` here matches nothing the page loads —
 # the bootstrap is inline and the runtime comes from the CDN.
