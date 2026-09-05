@@ -12,6 +12,7 @@ import {
 import { PYTHON_WORKER_SOURCE } from './worker_source';
 import { PYODIDE_CDN_BASE } from './version';
 import { build_mirror } from './mirror';
+import { BUSY_HINT_MS } from './repl';
 import type { SaveRequest } from './save_limits';
 
 /** Where the isolation host lives. Served from static/, never bundled. */
@@ -83,6 +84,17 @@ export interface PythonClientOptions {
      * case, because its switch must stay exhaustive.
      */
     on_save?: (message: { files: SaveRequest[] }) => void;
+    /**
+     * A statement has been running for a while with nothing to show for it.
+     *
+     * NOT a watchdog. Measured against the live REPL: a `while True: pass`
+     * leaves the page at a full 60 fps, the desktop fully interactive, and
+     * Ctrl+C recovers the session — the worker has its own thread, so nothing
+     * is actually hanging. The only real problem is that the terminal looks
+     * dead and says nothing about Ctrl+C. Killing the runtime instead would
+     * murder legitimate work; importing numpy takes seconds.
+     */
+    on_busy?: () => void;
     /** §3.2's pre-loaded greeting, run before the banner is announced. */
     greeting?: string;
     /** Defaults to the real window; overridden in tests. */
@@ -114,6 +126,12 @@ export function create_python_client(
     const bus: MessageBus = options.bus ?? globalThis;
     let disposed = false;
     let initialised = false;
+    let busy_timer: ReturnType<typeof setTimeout> | undefined;
+
+    const stop_busy_timer = () => {
+        if (busy_timer != null) clearTimeout(busy_timer);
+        busy_timer = undefined;
+    };
 
     const post = (message: unknown) => {
         // '*' is forced: the sandbox has an opaque origin, so there is no
@@ -154,6 +172,10 @@ export function create_python_client(
         const message = parse_from_runtime(event.data);
         if (message == null) return;
 
+        // ANY word from the runtime means it is not silent, so the hint is no
+        // longer warranted — a loop that prints as it goes must never see it.
+        stop_busy_timer();
+
         // The host announces itself before any runtime exists; that handshake
         // is what tells us the frame is alive and ready for `init`.
         if (message.kind === 'loading' && message.detail === 'Sandbox ready') {
@@ -187,6 +209,14 @@ export function create_python_client(
     return {
         exec(source: string) {
             if (disposed) return;
+            // Armed here and cleared by the first message back, so a statement
+            // that prints as it goes never trips it — only genuine silence
+            // does.
+            stop_busy_timer();
+            busy_timer = setTimeout(() => {
+                busy_timer = undefined;
+                if (!disposed) options.on_busy?.();
+            }, BUSY_HINT_MS);
             post({ kind: 'exec', source });
         },
         settle(settled: string[]) {
@@ -196,6 +226,7 @@ export function create_python_client(
 
         restart() {
             if (disposed) return;
+            stop_busy_timer();
             post({ kind: 'terminate' });
             initialised = false;
             // `location.href = …`, NOT `location.reload()`.
@@ -222,6 +253,7 @@ export function create_python_client(
         },
         dispose() {
             disposed = true;
+            stop_busy_timer();
             bus.removeEventListener('message', on_window_message);
             frame.removeEventListener('load', send_init);
         },

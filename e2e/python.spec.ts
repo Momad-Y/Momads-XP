@@ -694,6 +694,95 @@ test('a saved script persists, updates in place, and CMD can read it @online', a
     expect(await cmdScreen(page)).not.toContain('print(1)');
 });
 
+/**
+ * Output from the runtime cannot scribble the terminal.
+ *
+ * Measured before this landed: `print("\x1b[2J\x1b[H…")` wiped the
+ * scrollback, taking earlier output with it. Colour survives on purpose —
+ * `theme.ts` records the 16-colour palette as load-bearing because Pyodide's
+ * tracebacks are ANSI-coloured.
+ */
+test('Python output cannot clear the screen, but keeps its colour @online', async ({
+    page,
+}) => {
+    test.setTimeout(180_000);
+    await bootToDesktop(page);
+    await openPython(page);
+    await expect
+        .poll(async () => cmdScreen(page), { timeout: 120_000 })
+        .toContain('Python 3.13');
+
+    await type(page, 'print("MARKER-BEFORE")');
+    await expect
+        .poll(async () => cmdScreen(page), { timeout: 30_000 })
+        .toContain('MARKER-BEFORE');
+
+    await type(page, String.raw`print("\x1b[2J\x1b[H\x1b[1;3rSCRIBBLED")`);
+    await expect
+        .poll(async () => cmdScreen(page), { timeout: 30_000 })
+        .toContain('SCRIBBLED');
+
+    // The half that matters: earlier output is still there.
+    expect(await cmdScreen(page)).toContain('MARKER-BEFORE');
+
+    // And a traceback is still red — the feature the strip-everything
+    // alternative would have destroyed.
+    await type(page, '1/0');
+    await expect
+        .poll(async () => cmdScreen(page), { timeout: 30_000 })
+        .toContain('ZeroDivisionError');
+    const red = await page
+        .locator('.xterm-rows')
+        .last()
+        .evaluate((root) =>
+            Array.from(root.querySelectorAll('span'))
+                .map((s) => getComputedStyle(s).color)
+                .join(' '),
+        );
+    expect(red).toContain('rgb(');
+});
+
+/**
+ * A statement that goes quiet says so, rather than looking dead.
+ *
+ * NOT a watchdog: measured, a busy worker leaves the page at a full 60 fps
+ * with the desktop interactive, so nothing is hanging. The visitor just has no
+ * way to know Ctrl+C exists.
+ */
+test('a long-running statement tells you Ctrl+C exists @online', async ({
+    page,
+}) => {
+    test.setTimeout(180_000);
+    await bootToDesktop(page);
+    await openPython(page);
+    await expect
+        .poll(async () => cmdScreen(page), { timeout: 120_000 })
+        .toContain('Python 3.13');
+
+    await type(page, 'while True: pass');
+    // The blank line is required: a compound statement is INCOMPLETE on one
+    // line, exactly as in CPython's REPL, so without it nothing executes and
+    // there is nothing to be busy about. Wait for the continuation prompt
+    // before sending it — typing both back to back races the terminal and the
+    // block never submits.
+    await expect
+        .poll(async () => cmdScreen(page), { timeout: 20_000 })
+        .toContain('...');
+    await type(page, '');
+    await expect
+        .poll(async () => cmdScreen(page), { timeout: 30_000 })
+        .toContain('press Ctrl+C to stop it');
+
+    // The page is fine throughout — that is why this is a hint and not a kill.
+    await expect(page.locator('#start-menu-btn')).toBeVisible();
+
+    await page.locator('.xterm-helper-textarea').last().click();
+    await page.keyboard.press('Control+C');
+    await expect
+        .poll(async () => cmdScreen(page), { timeout: 120_000 })
+        .toContain('Python 3.13');
+});
+
 test('the shell and the interpreter keep separate line histories @online', async ({
     page,
 }) => {
