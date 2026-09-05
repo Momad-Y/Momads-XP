@@ -126,6 +126,23 @@
             path: './programs/about_me.svelte',
         },
         {
+            name: 'My CV',
+            icon: '/assets/icons/my-cv.png',
+            // no fs_item: the viewer falls back to profile.meta.resumePdf
+            // (a partial fs_item would throw in full_vfs_item)
+            path: './programs/pdf_viewer.svelte',
+        },
+        {
+            name: 'Internet Explorer',
+            icon: '/images/xp/icons/InternetExplorer6.png',
+            path: './programs/internet_explorer.svelte',
+        },
+        {
+            name: 'Contact Me',
+            icon: '/assets/icons/contact-me.png',
+            path: './programs/contact_me.svelte',
+        },
+        {
             name: 'Command Prompt',
             icon: '/images/xp/icons/CommandPrompt.png',
             path: './programs/cmd.svelte',

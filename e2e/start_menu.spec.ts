@@ -52,6 +52,9 @@ test('All Programs flyout lists the programs and the Games flyout', async ({
     for (const label of [
         'My Computer',
         'About Me',
+        'My CV',
+        'Internet Explorer',
+        'Contact Me',
         'Command Prompt',
         'Python',
         'Paint',
@@ -66,4 +69,33 @@ test('All Programs flyout lists the programs and the Games flyout', async ({
     for (const game of ['Minesweeper', 'Solitaire', 'Chess', 'DOOM']) {
         await expect(flyout.getByText(game)).toBeVisible();
     }
+});
+
+// My CV carries no fs_item (the viewer falls back to profile.meta.resumePdf);
+// a partial one would throw in full_vfs_item, so launching it is the assertion
+// that matters — visibility in the flyout alone would not catch that.
+test('All Programs launches My CV', async ({ page }) => {
+    await stubBrowse(page);
+    await bootToDesktop(page);
+    await page.locator('#start-menu-btn').click();
+    await page.locator('#start-menu').getByText('All Programs').hover();
+    await page.locator('#all-programs-flyout').getByText('My CV').click();
+
+    const win = page.locator('#work-space .window').first();
+    await expect(win).toBeVisible();
+    await expect(win.locator('canvas').first()).toBeVisible({
+        timeout: 15000,
+    });
+});
+
+test('All Programs launches Contact Me', async ({ page }) => {
+    await stubBrowse(page);
+    await bootToDesktop(page);
+    await page.locator('#start-menu-btn').click();
+    await page.locator('#start-menu').getByText('All Programs').hover();
+    await page.locator('#all-programs-flyout').getByText('Contact Me').click();
+
+    await expect(
+        page.locator('#work-space .window', { hasText: 'Contact Me' }),
+    ).toBeVisible();
 });
