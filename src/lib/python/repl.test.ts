@@ -28,7 +28,12 @@ function kinds(effects: readonly ReplEffect[]): string[] {
     return effects.map((e) => e.kind);
 }
 
-const READY: ReplState = { ready: true, awaiting: false, block_open: false };
+const READY: ReplState = {
+    ready: true,
+    awaiting: false,
+    block_open: false,
+    started: true,
+};
 
 describe('on_submit', () => {
     it('sends ONE line, never an accumulated block', () => {
@@ -224,7 +229,7 @@ describe('on_runtime_message', () => {
         // A `...` prompt left open can never advance: a submit returns early
         // while !ready, so the visitor types into a REPL that answers nothing.
         const result = on_runtime_message(
-            { ready: true, awaiting: true, block_open: true },
+            { ready: true, awaiting: true, block_open: true, started: true },
             { kind: 'error', message: 'Python runtime unavailable' },
         );
         expect(result.state.block_open).toBe(false);
@@ -328,5 +333,77 @@ describe('runtime text cannot scribble the terminal', () => {
         expect(
             written({ kind: 'error', message: `${ESC}]0;pwned\x07boom` }),
         ).not.toContain('pwned');
+    });
+});
+
+describe('a dead session can be recovered', () => {
+    /** Get to the state a crashed runtime leaves behind. */
+    const crashed = () => {
+        const ready = on_runtime_message(initial_repl_state(), {
+            kind: 'ready',
+            banner: 'Python 3.13',
+        }).state;
+        return on_runtime_message(ready, {
+            kind: 'error',
+            message: 'worker gone',
+        }).state;
+    };
+
+    it('leaves the session not ready and not awaiting', () => {
+        const state = crashed();
+        expect(state.ready).toBe(false);
+        expect(state.awaiting).toBe(false);
+    });
+
+    it('Ctrl+C RESTARTS a dead session instead of faking a prompt', () => {
+        // The old behaviour took the idle branch — because `awaiting` is false
+        // — and printed a prompt that could never accept input, since every
+        // submit returns early while `!ready`. The only way out was closing
+        // the window.
+        const result = on_interrupt(crashed());
+        expect(result.effects.map((e) => e.kind)).toContain('restart');
+    });
+
+    it('still survives Ctrl+C at a healthy idle prompt', () => {
+        // The opposite failure: turning every idle Ctrl+C into a restart would
+        // destroy every variable the visitor had defined.
+        const ready = on_runtime_message(initial_repl_state(), {
+            kind: 'ready',
+            banner: 'Python 3.13',
+        }).state;
+        const result = on_interrupt(ready);
+        expect(result.effects.map((e) => e.kind)).not.toContain('restart');
+        expect(result.state.ready).toBe(true);
+    });
+
+    it('says the interpreter STOPPED, not that you are offline', () => {
+        // Measured: `import js; js.self.close()` kills the worker with no
+        // error event and no network involvement. "Try again once you are back
+        // online" is a diagnosis, and it was wrong.
+        const text = on_runtime_message(
+            on_runtime_message(initial_repl_state(), {
+                kind: 'ready',
+                banner: 'Python 3.13',
+            }).state,
+            { kind: 'error', message: 'worker gone' },
+        )
+            .effects.filter((e) => e.kind === 'write')
+            .map((e) => e.text)
+            .join(' ');
+        expect(text).toContain('Ctrl+C');
+        expect(text).not.toContain('online');
+    });
+
+    it('DOES blame the network when the runtime never started', () => {
+        // A CDN that cannot be reached is the other real cause, and it is the
+        // only one where "are you online?" is the right question.
+        const text = on_runtime_message(initial_repl_state(), {
+            kind: 'error',
+            message: 'fetch failed',
+        })
+            .effects.filter((e) => e.kind === 'write')
+            .map((e) => e.text)
+            .join(' ');
+        expect(text).toContain('online');
     });
 });

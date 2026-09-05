@@ -36,6 +36,9 @@
             if (window.origin !== 'null') return;
 
             let worker = null;
+            // Set once the runtime has announced its banner, so `onerror` can
+            // tell a failed start from a mid-session crash.
+            let started = false;
             let announce = null;
 
             const toParent = (msg) => {
@@ -62,12 +65,24 @@
                         // an opaque error and no message. The driver therefore
                         // uses importScripts to pull in Pyodide's UMD bundle.
                         worker = new Worker(URL.createObjectURL(blob));
-                        worker.onmessage = (e) => { toParent(e.data); };
+                        worker.onmessage = (e) => {
+                            if (e.data && e.data.kind === 'ready') {
+                                started = true;
+                            }
+                            toParent(e.data);
+                        };
                         worker.onerror = (e) => {
+                            // Accurate about WHEN it died. The same handler
+                            // fires for a CDN that never loaded and for a
+                            // runtime that crashed an hour in, and telling a
+                            // visitor mid-session that it "failed to start"
+                            // sends them looking at their network.
                             toParent({
                                 kind: 'error',
                                 message:
-                                    'Python runtime failed to start' +
+                                    (started
+                                        ? 'Python runtime stopped unexpectedly'
+                                        : 'Python runtime failed to start') +
                                     (e && e.message ? ': ' + e.message : '.'),
                             });
                         };
@@ -110,6 +125,7 @@
                     // app says so.
                     worker.terminate();
                     worker = null;
+                    started = false;
                     // RE-ARM the handshake. Without this the frame goes silent
                     // after a Ctrl+C and the only remaining re-init trigger is
                     // the iframe `load` event — which is exactly the path that

@@ -44,6 +44,15 @@ export interface ReplState {
      * precisely what caused the double-concatenation bug.
      */
     readonly block_open: boolean;
+    /**
+     * The runtime announced its banner at least once this session.
+     *
+     * Distinguishes "never came up" — where the CDN is the likely cause and
+     * "are you online?" is the right question — from "came up and then died",
+     * where it is not. Measured: `import js; js.self.close()` kills the worker
+     * with no error event and no network involved.
+     */
+    readonly started: boolean;
 }
 
 export type ReplEffect =
@@ -78,7 +87,7 @@ export const BUSY_HINT_MS = 4000;
 export const BUSY_HINT_TEXT = 'still running — press Ctrl+C to stop it';
 
 export function initial_repl_state(): ReplState {
-    return { ready: false, awaiting: false, block_open: false };
+    return { ready: false, awaiting: false, block_open: false, started: false };
 }
 
 /** PS1 or PS2, depending on whether a block is open. Also used for redraws. */
@@ -122,7 +131,7 @@ export function on_runtime_message(
             };
 
         case 'ready': {
-            const next = { ...state, ready: true };
+            const next = { ...state, ready: true, started: true };
             // SPLIT the banner. It is multi-line, and writing it as one string
             // leaves bare \n characters in the stream; xterm does not translate
             // those, so a bare \n moves down WITHOUT returning to column 0 and
@@ -226,7 +235,12 @@ export function on_runtime_message(
                         ),
                     ),
                     line(
-                        colour('Try again once you are back online.', FG_GREY),
+                        colour(
+                            state.started
+                                ? 'The interpreter stopped. Press Ctrl+C to restart it.'
+                                : 'Try again once you are back online.',
+                            FG_GREY,
+                        ),
                     ),
                 ],
             };
@@ -262,7 +276,11 @@ export function on_interrupt(state: ReplState): ReplResult {
     // prompt. The session SURVIVES. Terminating here would mean that pressing
     // Ctrl+C out of habit to clear a line destroyed every variable defined so
     // far, which is a restart, not an interrupt.
-    if (!state.awaiting) {
+    // A session that is not READY has already lost its state, so the idle
+    // branch below would hand back a prompt that can never accept input —
+    // every submit returns early while `!ready`. That was a dead end whose
+    // only exit was closing the window.
+    if (!state.awaiting && state.ready) {
         const next = { ...state, block_open: false };
         return {
             state: next,
