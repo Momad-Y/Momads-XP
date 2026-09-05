@@ -99,12 +99,10 @@
         //load other pure js lib
         // panzoom is vendored (design decision 13) — removes the unpkg runtime
         // dependency; consumer is the kept image_viewer. The Google Charts
-        // loader stays CDN WITHOUT SRI: it fetches submodules dynamically, so
-        // SRI is infeasible — accepted; sole consumer is disk_properties.
-        loadjs([
-            'https://www.gstatic.com/charts/loader.js',
-            '/js/panzoom.min.js',
-        ]);
+        // loader used to sit alongside it and could not carry SRI (it fetches
+        // submodules dynamically); disk_properties now draws its own pie from
+        // `$lib/charts/pie3d`, so nothing third-party loads on boot any more.
+        loadjs(['/js/panzoom.min.js']);
     });
 
     onDestroy(() => {

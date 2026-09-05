@@ -5,9 +5,9 @@
  *   (`use:click_outside`, `use:long_press`, `use:double_tap`), the `tooltip`
  *   attribute read by the tooltip action, and the non-standard `fs-id` /
  *   `program-id` DOM hooks the inherited base uses instead of data-*.
- * - The globals below are loaded at runtime from CDN <script> tags in
- *   app.html / desktop.svelte (jQuery UI, loadjs, panzoom, Google Charts),
- *   so they have no importable module types.
+ * - The globals below are loaded at runtime from <script> tags in
+ *   app.html / desktop.svelte (jQuery UI, loadjs, panzoom), so they have no
+ *   importable module types.
  */
 
 declare namespace svelteHTML {
@@ -48,19 +48,6 @@ interface PanzoomInstance {
     smoothZoom(x: number, y: number, scale: number): void;
 }
 
-interface GoogleChartsApi {
-    charts: {
-        load(version: string, options: { packages: string[] }): void;
-        setOnLoadCallback(callback: () => void): void;
-    };
-    visualization: {
-        arrayToDataTable(data: (string | number)[][]): unknown;
-        PieChart: new (element: Element | null) => {
-            draw(data: unknown, options: Record<string, unknown>): void;
-        };
-    };
-}
-
 declare const jQuery: (element: HTMLElement) => JQueryUiElement;
 
 /** Global defined inline in app.html; fetches assets to warm the HTTP cache. */
@@ -72,8 +59,6 @@ declare const panzoom: (
         filterKey?: (event: KeyboardEvent) => boolean | undefined;
     },
 ) => PanzoomInstance;
-
-declare const google: GoogleChartsApi;
 
 /** hash-sum ships no TypeScript declarations. */
 declare module 'hash-sum' {

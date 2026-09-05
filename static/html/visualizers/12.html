@@ -1,5 +1,13 @@
 <html>
     <head>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "/js/three/three.module.js"
+            }
+        }
+    </script>
+
         <style>
         </style>
     </head>
@@ -9,8 +17,8 @@ Toshiya Marukubo
 https://codepen.io/toshiya-marukubo/pen/JjOYmxG -->
     <body>
         <script type="module">
-            import * as THREE from "https://cdn.skypack.dev/three@0.136.0";
-            import {OrbitControls} from "https://cdn.skypack.dev/three@0.136.0/examples/jsm/controls/OrbitControls";
+            import * as THREE from "three";
+            import {OrbitControls} from "/js/three/examples/jsm/controls/OrbitControls.js";
             // Reference
 // https://towardsdatascience.com/fun-with-html-canvas-lets-make-lava-lamp-plasma-e4b0d89fe778
 // https://www.youtube.com/watch?v=8K5wJeVgjrM&t=615s

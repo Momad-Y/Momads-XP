@@ -1,5 +1,13 @@
 <html>
     <head>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "/js/three/three.module.js"
+            }
+        }
+    </script>
+
         <style>
 *{ margin: 0px;}
 html, body {
@@ -256,8 +264,8 @@ void main() {
 </script>
 
 <script type="module">
-    import * as THREE from "https://cdn.skypack.dev/three@0.136.0";
-    import {OrbitControls} from "https://cdn.skypack.dev/three@0.136.0/examples/jsm/controls/OrbitControls";
+    import * as THREE from "three";
+    import {OrbitControls} from "/js/three/examples/jsm/controls/OrbitControls.js";
 
 let camera, scene, renderer, clock;
 let uniforms;

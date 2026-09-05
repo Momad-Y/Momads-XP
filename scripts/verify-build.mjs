@@ -36,6 +36,13 @@ function skip(msg) {
     notes.push(`  SKIPPED ${msg}`);
 }
 
+/** Every file under `dir`, recursively. */
+function walk_files(dir) {
+    return readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+        e.isDirectory() ? walk_files(join(dir, e.name)) : [join(dir, e.name)],
+    );
+}
+
 /** Every .css emitted into the client asset dir. */
 function css_files() {
     const dir = join(BUILD, '_app', 'immutable', 'assets');
@@ -204,6 +211,64 @@ if (!existsSync(BUILD)) {
                 'python-sandbox.html relays every message kind, mirror included',
             );
         }
+    }
+}
+
+// ── 3c. No SRI-less CDN in the build output ─────────────────────────────────
+// Google Charts (gstatic) and three.js (skypack) were removed because neither
+// could carry an integrity hash. Both were reachable only from files no gate
+// reads: `static/html/visualizers/*.html` is outside ESLint, prettier and
+// coverage, and the loader call was one array literal. This check runs on the
+// REAL build output, so it cannot be fooled by a stale `static/`.
+{
+    const vendored = join('build', 'js', 'three');
+    if (!existsSync(join(vendored, 'three.module.js'))) {
+        fail(
+            'build/js/three/three.module.js is MISSING — every music-player ' +
+                'visualizer would fail to resolve its imports and render black',
+        );
+    } else {
+        ok('vendored three.js reached the build');
+    }
+
+    const html_dir = join('build', 'html', 'visualizers');
+    const pages = existsSync(html_dir)
+        ? readdirSync(html_dir).filter((f) => f.endsWith('.html'))
+        : [];
+    if (pages.length !== 12) {
+        fail(
+            `expected 12 built visualizers, found ${String(pages.length)} — ` +
+                'the music player picks one at random, so a missing file is a ' +
+                'black screen for 1 in 12 plays',
+        );
+    } else {
+        const leaks = pages.filter((f) =>
+            readFileSync(join(html_dir, f), 'utf8').includes('skypack.dev'),
+        );
+        if (leaks.length > 0) {
+            fail(
+                `skypack.dev is back in: ${leaks.join(', ')} — an ES import ` +
+                    'cannot carry an SRI hash, which is why it was removed',
+            );
+        } else {
+            ok('no visualizer imports from skypack');
+        }
+    }
+
+    const entry = readFileSync(join(BUILD, 'index.html'), 'utf8');
+    const app_js = existsSync(join(BUILD, '_app'))
+        ? walk_files(join(BUILD, '_app')).filter((f) => f.endsWith('.js'))
+        : [];
+    const gstatic = [entry, ...app_js.map((f) => readFileSync(f, 'utf8'))].some(
+        (src) => src.includes('gstatic.com/charts'),
+    );
+    if (gstatic) {
+        fail(
+            'the Google Charts loader is back in the build — it runs on every ' +
+                'page load and cannot carry SRI (it fetches submodules itself)',
+        );
+    } else {
+        ok('no Google Charts loader in the built app');
     }
 }
 

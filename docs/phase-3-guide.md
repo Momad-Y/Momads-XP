@@ -201,6 +201,17 @@ documented at `desktop.svelte:99-106` — the Google Charts loader for
 `disk_properties`, CDN without SRI because it fetches submodules dynamically.
 Not a Phase 3 path.
 
+> **SUPERSEDED — see `docs/cdn-removal-plan.md`.** That acceptance no longer
+> holds. `disk_properties` draws its own pie from `$lib/charts/pie3d`, whose
+> geometry was traced off the real Google Charts output before the loader was
+> deleted (`design/research/google-charts-pie-baseline.json`); the loader is
+> gone from `desktop.svelte`, and `cdn.skypack.dev` — which this table never
+> noticed, because the visualizer iframe only loads while audio plays — was
+> replaced by vendored three.js under `static/js/three/`. `e2e/no_cdn.spec.ts`
+> now asserts an allowlist of permitted origins rather than a denylist of two
+> hostnames, which also makes ci.yml's "hermetic" claim for the `default`
+> project true for the first time.
+
 **A probe bug worth recording.** The first Ctrl+C probe reported FAIL. The
 product was fine; the probe typed into the terminal *during* the restart
 without re-focusing, and used `toContain('Python 3.13')` as its success signal —

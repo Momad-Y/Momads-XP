@@ -2,12 +2,13 @@
 
 <script lang="ts">
     import { folder_size } from '../../../lib/fs_size';
+    import { pie_shapes, GEOMETRY } from '../../../lib/charts/pie3d';
     import { type_label } from '../../../lib/details_columns';
     import Window from '../../../lib/components/xp/Window.svelte';
     import Button from '../../../lib/components/xp/Button.svelte';
     import Tab from '../../../lib/components/xp/Tab.svelte';
     import CheckBox from '../../../lib/components/xp/CheckBox.svelte';
-    import { onMount, unmount } from 'svelte';
+    import { unmount } from 'svelte';
     import { runningPrograms, hardDrive } from '../../../lib/store';
     import { icons } from '../../../lib/system';
     import * as utils from '../../../lib/utils';
@@ -55,9 +56,12 @@
     };
     details.free_space = details.capacity - details.used_space;
 
-    onMount(() => {
-        draw_chart();
-    });
+    // Colours match the legend swatches below (bg-blue-700 / bg-pink-500) and
+    // the shades the removed Google Charts config used.
+    const slices = pie_shapes([
+        { value: details.used_space, colour: '#1d4ed8' },
+        { value: details.free_space, colour: '#ec4899' },
+    ]);
 
     export function destroy() {
         runningPrograms.update((programs) =>
@@ -79,33 +83,6 @@
         minimize_btn: false,
         exec_path,
     };
-
-    function draw_chart() {
-        google.charts.load('current', { packages: ['corechart'] });
-        google.charts.setOnLoadCallback(() => {
-            const data = google.visualization.arrayToDataTable([
-                ['space', 'size'],
-                ['Used space', details.used_space],
-                ['Free space', details.free_space],
-            ]);
-
-            const options = {
-                is3D: true,
-                enableInteractivity: false,
-                backgroundColor: 'transparent',
-                chartArea: { height: '100%' },
-                pieSliceText: 'none',
-                pieSliceBorderColor: '#000',
-                colors: ['#1d4ed8', '#ec4899'],
-                legend: { position: 'none' },
-            };
-
-            const chart = new google.visualization.PieChart(
-                document.querySelector(`.window[program-id="${id}"] .chart`),
-            );
-            chart.draw(data, options);
-        });
-    }
 </script>
 
 <Window {options} bind:this={window} on_click_close={destroy}>
@@ -208,7 +185,31 @@
                 </div>
             </div>
 
-            <div class="chart w-full h-[100px]"></div>
+            <div class="chart w-full h-[100px]">
+                {#if slices.length > 0}
+                    <svg
+                        class="w-full h-full"
+                        viewBox="0 0 {GEOMETRY.width} {GEOMETRY.height}"
+                        role="img"
+                        aria-label="Used and free space"
+                    >
+                        <!-- eslint-disable-next-line svelte/require-each-key -- painter's order is the identity here; keying would reorder draws -->
+                        {#each slices as shape}
+                            {#if shape.kind === 'ellipse'}
+                                <ellipse
+                                    cx={GEOMETRY.cx}
+                                    cy={GEOMETRY.cy}
+                                    rx={GEOMETRY.rx}
+                                    ry={GEOMETRY.ry}
+                                    fill={shape.fill}
+                                />
+                            {:else}
+                                <path d={shape.d} fill={shape.fill} />
+                            {/if}
+                        {/each}
+                    </svg>
+                {/if}
+            </div>
 
             <div class="px-2 my-3 mb-6 text-[12px] text-slate-800">
                 <CheckBox
