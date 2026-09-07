@@ -5,7 +5,11 @@
     import Window from '../../../lib/components/xp/Window.svelte';
     import { runningPrograms, systemVolume } from '../../../lib/store';
     import { required } from '../../../lib/types';
-    import { TRACKS, format_duration } from '../../../lib/music/manifest';
+    import {
+        TRACKS,
+        GENRES,
+        format_duration,
+    } from '../../../lib/music/manifest';
     import {
         bar_heights,
         create_source_cache,
@@ -73,6 +77,20 @@
     let app_volume = 0.8;
 
     $: track = TRACKS[index];
+
+    /*
+     * Groups for display only. `TRACKS` is already ordered genre-by-genre by
+     * the generator, so each group is a contiguous run and `offset` is the
+     * index of its first track in the FLAT list. Everything else — select,
+     * next_index, prev_index, `ended` — keeps working on flat indices, which is
+     * what keeps prev/next walking the whole library instead of stopping at a
+     * genre boundary.
+     */
+    const groups = GENRES.map((genre) => ({
+        name: genre.name,
+        offset: TRACKS.findIndex((t) => t.genre === genre.dir),
+        tracks: TRACKS.filter((t) => t.genre === genre.dir),
+    })).filter((g) => g.tracks.length > 0);
     $: output_volume = effective_volume(app_volume, $systemVolume);
     $: if (audio != null) audio.volume = output_volume;
     $: ratio = progress_ratio(current_time, duration);
@@ -210,8 +228,34 @@
             ></canvas>
         </div>
 
-        <div class="px-3 pb-1 text-[12px] font-bold">
-            {track?.title ?? 'No track'}
+        <div class="flex items-center gap-2 px-3 pb-1">
+            <!-- Art sits BESIDE the title, never in place of the visualiser:
+                 the canvas above is a Phase 3 exit criterion, and removing a
+                 shipped feature to make room for a new one is a bad trade. -->
+            {#if track?.cover != null}
+                <img
+                    src={track.cover}
+                    alt=""
+                    data-testid="cover-art"
+                    class="h-10 w-10 shrink-0 rounded-sm border border-black/40 object-cover"
+                />
+            {:else}
+                <div
+                    data-testid="cover-art"
+                    class="h-10 w-10 shrink-0 rounded-sm border border-black/40 bg-contain bg-center bg-no-repeat opacity-70"
+                    style:background-image="url(/images/xp/icons/WindowsMediaPlayer9.png)"
+                ></div>
+            {/if}
+            <div class="min-w-0">
+                <div class="truncate text-[12px] font-bold">
+                    {track?.title ?? 'No track'}
+                </div>
+                {#if track?.artist != null}
+                    <div class="truncate text-[11px] opacity-80">
+                        {track.artist}
+                    </div>
+                {/if}
+            </div>
         </div>
 
         <!-- seek bar -->
@@ -274,25 +318,34 @@
         <div
             class="mx-2 mb-2 grow overflow-auto rounded border border-black/40 bg-white/95 text-black"
         >
-            {#each TRACKS as t, i (t.id)}
-                <!-- svelte-ignore a11y_click_events_have_key_events -->
+            {#each groups as group (group.name)}
                 <div
-                    data-testid="track-row"
-                    class="flex cursor-pointer justify-between px-2 py-[3px] {i ===
-                    index
-                        ? 'bg-[#316ac5] text-white'
-                        : 'hover:bg-blue-100'}"
-                    role="button"
-                    tabindex="0"
-                    on:click={() => {
-                        select(i);
-                    }}
+                    data-testid="genre-header"
+                    class="sticky top-0 bg-[#d6e5f5] px-2 py-[2px] text-[11px] font-bold text-[#1c3f75]"
                 >
-                    <span>{t.title}</span>
-                    <span class="opacity-70"
-                        >{format_duration(t.duration_s)}</span
-                    >
+                    {group.name}
                 </div>
+                {#each group.tracks as t, n (t.id)}
+                    <!-- svelte-ignore a11y_click_events_have_key_events -->
+                    <div
+                        data-testid="track-row"
+                        class="flex cursor-pointer justify-between px-2 py-[3px] {group.offset +
+                            n ===
+                        index
+                            ? 'bg-[#316ac5] text-white'
+                            : 'hover:bg-blue-100'}"
+                        role="button"
+                        tabindex="0"
+                        on:click={() => {
+                            select(group.offset + n);
+                        }}
+                    >
+                        <span class="truncate">{t.title}</span>
+                        <span class="shrink-0 pl-2 opacity-70"
+                            >{format_duration(t.duration_s)}</span
+                        >
+                    </div>
+                {/each}
             {/each}
         </div>
 

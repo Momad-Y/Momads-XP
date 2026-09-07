@@ -35,6 +35,17 @@ jobs:
                   npx tsc --noEmit --strict --skipLibCheck --resolveJsonModule --module esnext --moduleResolution bundler --target es2022 scripts/generate-vfs.ts
                   npm run generate:vfs
                   git diff --exit-code static/json/hard_drive.json src/lib/generated
+                  # Album art is extracted into static/assets/covers, which the
+                  # generator OWNS (clears and rewrites). `git diff` cannot see
+                  # this directory's failure modes: it exits 0 for an UNTRACKED
+                  # file, so a cover added but never committed would sail
+                  # through, and it is silent about a stale file that is simply
+                  # unchanged. `git status --porcelain -uall` catches both.
+                  if [ -n "$(git status --porcelain --untracked-files=all static/assets/covers)" ]; then
+                    echo "static/assets/covers is out of date — commit what generate:vfs produced:"
+                    git status --porcelain --untracked-files=all static/assets/covers
+                    exit 1
+                  fi
 
             - name: Unit tests (coverage-gated)
               run: npx vitest run --coverage

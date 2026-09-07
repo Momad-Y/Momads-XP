@@ -556,3 +556,114 @@ describe('My Documents \\ Python (the REPL save folder)', () => {
         expect(drive[PYTHON_FOLDER_ID]?.children).toEqual([]);
     });
 });
+
+/*
+ * Reaping items a NEW SEED DROPPED.
+ *
+ * Before this, only a pruned program (`fake` + `executable`) could ever leave a
+ * returning visitor's drive. Everything else absent from a new seed was carried
+ * forever. That held while seed content only grew; it breaks the moment a seed
+ * folder is curated, which is exactly what the music library does — renaming a
+ * track, moving it between genres, or renaming a genre folder mints new ids and
+ * would strand the old ones pointing at URLs that 404.
+ */
+describe('merge_on_reseed reaps items the new seed dropped', () => {
+    const music = 'my_music';
+    const old_seed = drive(
+        item({ id: music, type: 'folder', children: ['old_track'] }),
+        item({
+            id: 'old_track',
+            parent: music,
+            storage_type: 'remote',
+            url: '/audio/music/old.mp3',
+        }),
+    );
+    const new_seed = drive(
+        item({ id: music, type: 'folder', children: ['genre'] }),
+        item({ id: 'genre', type: 'folder', parent: music, children: [] }),
+    );
+    const previous = snapshot_seed_fields(old_seed);
+
+    it('drops a track the new seed no longer contains', () => {
+        const merged = merge_on_reseed(old_seed, new_seed, previous);
+        expect(merged['old_track']).toBeUndefined();
+        expect(merged[music]?.children).toEqual(['genre']);
+    });
+
+    it('drops a renamed genre folder AND the tracks inside it', () => {
+        // a folder has no storage_type and no executable flag, so no
+        // shape-based predicate could ever have reached this case
+        const cached = drive(
+            item({ id: music, type: 'folder', children: ['old_genre'] }),
+            item({
+                id: 'old_genre',
+                type: 'folder',
+                parent: music,
+                children: ['t1'],
+            }),
+            item({ id: 't1', parent: 'old_genre', storage_type: 'remote' }),
+        );
+        const merged = merge_on_reseed(
+            cached,
+            new_seed,
+            snapshot_seed_fields(cached),
+        );
+        expect(merged['old_genre']).toBeUndefined();
+        expect(merged['t1']).toBeUndefined();
+    });
+
+    it('KEEPS a file the visitor put there themselves', () => {
+        // never in any seed, so `previous` has no entry — this is what protects
+        // an upload, and it does NOT depend on `authored`, which
+        // new_fs_item_raw never stamps
+        const cached = drive(
+            item({
+                id: music,
+                type: 'folder',
+                children: ['old_track', 'mine'],
+            }),
+            item({ id: 'old_track', parent: music, storage_type: 'remote' }),
+            item({ id: 'mine', parent: music, storage_type: 'local' }),
+        );
+        const merged = merge_on_reseed(cached, new_seed, previous);
+        expect(merged['old_track']).toBeUndefined();
+        expect(merged['mine']).toBeDefined();
+        expect(merged[music]?.children).toContain('mine');
+    });
+
+    it('KEEPS a seed item the visitor overwrote with their own bytes', () => {
+        // save_file flips url/storage_type on a SEED id when Paint saves over a
+        // wallpaper; those are the visitor's bytes now
+        const cached = drive(
+            item({ id: music, type: 'folder', children: ['old_track'] }),
+            item({
+                id: 'old_track',
+                parent: music,
+                storage_type: 'local',
+                url: 'blob:theirs',
+            }),
+        );
+        const merged = merge_on_reseed(cached, new_seed, previous);
+        expect(merged['old_track']).toBeDefined();
+    });
+
+    it('KEEPS an explicitly authored item', () => {
+        const cached = drive(
+            item({ id: music, type: 'folder', children: ['old_track'] }),
+            item({
+                id: 'old_track',
+                parent: music,
+                storage_type: 'remote',
+                authored: true,
+            }),
+        );
+        const merged = merge_on_reseed(cached, new_seed, previous);
+        expect(merged['old_track']).toBeDefined();
+    });
+
+    it('infers NOTHING without a snapshot, exactly like the tombstone block', () => {
+        // a legacy drive, or the first re-seed after this shipped
+        const merged = merge_on_reseed(old_seed, new_seed);
+        expect(merged['old_track']).toBeDefined();
+    });
+});

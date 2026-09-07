@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { statSync } from 'node:fs';
-import { format_duration, TRACKS } from './manifest';
+import { format_duration, TRACKS, GENRES } from './manifest';
 import hard_drive from '../../../static/json/hard_drive.json';
 
 describe('TRACKS', () => {
@@ -12,13 +12,36 @@ describe('TRACKS', () => {
     });
 
     it('every file exists and its size_kb matches the committed bytes', () => {
-        // size_kb is hand-written on purpose: statSync'ing it at generation
-        // time would make the mp3 bytes an input to SEED_VERSION, so
-        // regenerating a track would silently re-seed every returning visitor.
-        // This test is what keeps the hand-written value honest.
+        // size_kb is now SCANNED, not hand-written, so this no longer guards a
+        // typo — it guards the committed manifest being stale relative to the
+        // files on disk. Regenerating is what re-seeds every returning
+        // visitor, so a drift here means someone changed audio without
+        // regenerating, and CI's freshness gate is the other half of that.
         for (const track of TRACKS) {
-            const bytes = statSync(`static/audio/music/${track.filename}`).size;
+            const bytes = statSync(
+                `static/audio/music/${track.genre}/${track.filename}`,
+            ).size;
             expect(Math.round(bytes / 1024)).toBe(track.size_kb);
+        }
+    });
+
+    it('belongs to a declared genre and carries an artist field', () => {
+        const dirs = new Set(GENRES.map((g) => g.dir));
+        for (const track of TRACKS) {
+            expect(dirs.has(track.genre)).toBe(true);
+            // null is a legitimate value; undefined means the scan dropped it
+            expect(
+                track.artist === null || typeof track.artist === 'string',
+            ).toBe(true);
+        }
+    });
+
+    it('points cover art at the extracted static path when there is any', () => {
+        for (const track of TRACKS) {
+            if (track.cover == null) continue;
+            expect(track.cover).toMatch(
+                /^\/assets\/covers\/[0-9a-f]{16}\.\w+$/,
+            );
         }
     });
 
@@ -33,12 +56,23 @@ describe('TRACKS', () => {
         }
     });
 
-    it('is seeded into My Music with matching ids, names and sizes', () => {
-        // The manifest is the single source of truth and generate-vfs derives
-        // the seed from it. This asserts the derivation actually happened —
-        // otherwise the player and Explorer would disagree about what exists.
-        const drive: Record<string, { name?: string; size?: number }> =
-            hard_drive;
+    it('is seeded under its genre folder with matching ids, names and sizes', () => {
+        // The FOLDER is the source of truth and generate-vfs derives both the
+        // manifest and the seed from one in-memory scan. This asserts the
+        // derivation actually happened, and that each track is parented to its
+        // genre folder rather than loose in My Music — otherwise the player and
+        // Explorer would disagree about what exists and where.
+        const drive: Record<
+            string,
+            {
+                name?: string;
+                size?: number;
+                parent?: string;
+                children?: string[];
+            }
+        > = hard_drive;
+        const genre_of = new Map(GENRES.map((g) => [g.dir, g.id]));
+
         for (const track of TRACKS) {
             const item = drive[track.id];
             expect(
@@ -47,6 +81,19 @@ describe('TRACKS', () => {
             ).toBeDefined();
             expect(item?.name).toBe(`${track.title}.mp3`);
             expect(item?.size).toBe(track.size_kb);
+            expect(item?.parent).toBe(genre_of.get(track.genre));
+            expect(drive[genre_of.get(track.genre) ?? '']?.children).toContain(
+                track.id,
+            );
+        }
+    });
+
+    it('seeds one folder per declared genre, named from profile.json', () => {
+        const drive: Record<string, { name?: string; type?: string }> =
+            hard_drive;
+        for (const genre of GENRES) {
+            expect(drive[genre.id]?.type).toBe('folder');
+            expect(drive[genre.id]?.name).toBe(genre.name);
         }
     });
 

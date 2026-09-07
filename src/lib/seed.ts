@@ -148,6 +148,54 @@ function user_edits(
 }
 
 /**
+ * An item that came from an OLDER seed and the new seed dropped.
+ *
+ * WHY THIS EXISTS: `is_stale_placeholder` reaps exactly one shape — a pruned
+ * program (`fake` + `executable`). Everything else absent from a new seed is
+ * carried forever, and there was no way to reap it. That was survivable while
+ * seed content only ever grew. It stops being survivable the moment a seed
+ * folder is CURATED: the music library is discovered from disk, so renaming a
+ * track, moving it between genres, or renaming a genre folder mints new ids and
+ * strands the old ones in every returning visitor's drive, pointing at URLs
+ * that 404. A shape-based predicate cannot fix that — a renamed genre folder is
+ * a plain `type: 'folder'` with no `storage_type` and no `executable` at all.
+ *
+ * So this asks PROVENANCE instead, which `is_stale_placeholder`'s own header
+ * argues for: `previous` records an entry for every id the seed the visitor
+ * ACTUALLY RECEIVED contained (`snapshot_seed_fields`). An id in there, absent
+ * from the new seed, was dropped deliberately by us — not authored by them.
+ *
+ * It is the mirror of the tombstone block below, which uses the same snapshot
+ * to infer the opposite direction, and it shares that block's fallback: with no
+ * `previous` — a legacy drive, or the first re-seed after this shipped —
+ * nothing is inferred and behaviour is exactly as before.
+ *
+ * Two things it must never reap:
+ *   - an id `previous` never held, which is the visitor's own item. This is
+ *     what protects an mp3 they upload into a genre folder, and it protects it
+ *     WITHOUT relying on `authored` — `new_fs_item_raw` does not stamp that.
+ *   - a seed item they overwrote with their own bytes. `save_file` flips
+ *     `url`/`storage_type` on a SEED id when Paint saves over a wallpaper, so a
+ *     changed `storage_type` means their bytes are in there and it is theirs.
+ */
+function is_dropped_seed_item(
+    item: VfsItem,
+    previous: SeedFieldSnapshot | undefined,
+): boolean {
+    if (previous == null) return false;
+    const was = previous[item.id];
+    if (was == null) return false;
+    if (item.authored === true) return false;
+    if (
+        was.storage_type !== undefined &&
+        item.storage_type !== was.storage_type
+    ) {
+        return false;
+    }
+    return true;
+}
+
+/**
  * Re-seed merge (Phase 2 spec D3): the new seed owns every id it contains; the
  * visitor's OWN items are carried when their parent resolves in seed ∪ carried
  * (transitively), then relinked into their seed parent's `children` (folders
@@ -167,7 +215,10 @@ export function merge_on_reseed(
     previous?: SeedFieldSnapshot,
 ): HardDrive {
     const candidates = Object.values(cached).filter(
-        (i) => seed[i.id] == null && !is_stale_placeholder(i),
+        (i) =>
+            seed[i.id] == null &&
+            !is_stale_placeholder(i) &&
+            !is_dropped_seed_item(i, previous),
     );
     const carried = new Set<string>();
     let grew = true;

@@ -30,6 +30,7 @@
         "eslint-plugin-svelte": "^3.20.0",
         "husky": "^9.1.7",
         "lint-staged": "^17.0.8",
+        "music-metadata": "11.15.0",
         "postcss": "^8.4.14",
         "postcss-load-config": "^4.0.1",
         "prettier": "^3.9.5",
