@@ -121,14 +121,23 @@ function radial_face(angle: number): string | null {
  */
 export function pie_shapes(slices: readonly Slice[]): Shape[] {
     if (slices.length === 0) return [];
-    if (slices.some((s) => !Number.isFinite(s.value) || s.value < 0)) return [];
+    if (slices.some((s) => !Number.isFinite(s.value))) return [];
 
-    const total = slices.reduce((sum, s) => sum + s.value, 0);
+    /*
+     * An over-filled drive gives a NEGATIVE free_space — `disk_properties`
+     * subtracts without clamping, and that is the base's documented kept-bug.
+     * Drawing nothing would hide it behind an empty box; a full disk is both
+     * the truthful reading and what XP itself would show. The byte read-outs
+     * above the chart still print the negative figure.
+     */
+    const clamped = slices.map((s) => ({ ...s, value: Math.max(0, s.value) }));
+
+    const total = clamped.reduce((sum, s) => sum + s.value, 0);
     if (!Number.isFinite(total) || total <= 0) return [];
 
     // A slice covering everything degenerates: an arc whose ends coincide draws
     // nothing, so the baseline emits an <ellipse> plus one full-front wall.
-    const whole = slices.find((s) => s.value === total);
+    const whole = clamped.find((s) => s.value === total);
     if (whole != null) {
         const wall = outer_wall(FRONT_START, FRONT_END);
         return [
@@ -149,7 +158,7 @@ export function pie_shapes(slices: readonly Slice[]): Shape[] {
     // `bounds[i]` an optional, and the arithmetic reads worse for the checks
     const wedges: { from: number; to: number; slice: Slice }[] = [];
     let cursor = 0;
-    for (const slice of slices) {
+    for (const slice of clamped) {
         const to = cursor + (slice.value / total) * TAU;
         wedges.push({ from: cursor, to, slice });
         cursor = to;
