@@ -67,12 +67,23 @@ test('drive Properties draws its pie locally', async ({ page }) => {
     const chart = page.locator('.window .chart svg');
     await expect(chart).toBeVisible();
 
-    // the seeded C: is almost entirely free, which the capture showed Google
-    // rendering as an <ellipse> plus one wall rather than two wedges
     await expect(chart.locator('[fill="#ec4899"]')).toHaveCount(1);
     await expect(chart.locator('[fill="#b13673"]')).toHaveCount(1);
-    // whatever it drew, it must be real geometry
-    await expect(chart.locator('path,ellipse').first()).toBeVisible();
+
+    /*
+     * The used wedge must be VISIBLE, not merely present. At the drive's old
+     * 25GiB capacity this slice was 0.34 degrees — about a third of a pixel —
+     * so it was in the DOM and invisible on screen, which is exactly the bug
+     * that shrinking the capacity fixed. Asserted here rather than in its own
+     * spec because the dialog is already open; a separate file would pay a
+     * second boot for one measurement.
+     */
+    const used = chart.locator('[fill="#1d4ed8"]');
+    await expect(used).toHaveCount(1);
+    const box = await used.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box?.width ?? 0).toBeGreaterThan(20);
+    expect(box?.height ?? 0).toBeGreaterThan(10);
 
     expect(foreign.filter((u) => u.includes('gstatic'))).toEqual([]);
     expect(foreign).toEqual([]);

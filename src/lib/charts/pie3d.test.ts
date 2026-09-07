@@ -164,10 +164,24 @@ describe('degenerate inputs never reach the DOM', () => {
         expect(mine(0, 0)).toEqual([]);
     });
 
-    it('renders nothing for a negative slice', () => {
-        // free_space goes negative when a drive is over-filled; the numeric
-        // read-outs above the chart still show it, but the pie must not break
-        expect(mine(120, -20)).toEqual([]);
+    it('shows an over-filled drive as completely full', () => {
+        // free_space goes negative when used exceeds capacity. An empty box
+        // would hide that; a full disk is the truthful reading, and is what
+        // XP itself showed. The byte read-outs still print the negative.
+        const shapes = mine(120, -20);
+        expect(shapes.map((s) => s.kind)).toEqual(['path', 'ellipse']);
+        expect(shapes[1]?.fill).toBe(USED);
+        expect(shapes[0]?.fill).toBe(darken(USED));
+    });
+
+    it('draws a visible wedge at the seeded C: ratio', () => {
+        // 24,512 KB of 131,072 — the reason the capacity was shrunk. At the
+        // old 25GiB this wedge was 0.34 degrees, roughly a third of a pixel.
+        const shapes = mine(24512, 131072 - 24512);
+        const blue = shapes.find((s) => s.fill === USED);
+        expect(blue).toBeDefined();
+        const xs = endpoints(blue?.d ?? '').map((p) => p[0]);
+        expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(20);
     });
 
     it('never emits NaN in path data', () => {
