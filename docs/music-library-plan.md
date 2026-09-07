@@ -453,3 +453,63 @@ and assume no track count.
 | §7 asserts the re-seed trade away rather than arguing it | Weak | **Accepted as framing.** The verdict stands — visibility via a committed, diffed manifest is the protection — but it is now stated as a real cost: any re-encode of any one track re-seeds the whole visitor population. That is acceptable *only because* §6D makes re-seeds safe; before §6D it would not have been. |
 | Git history weight and Netlify bandwidth are dodged as out-of-scope | Acceptable | **Accepted.** A9. |
 | Bundle size, first-paint preload, player helper assumptions | — | **Confirmed non-problems.** A10 records them so they are not re-litigated. |
+
+
+---
+
+## Adding the real music (the owner's checklist)
+
+**Format:** MP3, **CBR**, 44.1 kHz stereo. CBR specifically — variable bitrate
+without a Xing header makes the seek bar land in the wrong place in some
+browsers. **128 kbps**: 15 four-minute songs is ~57 MB, which fits the 128 MB
+C: drive comfortably. 192 kbps (~86 MB) fits tightly; 320 kbps (~144 MB)
+overflows it.
+
+**Layout** — the folder name is the genre, and track order within a genre is
+FILENAME order, so prefix to control it:
+
+```
+static/audio/music/
+  arabic-ballads/   01 - Shedeeny.mp3   02 - Waili.mp3   03 - bya3een el sabr.mp3
+  egyptian-rap/     01 - Laqta.mp3      02 - Free.mp3    03 - El Neyya.mp3   04 - Mantika.mp3
+  pop/              01 - Shape of You.mp3   02 - Far Away.mp3
+  hip-hop/          01 - Middle Child.mp3   02 - Heartless.mp3   03 - Bound 2.mp3
+                    04 - All the stars.mp3  05 - Swimming Pools.mp3  06 - i.mp3
+```
+
+**Then paste this into `profile.json` under `"music"`, replacing the `demo`
+entry**, and delete `static/audio/music/demo/`:
+
+```json
+"genres": [
+    { "dir": "arabic-ballads", "name": "Arabic Ballads" },
+    { "dir": "egyptian-rap", "name": "Egyptian Rap" },
+    { "dir": "pop", "name": "Pop" },
+    { "dir": "hip-hop", "name": "Hip Hop" }
+]
+```
+
+**Then `npm run generate:vfs`.** That is the whole loop.
+
+### Renaming a genre later is a TWO-part edit, on purpose
+
+The folder and its `profile.json` `dir` must match. Renaming only one is a hard
+error, not a silent skip — a genre that quietly stops appearing is the worst
+failure this feature can have. Both error messages hand over the fix: an
+undeclared folder prints the exact JSON line to paste, and a declared genre with
+no folder says the two must match.
+
+A rename also mints new ids for the folder and every track in it (ids are
+`sha256(genre/filename)`), which strands the old ones — handled by the reap
+rule in §6, and asserted in `seed.test.ts`.
+
+### Copyright
+
+The owner's decision, taken knowingly: ship the tracks and carry a notice. It
+lives in `profile.json` as `music.notice` — content, not component text, per
+CLAUDE.md — and renders in the player:
+
+> All music legally acquired™ · personal listening only, not for distribution.
+
+A notice is not a licence. It states intent and it is what the owner asked for;
+the underlying exposure is unchanged and was raised before the decision.

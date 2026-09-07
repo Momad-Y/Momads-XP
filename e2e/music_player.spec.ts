@@ -72,6 +72,12 @@ test('opens with the discovered track list, grouped by genre', async ({
 
     // art slot always renders — the icon stands in when a file carries no cover
     await expect(page.getByTestId('cover-art')).toBeVisible();
+
+    // Exact string, per CLAUDE.md. It lives in profile.json, not the
+    // component, because it is content.
+    await expect(page.getByTestId('music-notice')).toHaveText(
+        'All music legally acquired™ · personal listening only, not for distribution.',
+    );
 });
 
 test('play, pause and play again — the createMediaElementSource trap', async ({

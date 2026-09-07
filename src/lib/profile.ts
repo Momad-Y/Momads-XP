@@ -182,6 +182,8 @@ export interface MusicGenre {
 
 export interface ProfileMusic {
     genres: MusicGenre[];
+    /** Shown in the player. Content, so it lives here and not in the component. */
+    notice: string;
 }
 
 export interface Profile {

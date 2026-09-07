@@ -138,8 +138,10 @@ describe('scan_music fails loudly', () => {
     it('when a folder on disk is undeclared', async () => {
         put('tarab', 'a.mp3');
         put('mystery', 'b.mp3');
+        // the message hands over the exact profile.json line, because
+        // renaming a genre folder is deliberately a two-part edit
         await expect(scan_music(only_tarab, tags(), root)).rejects.toThrow(
-            /no genre in profile.json/,
+            /"dir": "mystery"/,
         );
     });
 

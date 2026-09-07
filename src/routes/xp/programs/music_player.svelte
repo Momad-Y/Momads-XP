@@ -4,6 +4,7 @@
     import { onDestroy, unmount } from 'svelte';
     import Window from '../../../lib/components/xp/Window.svelte';
     import { runningPrograms, systemVolume } from '../../../lib/store';
+    import { profile } from '../../../lib/profile';
     import { required } from '../../../lib/types';
     import {
         TRACKS,
@@ -347,6 +348,13 @@
                     </div>
                 {/each}
             {/each}
+        </div>
+
+        <div
+            data-testid="music-notice"
+            class="px-3 pb-2 text-[10px] leading-tight opacity-70"
+        >
+            {profile.music.notice}
         </div>
 
         <audio

@@ -176,9 +176,14 @@ export async function scan_music(
 
     for (const dir of on_disk) {
         if (!declared.has(dir)) {
+            // Renaming a folder is deliberately a TWO-part edit: the folder and
+            // its profile.json entry. Failing here rather than skipping is what
+            // stops a renamed or newly pasted genre from silently vanishing —
+            // so the error hands over the exact line to paste.
             throw new Error(
-                `${root}/${dir} exists but no genre in profile.json declares it — ` +
-                    'its tracks would silently never appear',
+                `${root}/${dir} exists but no genre in profile.json declares it. ` +
+                    'Add it to profile.json "music".genres, in the order you want ' +
+                    `it shown:\n    { "dir": "${dir}", "name": "${dir.replace(/-/g, ' ')}" }`,
             );
         }
     }
@@ -207,7 +212,9 @@ export async function scan_music(
                 .sort(by_name);
         } catch {
             throw new Error(
-                `genre "${genre.dir}" is declared in profile.json but ${dir} does not exist`,
+                `genre "${genre.dir}" is declared in profile.json but ${dir} ` +
+                    'does not exist. If you renamed the folder, rename its ' +
+                    '"dir" here too — the two must match.',
             );
         }
 
