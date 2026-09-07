@@ -1,68 +1,63 @@
 /**
- * The bundled Music Player tracks (SPECIFICATION.md §3.2, plan T9).
+ * The Music Player's library — TYPES and helpers only.
  *
- * THE SINGLE SOURCE OF TRUTH. The player reads this at runtime, and
- * `scripts/generate-vfs.ts` derives the `My Music` seed entries from it — so
- * there is exactly one list to maintain. Two hand-kept lists would drift, and
- * a drifted VFS entry is shipped data that cannot be un-shipped (see below).
+ * THE TRACK LIST IS NO LONGER HAND-WRITTEN. It is discovered from
+ * `static/audio/music/<genre>/*.mp3` by `scan.ts` and emitted into
+ * `src/lib/generated/music.ts`, which CLAUDE.md forbids hand-editing. The owner
+ * drops files into a genre folder and runs `npm run generate:vfs`. Genres, their
+ * display names and their order come from `profile.json`; the folder supplies
+ * the tracks.
  *
- * `size_kb` IS HAND-WRITTEN, DELIBERATELY. It could be `statSync`'d at
- * generation time, but then the mp3 bytes would become an input to
- * SEED_VERSION — which hashes the serialised seed — so regenerating a track
- * would silently bump the seed for every returning visitor. That is exactly
- * the migration T3 exists to make safe, and it should never fire by accident.
- * A test asserts these values match the committed files, so drift is a red
- * test rather than a wrong number in Explorer.
+ * WHAT REPLACED THE OLD PROTECTIONS. `size_kb` used to be hand-written so mp3
+ * bytes could never become an input to SEED_VERSION, because a re-encode would
+ * silently re-seed every returning visitor. Scanning reintroduces that path, so
+ * the protection moved rather than vanished: the generated manifest is
+ * COMMITTED and CI diffs `src/lib/generated`, so a re-encode is a red freshness
+ * gate and a visible diff instead of a silent bump. It is a real cost — any
+ * re-encode of any one track re-seeds everyone — and it is acceptable only
+ * because vanished seed ids are now reaped (`seed.ts`), which makes re-seeds
+ * safe in a way they were not before.
  *
- * UNITS ARE KB. `VfsItem.size` is documented as KB (types.ts) and the
- * inherited wallpaper entries prove the convention; a byte value would render
- * as "3,145,728 KB" in the Details column.
+ * `duration_s` deliberately does NOT reach the VFS seed. It is player metadata,
+ * not file metadata, so only `size` feeds SEED_VERSION — unchanged from before.
  *
- * IDS ARE PERMANENT. `merge_on_reseed` carries any cached item absent from a
- * later seed, and there is no mechanism to reap one — so a renamed id would
- * persist in every returning visitor's My Music forever, alongside its
- * replacement.
+ * IDS ARE DERIVED, NOT CHOSEN — `sha256(genre/filename)`, see `scan.ts`. A
+ * rename or a move between genres therefore mints a new id and strands the old
+ * one; `merge_on_reseed` reaps it from returning visitors' drives.
+ *
+ * UNITS ARE KB. `VfsItem.size` is documented as KB (types.ts); a byte value
+ * would render as "3,145,728 KB" in the Details column.
  */
 export interface Track {
-    /** Stable VFS id. NEVER change one — see the header. */
+    /** Derived from genre + filename. See `scan.ts`. */
     id: string;
+    /** ID3 title, falling back to the filename without its extension. */
     title: string;
+    /** ID3 artist, or null when the file carries no tag. */
+    artist: string | null;
     /** File name as it appears in Explorer. */
     filename: string;
     /** Served from static/, so the player never depends on the VFS. */
     url: string;
-    /** Rounded KB, matching the committed file. Asserted by a test. */
+    /** Rounded KB, matching the committed file. */
     size_kb: number;
     /** Whole seconds, for the track list and the seek bar's initial state. */
     duration_s: number;
+    /** `dir` of the owning genre. */
+    genre: string;
+    /** Extracted cover art URL, or null when the file carries none. */
+    cover: string | null;
 }
 
-export const TRACKS: readonly Track[] = [
-    {
-        id: 'p3MusicAscentTrack00001',
-        title: 'Ascent',
-        filename: 'ascent.mp3',
-        url: '/audio/music/ascent.mp3',
-        size_kb: 167,
-        duration_s: 42,
-    },
-    {
-        id: 'p3MusicPulseTrack000001',
-        title: 'Pulse',
-        filename: 'pulse.mp3',
-        url: '/audio/music/pulse.mp3',
-        size_kb: 501,
-        duration_s: 38,
-    },
-    {
-        id: 'p3MusicDriftTrack000001',
-        title: 'Drift',
-        filename: 'drift.mp3',
-        url: '/audio/music/drift.mp3',
-        size_kb: 455,
-        duration_s: 36,
-    },
-];
+export interface Genre {
+    id: string;
+    /** Folder under `static/audio/music`. */
+    dir: string;
+    /** Display name, from `profile.json`. */
+    name: string;
+}
+
+export { TRACKS, GENRES } from '../generated/music';
 
 /** Formats seconds as `m:ss`, the way every media player does. */
 export function format_duration(seconds: number): string {

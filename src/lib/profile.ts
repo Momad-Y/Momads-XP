@@ -167,6 +167,25 @@ export interface ProfileSystemProperties {
     advanced: SystemPropertiesAdvanced;
 }
 
+/**
+ * One genre of the music library.
+ *
+ * `dir` is a folder under `static/audio/music` AND a URL segment AND an id
+ * input, so `scan_music` validates it as a plain slug. `name` carries the
+ * display text and is free of those constraints — which is the whole reason
+ * the two are separate fields rather than one folder name.
+ */
+export interface MusicGenre {
+    dir: string;
+    name: string;
+}
+
+export interface ProfileMusic {
+    genres: MusicGenre[];
+    /** Shown in the player. Content, so it lives here and not in the component. */
+    notice: string;
+}
+
 export interface Profile {
     meta: ProfileMeta;
     about: ProfileAbout;
@@ -181,6 +200,7 @@ export interface Profile {
     systemProperties: ProfileSystemProperties;
     folderOptions: ProfileFolderOptions;
     internetOptions: ProfileInternetOptions;
+    music: ProfileMusic;
 }
 
 function is_record(value: unknown): value is Record<string, unknown> {

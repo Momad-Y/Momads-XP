@@ -391,7 +391,6 @@
                 },
                 {
                     "ext": ".mp3",
-
                     "desc": "MP3 Audio — Media Player, or the fancy one"
                 }
             ],
@@ -447,5 +446,14 @@
             ],
             "note": "Restore Defaults would undo years of careful tinkering."
         }
+    },
+    "music": {
+        "genres": [
+            {
+                "dir": "demo",
+                "name": "Demo Tracks"
+            }
+        ],
+        "notice": "All music legally acquired™ · personal listening only, not for distribution."
     }
 }

@@ -29,6 +29,17 @@ async function openMyMusic(page: Page) {
     return win;
 }
 
+/**
+ * My Music now holds a folder per genre, so anything asserting on track FILES
+ * has to descend one level. The dialog only appears on the first folder entry.
+ */
+async function openGenre(page: Page, genre: string) {
+    const win = await openMyMusic(page);
+    await win.getByText(genre, { exact: true }).first().dblclick();
+    await page.waitForTimeout(450);
+    return win;
+}
+
 async function openPlayer(page: Page) {
     await page.locator('#start-menu-btn').click();
     await page.locator('#start-menu').getByText('All Programs').hover();
@@ -40,15 +51,33 @@ async function openPlayer(page: Page) {
     });
 }
 
-test('opens with the bundled track list', async ({ page }) => {
+test('opens with the discovered track list, grouped by genre', async ({
+    page,
+}) => {
     await bootToDesktop(page);
     await openPlayer(page);
 
+    // The library is scanned from static/audio/music/<genre>/*.mp3 and ordered
+    // genre-by-genre, then by filename, so these are positions in a flat list
+    // that the headers only visually divide.
     const rows = page.getByTestId('track-row');
     await expect(rows).toHaveCount(3);
     await expect(rows.nth(0)).toContainText('Ascent');
-    await expect(rows.nth(1)).toContainText('Pulse');
-    await expect(rows.nth(2)).toContainText('Drift');
+    await expect(rows.nth(1)).toContainText('Drift');
+    await expect(rows.nth(2)).toContainText('Pulse');
+
+    const headers = page.getByTestId('genre-header');
+    await expect(headers).toHaveCount(1);
+    await expect(headers.nth(0)).toHaveText('Demo Tracks');
+
+    // art slot always renders — the icon stands in when a file carries no cover
+    await expect(page.getByTestId('cover-art')).toBeVisible();
+
+    // Exact string, per CLAUDE.md. It lives in profile.json, not the
+    // component, because it is content.
+    await expect(page.getByTestId('music-notice')).toHaveText(
+        'All music legally acquired™ · personal listening only, not for distribution.',
+    );
 });
 
 test('play, pause and play again — the createMediaElementSource trap', async ({
@@ -94,27 +123,31 @@ test('next and previous wrap around the playlist', async ({ page }) => {
     const src = async () =>
         page.locator('audio').evaluate((el: HTMLAudioElement) => el.src);
 
+    // Order is FILENAME order within a genre, not the old hand-written array
+    // order — which is how the owner controls playback order, by prefixing.
     expect(await src()).toContain('ascent.mp3');
     await page.getByRole('button', { name: 'Next' }).click();
-    await expect.poll(src).toContain('pulse.mp3');
+    await expect.poll(src).toContain('drift.mp3');
 
     // Backwards past the first track must wrap to the last, not stall at 0.
     await page.getByRole('button', { name: 'Previous' }).click();
     await expect.poll(src).toContain('ascent.mp3');
     await page.getByRole('button', { name: 'Previous' }).click();
-    await expect.poll(src).toContain('drift.mp3');
+    await expect.poll(src).toContain('pulse.mp3');
 });
 
 test('clicking a track row switches to it', async ({ page }) => {
     await bootToDesktop(page);
     await openPlayer(page);
 
+    // nth(2) counts across the flat list, so a genre header between rows must
+    // not shift the mapping — which is exactly what `group.offset` guarantees.
     await page.getByTestId('track-row').nth(2).click();
     await expect
         .poll(async () =>
             page.locator('audio').evaluate((el: HTMLAudioElement) => el.src),
         )
-        .toContain('drift.mp3');
+        .toContain('pulse.mp3');
 });
 
 test('the volume slider drives the element, multiplied by the tray volume', async ({
@@ -162,7 +195,10 @@ test('Details shows KB while the status bar shows MB — in ONE window', async (
     // the test load-bearing. Asserting only the Details cell would pass on a
     // codebase where size_label had been re-routed through format_size.
     await bootToDesktop(page);
-    const win = await openMyMusic(page);
+    // Tracks moved one level down into their genre folder; the coverage did
+    // not move with them by accident — this is still the ONLY assertion that
+    // the Details column and the status bar spell sizes by different rules.
+    const win = await openGenre(page, 'Demo Tracks');
 
     // Details view. The status bar is ON by default — toggling it here would
     // turn it OFF, which is how this test first failed.
