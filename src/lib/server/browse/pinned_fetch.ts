@@ -14,6 +14,7 @@
  */
 import { Readable } from 'node:stream';
 import type { LookupAddress } from 'node:dns';
+import { SITE_URL } from '../../site';
 
 export interface PinnedRequest {
     url: string;
@@ -86,8 +87,7 @@ export async function pinned_fetch(
                 headers: {
                     // Identify honestly and ask for a document. No cookies, no
                     // auth: none are added anywhere.
-                    'User-Agent':
-                        'Mozilla/5.0 (compatible; MomadsXP/1.0; +https://momad-xp.netlify.app)',
+                    'User-Agent': `Mozilla/5.0 (compatible; MomadsXP/1.0; +${SITE_URL})`,
                     Accept: 'text/html,application/xhtml+xml,*/*;q=0.8',
                     'Accept-Language': 'en',
                     Host: parsed.host,

@@ -246,7 +246,7 @@ export const GET: RequestHandler = async (event) => {
         /**
          * NOT a 302. Redirecting to whatever URL was asked for made this an
          * open redirect on our own domain — anyone could hand out
-         * `momad-xp.netlify.app/api/browse?url=…` and have it launder a link
+         * `<our-domain>/api/browse?url=…` and have it launder a link
          * to somewhere else — and the 302/200/502 split was a clean signal for
          * probing which hosts answer.
          *
