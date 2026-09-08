@@ -69,6 +69,45 @@ function entry_file(
     };
 }
 
+/**
+ * The display filename for an asset URL — used so a file's name is not spelled
+ * a second time beside the URL that already contains it.
+ *
+ * `ext` derived from this is NOT cosmetic: it picks the icon (`file_icon.ts`),
+ * prints the Type cell (`details_columns.ts`) and selects the double-click
+ * handler (`system.ts` doctypes). So a query string or fragment must be
+ * stripped — `.pdf?v=2` would silently unbind the PDF viewer — and a decoded
+ * `/` must be refused, because `cmd/path.ts` splits names on it.
+ *
+ * Throws rather than degrading. This runs at generation time AND, through
+ * `python/mirror.ts`, in the browser; but a bad value cannot reach production
+ * because `npm run generate:vfs` runs in CI, so failing loudly here surfaces an
+ * authoring mistake at the only moment anyone can act on it. Same stance as the
+ * duplicate-id throw above.
+ */
+export function file_name_from_url(url: string): string {
+    const path = url.split(/[?#]/)[0] ?? '';
+    const last = path.slice(path.lastIndexOf('/') + 1);
+    let decoded: string;
+    try {
+        decoded = decodeURIComponent(last);
+    } catch {
+        // a stray `%` is not valid percent-encoding; the raw segment is the
+        // honest reading and the checks below still apply to it
+        decoded = last;
+    }
+    if (decoded === '') {
+        throw new Error(`vfs_gen: no filename in asset URL "${url}"`);
+    }
+    if (decoded.includes('/') || decoded.includes('\\')) {
+        throw new Error(
+            `vfs_gen: asset URL "${url}" decodes to a name containing a path ` +
+                `separator ("${decoded}") — it would be unaddressable from CMD`,
+        );
+    }
+    return decoded;
+}
+
 export function build_portfolio(profile: Profile): PortfolioBuild {
     const items: Record<string, VfsItem> = {};
     const entry_ids: string[] = [];
@@ -139,15 +178,21 @@ export function build_portfolio(profile: Profile): PortfolioBuild {
     }
 
     const resume_file_id = 'p2FileResumePdf';
+    const resume_url = profile.meta.resumePdf;
+    const resume_filename = file_name_from_url(resume_url);
+    const resume_dot = resume_filename.lastIndexOf('.');
     add({
         // parent stamped by the generator script
         ...base_item(resume_file_id, ''),
         type: 'file',
-        basename: 'Mohamed_Abdelnasser_Resume',
-        name: 'Mohamed_Abdelnasser_Resume.pdf',
-        ext: '.pdf',
+        basename:
+            resume_dot > 0
+                ? resume_filename.slice(0, resume_dot)
+                : resume_filename,
+        name: resume_filename,
+        ext: resume_dot > 0 ? resume_filename.slice(resume_dot) : '',
         storage_type: 'remote',
-        url: profile.meta.resumePdf,
+        url: resume_url,
         size: 61,
     });
 

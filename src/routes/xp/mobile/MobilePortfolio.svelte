@@ -43,7 +43,7 @@
         <span
             class="text-slate-50 text-[13px] font-bold truncate"
             style="text-shadow: 1px 1px 1px rgba(0,0,0,0.5);"
-            >Momad's XP — AI Engineer</span
+            >Momad's XP — {profile.meta.title}</span
         >
     </div>
 
