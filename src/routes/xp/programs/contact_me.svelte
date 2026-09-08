@@ -387,7 +387,7 @@
             <div
                 class="shrink-0 px-3 py-1 border-t border-stone-300 text-[11px] text-slate-700"
             >
-                Compose a message to Mohamed
+                Compose a message to {profile.meta.firstName}
             </div>
         {/if}
     </div>

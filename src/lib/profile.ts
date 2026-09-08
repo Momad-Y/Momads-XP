@@ -16,6 +16,15 @@ export interface ProfileImage {
 export interface ProfileMeta {
     name: string;
     shortName: string;
+    /**
+     * The owner's given name, as they are addressed directly.
+     *
+     * Data, not a heuristic: deriving it as "token 0 of `name`" would be a
+     * naming POLICY living inside a component, and it is wrong for any culture
+     * that puts the family name first. `shortName` is the product nickname
+     * ("Momad"), which is a different thing again.
+     */
+    firstName: string;
     title: string;
     tagline: string;
     location: string;
