@@ -23,6 +23,7 @@ import {
     wrap,
     wrap_items,
 } from './format';
+import { copy } from '../profile';
 import {
     children_of,
     display_path,
@@ -74,8 +75,7 @@ const NO_DRIVE: FsResult = {
  * makes that joke land badly, so it lands here instead and then does the
  * useful thing anyway.
  */
-const DIR_ASIDE =
-    "dir: this shell only speaks Linux. Showing you 'ls' instead.";
+const DIR_ASIDE = copy.dirAside;
 
 /** Peel a leading `-a` / `--all`; everything after it is the path. */
 function take_all_flag(rest: string): { all: boolean; path: string } {

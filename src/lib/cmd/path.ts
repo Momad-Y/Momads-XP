@@ -125,8 +125,8 @@ export function display_path(id: string, drive: HardDrive): string {
  *
  * In `children` ORDER, never sorted. Explorer renders the same array
  * (`Viewer2.svelte:23-29`) so the two views agree, and the seed order is
- * reverse-chronological — alphabetising would open the CV with "Corporatica,
- * Mentorness, Printerpix" instead of the current role first.
+ * reverse-chronological — alphabetising would open the CV at whichever
+ * employer happens to sort first, instead of the current role.
  */
 export function children_of(
     id: string,

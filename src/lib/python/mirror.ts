@@ -29,7 +29,7 @@ import type { PortfolioDetail } from '../portfolio';
 
 /** One node of the tree handed to the worker. Directories have no `text`. */
 export interface MirrorEntry {
-    /** Path under `/c`, e.g. `Experience/Printerpix — AI Engineer.txt`. */
+    /** Path under `/c`, e.g. `Experience/<Employer> — <Role>.txt`. */
     path: string;
     /** Present for files, absent for directories. */
     text?: string;

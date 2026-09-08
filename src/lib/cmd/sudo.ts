@@ -12,13 +12,14 @@
  *
  * The user's name is always DERIVED from `profile.meta.shortName`. §3.2 requires
  * command output to be sourced from JSON and CLAUDE.md forbids hardcoded
- * personal content; the jokes are the shell's voice and may be literals.
+ * personal content; the jokes are the shell's voice and live in
+ * profile.json's `copy.sudo`, so they are reworded there, not here.
  */
 import { accent, dim_accent, wrap } from './format';
+import { copy, fill_copy } from '../profile';
 
 /** The classic, which every branch that refuses still opens with. */
-const SUDOERS = (user: string) =>
-    `${user} is not in the sudoers file. This incident will be reported.`;
+const SUDOERS = (user: string) => fill_copy(copy.sudo.sudoers, { user });
 
 /**
  * EVERY branch returns through here.
@@ -50,37 +51,22 @@ export function run_sudo(args: string[], user: string): string[] {
     const first = args[0]?.toLowerCase() ?? '';
 
     if (command.length === 0) {
-        return say(
-            'usage: sudo <command>',
-            'Everyone tries `sudo make me a sandwich` eventually. You may as well get it over with.',
-        );
+        return say(copy.sudo.usage.headline, copy.sudo.usage.aside);
     }
 
     // xkcd 149. The whole joke is that sudo makes it work, so this branch is
     // the one place the command does NOT refuse.
     if (command === 'make me a sandwich') {
-        return say(
-            'Okay.',
-            'Made you a sandwich. It is not a real sandwich, on account of this not being a real computer. Enjoy it anyway.',
-        );
+        return say(copy.sudo.sandwich.headline, copy.sudo.sandwich.aside);
     }
 
     if (first === 'sudo') {
-        return say(
-            'Yes. I heard you the first time.',
-            'Saying it twice does not make you more of an administrator.',
-        );
+        return say(copy.sudo.repeated.headline, copy.sudo.repeated.aside);
     }
 
     if (first === 'rm') {
-        return say(
-            SUDOERS(user),
-            'You also just tried to delete a website from inside the website. Bold. Circular. Denied.',
-        );
+        return say(SUDOERS(user), copy.sudo.removeAside);
     }
 
-    return say(
-        SUDOERS(user),
-        'There is no root here, there is barely a filesystem. You are one tab away from closing the entire operating system, which is arguably more power than root.',
-    );
+    return say(SUDOERS(user), copy.sudo.deniedAside);
 }

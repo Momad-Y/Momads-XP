@@ -7,7 +7,7 @@
     import Dialog from '../../../lib/components/xp/Dialog.svelte';
     import { mount, unmount } from 'svelte';
     import { queueProgram, runningPrograms, zIndex } from '../../../lib/store';
-    import { profile } from '../../../lib/profile';
+    import { copy, fill_copy, profile } from '../../../lib/profile';
     import { PROJECTS_FOLDER_ID } from '../../../lib/generated/vfs_ids';
     import { required } from '../../../lib/types';
     import type {
@@ -80,8 +80,12 @@
         const dialog: MountedComponent = mount(Dialog, {
             target,
             props: {
-                title: 'About Momad',
-                message: `${profile.meta.name} — ${profile.meta.title}, ${profile.meta.location}. Built into Momad's XP. Very Professional.`,
+                title: copy.aboutDialog.title,
+                message: fill_copy(copy.aboutDialog.message, {
+                    name: profile.meta.name,
+                    title: profile.meta.title,
+                    location: profile.meta.location,
+                }),
                 icon: '/assets/icons/about-me.png',
                 get_self: () => dialog,
                 buttons: [
@@ -122,7 +126,9 @@
         },
         {
             name: 'Help',
-            items: [[{ name: 'About Momad', action: show_about_dialog }]],
+            items: [
+                [{ name: copy.aboutDialog.title, action: show_about_dialog }],
+            ],
         },
     ];
 
