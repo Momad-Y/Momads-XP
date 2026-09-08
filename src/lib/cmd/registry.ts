@@ -10,6 +10,7 @@
  * `profile.meta.shortName` rather than the literal the plan originally
  * specified.
  */
+import { copy } from '../profile';
 import type { Profile } from '../profile';
 import { run_sudo } from './sudo';
 import {
@@ -51,13 +52,13 @@ function join_blocks(blocks: string[][]): string[] {
 }
 
 /**
- * `whoami`'s remark. Kept beside the command set rather than inline so the
- * prose is wrapped by the same formatter as every other paragraph in the
- * terminal and cannot drift past 72 columns.
+ * `whoami`'s remark, from profile.json's `copy.whoamiAside`.
+ *
+ * Aliased here rather than read inline so it still passes through the same
+ * `wrap` as every other paragraph in the terminal and cannot drift past 72
+ * columns — the reason it was a module constant before it was content.
  */
-const WHOAMI_ASIDE =
-    '...is whose computer this is. You, on the other hand, are a guest who ' +
-    'arrived through a browser tab.';
+const WHOAMI_ASIDE = copy.whoamiAside;
 
 function bio_lines(profile: Profile): string[] {
     return profile.about.bio.flatMap((para, i) => [
@@ -159,10 +160,10 @@ export const COMMANDS: readonly Command[] = [
     {
         name: 'whoami',
         summary: 'print the current user',
-        // The NAME is derived, never a literal: §3.2 requires all output to come
-        // from JSON, and CLAUDE.md forbids hardcoded personal content. The
-        // aside underneath is the shell's own voice, which is why it can be a
-        // literal — it says nothing about Momad.
+        // The NAME is derived, never a literal: §3.2 requires all output to
+        // come from JSON, and CLAUDE.md forbids hardcoded personal content.
+        // The aside underneath is the owner's voice, so it comes from
+        // profile.json too — same file, different key.
         //
         // The first line stays exactly the bare username, so `whoami` still
         // ANSWERS before it jokes; the aside is dimmed to read as a remark
@@ -257,7 +258,7 @@ export const COMMANDS: readonly Command[] = [
     },
     {
         name: 'dir',
-        summary: 'what a Windows person types; it runs ls',
+        summary: copy.commandJokes.dir,
         run: () => [],
     },
     {
@@ -269,17 +270,17 @@ export const COMMANDS: readonly Command[] = [
     },
     {
         name: 'matrix',
-        summary: 'follow the white rabbit',
+        summary: copy.commandJokes.matrix,
         run: () => [],
     },
     {
         name: 'hack',
-        summary: 'initiate a totally real intrusion',
+        summary: copy.commandJokes.hack,
         run: () => [],
     },
     {
         name: 'sudo',
-        summary: 'attempt to elevate privileges',
+        summary: copy.commandJokes.sudo,
         // Branches and jokes live in `sudo.ts`; the name stays derived here.
         run: (args, profile) =>
             run_sudo(args, profile.meta.shortName.toLowerCase()),

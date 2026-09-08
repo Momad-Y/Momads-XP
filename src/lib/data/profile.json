@@ -456,5 +456,199 @@
             }
         ],
         "notice": "All music legally acquired™ · personal listening only, not for distribution."
+    },
+    "copy": {
+        "loginStatus": "1337 programs running.",
+        "aboutDialog": {
+            "title": "About Momad",
+            "message": "{name} — {title}, {location}. Built into Momad's XP. Very Professional."
+        },
+        "terminalWelcome": [
+            {
+                "text": "Welcome to Momad's XP Terminal",
+                "tone": "accent"
+            },
+            {
+                "text": "Type 'help' to see available commands.",
+                "tone": "plain"
+            },
+            {
+                "text": "Navigate my portfolio like a filesystem — try 'ls' or 'cd experience'.",
+                "tone": "plain"
+            },
+            {
+                "text": "",
+                "tone": "plain"
+            },
+            {
+                "text": "That's 'ls', not 'dir'. The title bar says Command Prompt; the",
+                "tone": "dim"
+            },
+            {
+                "text": "shell inside it disagrees, and I sided with the shell.",
+                "tone": "dim"
+            },
+            {
+                "text": "",
+                "tone": "plain"
+            }
+        ],
+        "whoamiAside": "...is whose computer this is. You, on the other hand, are a guest who arrived through a browser tab.",
+        "pythonGreeting": "Welcome to Momad's XP",
+        "sudo": {
+            "sudoers": "{user} is not in the sudoers file. This incident will be reported.",
+            "usage": {
+                "headline": "usage: sudo <command>",
+                "aside": "Everyone tries `sudo make me a sandwich` eventually. You may as well get it over with."
+            },
+            "sandwich": {
+                "headline": "Okay.",
+                "aside": "Made you a sandwich. It is not a real sandwich, on account of this not being a real computer. Enjoy it anyway."
+            },
+            "repeated": {
+                "headline": "Yes. I heard you the first time.",
+                "aside": "Saying it twice does not make you more of an administrator."
+            },
+            "removeAside": "You also just tried to delete a website from inside the website. Bold. Circular. Denied.",
+            "deniedAside": "There is no root here, there is barely a filesystem. You are one tab away from closing the entire operating system, which is arguably more power than root."
+        },
+        "matrixIntro": [
+            {
+                "text": "Wake up, Neo...",
+                "aside": false
+            },
+            {
+                "text": "The rain does not stop on its own. Nothing does, in here.",
+                "aside": false
+            },
+            {
+                "text": "There is no exit key. There is only Ctrl+C.",
+                "aside": false
+            },
+            {
+                "text": "(You already knew that. You have always known that.)",
+                "aside": true
+            }
+        ],
+        "hackScript": [
+            {
+                "kind": "step",
+                "text": "Locating mainframe",
+                "dots": 6,
+                "tag": "FOUND"
+            },
+            {
+                "kind": "step",
+                "text": "Bypassing firewall (all seven of them)",
+                "dots": 5,
+                "tag": "BYPASSED"
+            },
+            {
+                "kind": "step",
+                "text": "Brute-forcing admin password",
+                "dots": 8,
+                "tag": "it was 'password1'"
+            },
+            {
+                "kind": "step",
+                "text": "Escalating to root",
+                "dots": 6,
+                "tag": "DENIED"
+            },
+            {
+                "kind": "step",
+                "text": "Escalating to root, but saying please",
+                "dots": 5,
+                "tag": "GRANTED"
+            },
+            {
+                "kind": "step",
+                "text": "Rerouting through 12 proxies in 4 countries",
+                "dots": 4,
+                "tag": "ROUTED"
+            },
+            {
+                "kind": "step",
+                "text": "Decrypting RSA-8192 with a bent paperclip",
+                "dots": 7,
+                "tag": "DONE"
+            },
+            {
+                "kind": "progress",
+                "label": "Downloading the entire internet"
+            },
+            {
+                "kind": "step",
+                "text": "Accepting 4,281 cookie consent banners",
+                "dots": 5,
+                "tag": "AGREED"
+            },
+            {
+                "kind": "step",
+                "text": "Selecting all squares with traffic lights",
+                "dots": 6,
+                "tag": "FAILED"
+            },
+            {
+                "kind": "step",
+                "text": "Selecting all squares with traffic lights (try 9)",
+                "dots": 4,
+                "tag": "OK"
+            },
+            {
+                "kind": "step",
+                "text": "Uploading virus to the GUI in Visual Basic",
+                "dots": 5,
+                "tag": "UPLOADED"
+            },
+            {
+                "kind": "step",
+                "text": "Deleting System32 to free up space",
+                "dots": 6,
+                "tag": "just kidding"
+            },
+            {
+                "kind": "step",
+                "text": "Covering our tracks",
+                "dots": 5,
+                "tag": "COVERED"
+            },
+            {
+                "kind": "line",
+                "text": "ACCESS GRANTED."
+            },
+            {
+                "kind": "aside",
+                "text": "You now have unrestricted root access to, and total control over,"
+            },
+            {
+                "kind": "aside",
+                "text": "this web page. Which you already had."
+            },
+            {
+                "kind": "aside",
+                "text": "Nothing was hacked. It is a portfolio. Try 'projects'."
+            }
+        ],
+        "loginHints": {
+            "begin": "To begin, click 'My' user name",
+            "accounts": [
+                "After you log on, you 'can't' add or change accounts.",
+                "Don't go to Control Panel."
+            ]
+        },
+        "dirAside": "dir: this shell only speaks Linux. Showing you 'ls' instead.",
+        "commandJokes": {
+            "dir": "what a Windows person types; it runs ls",
+            "matrix": "follow the white rabbit",
+            "hack": "initiate a totally real intrusion",
+            "sudo": "attempt to elevate privileges"
+        },
+        "colorRefusal": {
+            "headline": "Black text on a black background. Bold choice, genius.",
+            "aside": "Refusing, on the grounds that you would never find the prompt again."
+        },
+        "placeholderNotice": "{name} is under construction — coming in a later phase.",
+        "contactRateLimit": "That was fast! Please wait a moment and try sending again."
     }
 }

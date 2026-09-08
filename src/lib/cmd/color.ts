@@ -9,6 +9,7 @@
  */
 import { colour, FG_GREY, FG_YELLOW } from '../term/ansi';
 import { XP_CONSOLE_THEME } from '../term/theme';
+import { copy } from '../profile';
 
 /**
  * The one non-hex argument `color` accepts. Exported so the completer offers
@@ -88,14 +89,8 @@ function too_dark_message(color: ParsedColor): string[] {
     const pure_black = color.r === 0 && color.g === 0 && color.b === 0;
     return pure_black
         ? [
-              colour(
-                  'Black text on a black background. Bold choice, genius.',
-                  FG_YELLOW,
-              ),
-              colour(
-                  'Refusing, on the grounds that you would never find the prompt again.',
-                  FG_GREY,
-              ),
+              colour(copy.colorRefusal.headline, FG_YELLOW),
+              colour(copy.colorRefusal.aside, FG_GREY),
           ]
         : [
               colour(

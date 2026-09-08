@@ -128,7 +128,7 @@ describe('children_of', () => {
     });
 
     it('preserves children order, which is reverse-chronological', () => {
-        // Alphabetical would open the CV with Corporatica. The seed order is
+        // Alphabetical would open the CV at the wrong employer. The seed order is
         // the CV order and Explorer renders the same array.
         const names = children_of(EXPERIENCE, drive).map((i) => i.basename);
         expect(names[0]).toBe('Printerpix — AI Engineer');

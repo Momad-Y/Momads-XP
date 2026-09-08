@@ -113,7 +113,7 @@ export function word_at(
  * Locate the path segment under the cursor, for `cd`/`ls`/`cat`/`dir`.
  *
  * `word_at` cannot do this. It splits on the last space (see above), and the
- * names on this drive are full of spaces — `My Music`, `Printerpix — AI
+ * names on this drive are full of spaces — `My Music`, `<Employer> — <Role>
  * Engineer.txt` — so completing `cd My Mu` through it would filter
  * `'My Music'.startsWith('Mu')` and find nothing. The path argument is instead
  * everything from after the command (and its `-a`, if any) to the cursor, with
@@ -161,7 +161,7 @@ function path_target(
  *
  * The slash is not decoration. The path argument is the raw remainder of the
  * line, so a trailing SPACE after a directory would make `cd Experience ` plus
- * a filename read as one segment called `Experience Printerpix…` and match
+ * a filename read as one segment called `Experience <Employer>…` and match
  * nothing. `/` is both the separator and the signal there is more to type.
  */
 function terminated(name: string, directory: boolean): string {
@@ -242,7 +242,7 @@ export function complete(
 
     // A single match is finished for the visitor, terminator included — that
     // is what makes `col<Tab>#ff8800` possible without a manual space, and
-    // what lets `cd Ex<Tab>Printerpix` keep going without one.
+    // what lets `cd Ex<Tab><Employer>` keep going without one.
     const insertion =
         candidates.length === 1
             ? path == null

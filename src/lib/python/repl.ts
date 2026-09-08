@@ -20,6 +20,7 @@
 import { colour, CRLF, FG_GREY, FG_RED, FG_YELLOW } from '../term/ansi';
 import { sanitise_runtime_text } from './sanitise';
 import type { FromRuntime } from './protocol';
+import { copy } from '../profile';
 
 /**
  * Python's own prompt colours, NOT the terminal accent.
@@ -317,7 +318,7 @@ export function on_eof(state: ReplState): ReplResult {
 }
 
 /** §3.2's pre-loaded greeting, evaluated before the banner is announced. */
-export const PYTHON_GREETING = 'print("Welcome to Momad\'s XP")';
+export const PYTHON_GREETING = `print(${JSON.stringify(copy.pythonGreeting)})`;
 
 /** Shown while the runtime downloads, by every host. */
 export const PYTHON_LOADING = colour('Loading Python runtime…', FG_GREY) + CRLF;

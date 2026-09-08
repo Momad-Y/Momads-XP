@@ -7,6 +7,7 @@
     import { runningPrograms } from '../../../lib/store';
     import { placeholder_display } from '../../../lib/placeholder';
     import { required } from '../../../lib/types';
+    import { copy, fill_copy } from '../../../lib/profile';
     import type {
         ProgramInstance,
         VfsItem,
@@ -52,7 +53,7 @@
                 style:background-image="url({display.icon})"
             ></div>
             <p class="text-[11px] text-slate-800">
-                {display.name} is under construction — coming in a later phase.
+                {fill_copy(copy.placeholderNotice, { name: display.name })}
             </p>
         </div>
         <div class="flex flex-row justify-center pb-1">

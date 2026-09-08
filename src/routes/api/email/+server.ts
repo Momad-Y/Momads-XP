@@ -111,7 +111,7 @@ export const POST: RequestHandler = async (event) => {
                 from: email_from(),
                 // Resend's sandbox compares the recipient against the
                 // account email CASE-SENSITIVELY — normalize (verified via
-                // API log: 403 for Mohamed.Y.… vs account mohamed.y.…).
+                // API log: 403 for Name.Y.… vs account name.y.…).
                 to: [profile.meta.email.toLowerCase()],
                 reply_to: result.value.from_email,
                 subject: `[Momad's XP] ${result.value.subject}`,
