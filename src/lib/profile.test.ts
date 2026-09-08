@@ -1,5 +1,6 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { profile } from './profile';
+import { copy, fill_copy, profile, to_beat, to_tone } from './profile';
 
 describe('profile integrity', () => {
     it('has complete meta with the Phase-1 asset paths', () => {
@@ -114,5 +115,116 @@ describe('profile integrity', () => {
         expect(Object.isFrozen(profile.meta)).toBe(true);
         expect(Object.isFrozen(profile.experience)).toBe(true);
         expect(Object.isFrozen(profile.experience[0])).toBe(true);
+    });
+});
+
+describe('fill_copy', () => {
+    it('substitutes named placeholders', () => {
+        expect(fill_copy('{a} and {b}', { a: 'x', b: 'y' })).toBe('x and y');
+    });
+
+    it('leaves an unknown placeholder visible rather than printing undefined', () => {
+        // a typo in profile.json should show as braces in the UI, not as a
+        // broken sentence with `undefined` in it
+        expect(fill_copy('hi {nope}', { a: 'x' })).toBe('hi {nope}');
+    });
+
+    it('is a no-op for copy with no placeholders', () => {
+        expect(fill_copy('plain text', {})).toBe('plain text');
+    });
+});
+
+describe('copy', () => {
+    it('gives every hack step real dots and a tag', () => {
+        // `to_beat` only checks these are present, so a `dots: 0` beat parses
+        // and would render as a step with no animation
+        for (const beat of copy.hackScript) {
+            if (beat.kind !== 'step') continue;
+            expect(beat.dots).toBeGreaterThan(0);
+            expect(beat.tag).not.toBe('');
+        }
+    });
+
+    it('carries the placeholders its consumers fill', () => {
+        // a renamed placeholder would render as literal braces in the About
+        // dialog and the sudoers line, which is quiet but wrong
+        expect(copy.aboutDialog.message).toContain('{name}');
+        expect(copy.sudo.sudoers).toContain('{user}');
+    });
+
+    it('is frozen, like the rest of the profile', () => {
+        expect(Object.isFrozen(copy)).toBe(true);
+    });
+});
+
+/*
+ * The validators, tested DIRECTLY.
+ *
+ * Asserting "every tone in copy.terminalWelcome is known" cannot fail: a bad
+ * tone throws while this file is being imported, so the assertion never runs.
+ * Reaching for the functions is the only way to exercise the rejecting half —
+ * which is also the half that has no other coverage.
+ */
+describe('to_tone', () => {
+    it('accepts the three slots the terminal can render', () => {
+        expect(to_tone('accent')).toBe('accent');
+        expect(to_tone('plain')).toBe('plain');
+        expect(to_tone('dim')).toBe('dim');
+    });
+
+    it('names the offending value when it refuses', () => {
+        expect(() => to_tone('acccent')).toThrow(/copy tone "acccent"/);
+        expect(() => to_tone('')).toThrow(/must be accent, plain or dim/);
+    });
+});
+
+describe('to_beat', () => {
+    it('narrows each beat kind to its own shape', () => {
+        expect(
+            to_beat({ kind: 'step', text: 'a', dots: 3, tag: 'OK' }),
+        ).toEqual({
+            kind: 'step',
+            text: 'a',
+            dots: 3,
+            tag: 'OK',
+        });
+        expect(to_beat({ kind: 'progress', label: 'l' })).toEqual({
+            kind: 'progress',
+            label: 'l',
+        });
+        expect(to_beat({ kind: 'aside', text: 'a' })).toEqual({
+            kind: 'aside',
+            text: 'a',
+        });
+    });
+
+    it('refuses a beat missing the fields its kind needs', () => {
+        expect(() => to_beat({ kind: 'step', text: 'a' })).toThrow(
+            /needs text, dots and tag/,
+        );
+        expect(() => to_beat({ kind: 'progress' })).toThrow(/needs a label/);
+        expect(() => to_beat({ kind: 'line' })).toThrow(/line beat needs text/);
+    });
+
+    it('refuses a kind the renderer has no branch for', () => {
+        expect(() => to_beat({ kind: 'explosion', text: 'x' })).toThrow(
+            /unknown hack beat kind "explosion"/,
+        );
+    });
+});
+
+describe('copy that is duplicated outside the bundle', () => {
+    it('keeps static/help.html saying the same thing as the login screen', () => {
+        /*
+         * `static/help.html` is served as a plain file — it cannot import
+         * profile.json, so this one joke genuinely lives in two places. That
+         * is the drift this whole refactor exists to end, so it is asserted
+         * instead of hoped for: reword `copy.loginHints.accounts` and this
+         * goes red until help.html is reworded too.
+         */
+        const html = readFileSync('static/help.html', 'utf8');
+        // the HTML wraps mid-sentence, so compare on collapsed whitespace
+        const flat = html.replace(/\s+/g, ' ');
+        expect(flat).toContain(copy.loginHints.accounts.join(' '));
     });
 });

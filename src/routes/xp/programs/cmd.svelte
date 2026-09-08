@@ -6,7 +6,7 @@
     import { hardDrive, runningPrograms } from '../../../lib/store';
     import { required } from '../../../lib/types';
     import Terminal from '../../../lib/components/xp/Terminal.svelte';
-    import { profile } from '../../../lib/profile';
+    import { copy, profile } from '../../../lib/profile';
     import { execute, normalise_spacing } from '../../../lib/cmd/registry';
     import { complete } from '../../../lib/cmd/complete';
     import {
@@ -905,21 +905,15 @@
         // title bar says Command Prompt and the shell inside it takes `ls`.
         // Saying so up front is also what makes `dir` a joke rather than a
         // dead end.
-        write_lines([
-            colour("Welcome to Momad's XP Terminal", FG_BRIGHT_GREEN),
-            "Type 'help' to see available commands.",
-            "Navigate my portfolio like a filesystem — try 'ls' or 'cd experience'.",
-            '',
-            colour(
-                "That's 'ls', not 'dir'. The title bar says Command Prompt; the",
-                FG_GREY,
-            ),
-            colour(
-                'shell inside it disagrees, and I sided with the shell.',
-                FG_GREY,
-            ),
-            '',
-        ]);
+        // The lines and their tones are the owner's, from profile.json's
+        // `copy.terminalWelcome`; only the palette slots are this component's.
+        write_lines(
+            copy.terminalWelcome.map(({ text, tone }) => {
+                if (tone === 'accent') return colour(text, FG_BRIGHT_GREEN);
+                if (tone === 'dim') return colour(text, FG_GREY);
+                return text;
+            }),
+        );
         prompt();
         term?.focus();
     }

@@ -19,6 +19,8 @@
  * would stop following `color`, since only bright green is repainted.
  */
 import { colour, DIM, FG_BRIGHT_GREEN } from '../term/ansi';
+import { copy } from '../profile';
+import type { MatrixIntroLine } from '../profile';
 
 /** Half-width katakana and digits — the glyph set the effect is known for. */
 export const MATRIX_GLYPHS =
@@ -39,31 +41,17 @@ const MAX_TRAIL = 16;
 const MIN_SPEED = 0.35;
 const MAX_SPEED = 1.1;
 
-export interface MatrixIntroLine {
-    text: string;
-    /** Rendered DIM, for the parenthetical. */
-    aside: boolean;
-}
+export type { MatrixIntroLine };
 
 /**
- * The warning, which exists because the egg no longer stops on its own.
+ * The warning, from `profile.json`'s `copy.matrixIntro`.
  *
- * An infinite animation that does not say how to leave is a trap, and this one
- * deliberately ignores every key except Ctrl+C — so the instruction is not
- * decoration, it is the only documentation of the exit.
+ * It exists because the egg no longer stops on its own: an infinite animation
+ * that does not say how to leave is a trap, and this one deliberately ignores
+ * every key except Ctrl+C — so the instruction is not decoration, it is the
+ * only documentation of the exit.
  */
-export const MATRIX_INTRO: readonly MatrixIntroLine[] = [
-    { text: 'Wake up, Neo...', aside: false },
-    {
-        text: 'The rain does not stop on its own. Nothing does, in here.',
-        aside: false,
-    },
-    { text: 'There is no exit key. There is only Ctrl+C.', aside: false },
-    {
-        text: '(You already knew that. You have always known that.)',
-        aside: true,
-    },
-];
+export const MATRIX_INTRO: readonly MatrixIntroLine[] = copy.matrixIntro;
 
 export interface MatrixColumn {
     /** Row index of the falling head. Negative while still above the screen. */

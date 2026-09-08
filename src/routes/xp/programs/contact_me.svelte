@@ -7,7 +7,7 @@
     import Dialog from '../../../lib/components/xp/Dialog.svelte';
     import { mount, unmount } from 'svelte';
     import { runningPrograms, zIndex } from '../../../lib/store';
-    import { profile } from '../../../lib/profile';
+    import { copy, profile } from '../../../lib/profile';
     import { validate_contact_form } from '../../../lib/contact';
     import { required } from '../../../lib/types';
     import type {
@@ -228,9 +228,7 @@
                     'The mail server is busy. Please try again in a little while.',
                 );
             } else if (res.status === 422) {
-                show_dialog(
-                    'That was fast! Please wait a moment and try sending again.',
-                );
+                show_dialog(copy.contactRateLimit);
             } else {
                 show_dialog(
                     'The message could not be sent. Please try again later.',

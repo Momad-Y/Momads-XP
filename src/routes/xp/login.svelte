@@ -1,6 +1,6 @@
 <script lang="ts">
     import { createEventDispatcher } from 'svelte';
-    import { profile } from '../../lib/profile';
+    import { copy, profile } from '../../lib/profile';
     import type { LoadPageEvent } from '../../lib/types';
 
     // eslint-disable-next-line @typescript-eslint/no-deprecated -- legacy component-event dispatcher kept as-is; matches the sibling boot screens
@@ -50,7 +50,7 @@
                     class="mt-6 text-slate-50 text-[17px]"
                     style="text-shadow: 1px 1px 2px rgba(0,0,0,0.35);"
                 >
-                    To begin, click 'My' user name
+                    {copy.loginHints.begin}
                 </p>
             </div>
         </div>
@@ -82,7 +82,7 @@
                         >{profile.meta.name}</span
                     >
                     <span class="text-slate-50 text-[11px] font-bold"
-                        >1337 programs running.</span
+                        >{copy.loginStatus}</span
                     >
                 </div>
             </div>
@@ -111,8 +111,8 @@
             <span class="text-slate-50 text-[16px]">Restart Momad's XP</span>
         </div>
         <p class="text-slate-100 text-[11px] text-right leading-snug">
-            After you log on, you 'can't' add or change accounts.<br />
-            Don't go to Control Panel.
+            {copy.loginHints.accounts[0]}<br />
+            {copy.loginHints.accounts[1]}
         </p>
     </div>
 </div>
