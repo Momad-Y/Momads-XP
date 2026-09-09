@@ -1,6 +1,6 @@
 # Momad's XP — Specification
 
-> A Windows XP-faithful portfolio website for Mohamed Abdelnasser, AI Engineer.
+> A Windows XP-faithful portfolio website for Mohamed Youssef Abdelnasser, AI Engineer.
 > Single source of truth for development.
 
 ---
@@ -23,7 +23,7 @@
 
 ## 1. Vision & Concept
 
-**Momad's XP** is a personal portfolio website that faithfully recreates the Windows XP operating system in the browser. It is not a parody or novelty — it is a fully interactive desktop environment used as a medium to present Mohamed Abdelnasser's work as an AI Engineer.
+**Momad's XP** is a personal portfolio website that faithfully recreates the Windows XP operating system in the browser. It is not a parody or novelty — it is a fully interactive desktop environment used as a medium to present Mohamed Youssef Abdelnasser's work as an AI Engineer.
 
 **Core principles:**
 
@@ -36,7 +36,7 @@
 - Desktop-focused — primary experience targets 1280x720+; mobile gets a simplified fallback
 - Proven base — built on [win32.run.cf](https://github.com/ducbao414/win32.run.cf) (MIT), the author-refactored Svelte 5 build of [win32.run](https://win32.run), stripped and rebranded in Phase 0 rather than rebuilding the XP shell from scratch
 
-**Positioning:** Mohamed Abdelnasser — AI Engineer | Automation Systems | Robotics | RoboCup @Home Champion. Based in Dubai, UAE. B.Sc. in AI (Intelligent Systems, Excellent with Honors) from AAST.
+**Positioning:** Mohamed Youssef Abdelnasser — AI Engineer | Agentic AI, LLMs, RAG | LangChain, LangGraph, Python. Based in Dubai, UAE. B.Sc. in AI (Intelligent Systems, Excellent with Honours) from AAST.
 
 ---
 
@@ -109,23 +109,22 @@ All transitions should use CSS animations (no JS-driven frame loops). The XP sta
 ```
 My Computer
 ├── Experience/
-│   ├── Printerpix — AI Engineer
+│   ├── Printerpix — Agentic AI Engineer
 │   ├── Udacity — Session Lead
 │   ├── Robotics Club AASTMT — VP of Software Development
-│   ├── Corporatica — NLP Intern
-│   ├── RoboCup Federation — AI & Robotics Engineer
+│   ├── Corporatica — AI Engineer Intern
+│   ├── RoboCup@Home — AAST Robotics Team — AI & Robotics Engineer
 │   └── Mentorness — ML Intern
 ├── Projects/
 │   ├── [Project entries from JSON]
 │   └── ...
 ├── Education/
 │   ├── AAST — B.Sc. Artificial Intelligence
-│   └── Al Ma'arifa International Private School
 ├── Skills/
-│   ├── AI & Machine Learning
-│   ├── NLP & LLMs
-│   ├── Robotics & Automation
-│   ├── Data Engineering
+│   ├── GenAI & LLM
+│   ├── ML & NLP
+│   ├── Data & Programming
+│   ├── Backend & Full-Stack
 │   └── Software Development
 ├── Certifications/
 │   └── [List from JSON]
@@ -256,7 +255,7 @@ All image paths are defined in the JSON data file under each entry's `images` ar
     - `cd [dir]` — navigate into a section (e.g. `cd experience`, `cd projects`);
       `cd ..` goes up, bare `cd` goes home
     - `pwd` — print current path (e.g. `/c/Experience`)
-    - `cat [file]` — display a file (e.g. `cat Printerpix — AI Engineer.txt`
+    - `cat [file]` — display a file (e.g. `cat Printerpix — Agentic AI Engineer.txt`
       renders that experience entry; Tab completion supplies the name)
     - `dir` — ribs the visitor for reaching for cmd.exe, then runs `ls`
 - **Commands added in Phase 6** (see the app entries below): `nano`, `vim` and
@@ -873,20 +872,20 @@ All personal content lives in a single `src/lib/data/profile.json`. Components r
 ```jsonc
 {
     "meta": {
-        "name": "Mohamed Abdelnasser",
+        "name": "Mohamed Youssef Abdelnasser",
         "shortName": "Momad",
         "title": "AI Engineer",
-        "tagline": "AI Engineer | Automation Systems | Robotics | RoboCup @Home Champion",
+        "tagline": "AI Engineer | Agentic AI, LLMs, RAG | LangChain, LangGraph, Python",
         "location": "Dubai, United Arab Emirates",
         "email": "Mohamed.Y.Abdelnasser@gmail.com",
         "phone": "+971503429805",
         "avatar": "/assets/avatar.png",
-        "resumePdf": "/assets/Mohamed_Abdelnasser_Resume.pdf",
+        "resumePdf": "/assets/CV.pdf",
     },
 
     "about": {
         "bio": [
-            "Hi, I'm Mohamed Abdelnasser, an AI Engineer with a B.Sc. in Artificial Intelligence (Intelligent Systems, Excellent with Honors) from AAST. I build production-ready AI systems, with a strong focus on automation and real-world impact.",
+            "Hi, I'm Mohamed Youssef Abdelnasser, an AI Engineer with a B.Sc. in Artificial Intelligence (Intelligent Systems, Excellent with Honours) from AAST. I build production-ready AI systems, with a strong focus on automation and real-world impact.",
             "I currently work at Printerpix, where I design and deploy AI-powered production systems across 9 international markets. Previously, I worked with Mentorness, Corporatica, and Udacity in research, development, and mentoring roles. I've built AI assistants, NLP pipelines, computer vision systems, and intelligent automations, and I led the AI and robotics stack for RoboCup @Home, earning 1st place nationally and 3rd place internationally.",
         ],
     },
@@ -912,7 +911,7 @@ All personal content lives in a single `src/lib/data/profile.json`. Components r
     "experience": [
         {
             "company": "Printerpix",
-            "role": "AI Engineer",
+            "role": "Agentic AI Engineer",
             "period": "October 2025 – Present",
             "location": "Dubai, United Arab Emirates",
             "description": [
@@ -957,7 +956,7 @@ All personal content lives in a single `src/lib/data/profile.json`. Components r
             "images": [],
         },
         {
-            "company": "RoboCup Federation",
+            "company": "RoboCup@Home — AAST Robotics Team",
             "role": "AI & Robotics Engineer",
             "period": "December 2023 – August 2024",
             "location": "Alexandria, Egypt & Eindhoven, Netherlands",
@@ -986,7 +985,7 @@ All personal content lives in a single `src/lib/data/profile.json`. Components r
             "institution": "Arab Academy for Science, Technology and Maritime Transport",
             "degree": "Bachelor's degree, Artificial Intelligence (Intelligent Systems)",
             "period": "October 2021 – July 2025",
-            "honors": "Excellent with Honors",
+            "honors": "Excellent with Honours",
             "images": [
                 {
                     "src": "/assets/images/aast-diploma.jpg",
@@ -999,7 +998,6 @@ All personal content lives in a single `src/lib/data/profile.json`. Components r
             ],
         },
         {
-            "institution": "Al Ma'arifa International Private School",
             "degree": "High School Diploma",
             "period": "September 2017 – July 2021",
             "images": [],
@@ -1007,27 +1005,27 @@ All personal content lives in a single `src/lib/data/profile.json`. Components r
     ],
 
     "skills": {
-        "AI & Machine Learning": [
+        "GenAI & LLM": [
             "TensorFlow",
             "PyTorch",
             "Scikit-learn",
             "Computer Vision",
             "Predictive Modeling",
         ],
-        "NLP & LLMs": [
+        "ML & NLP": [
             "LangChain",
             "LangGraph",
             "RAG Pipelines",
             "ReAct Agents",
             "Prompt Engineering",
         ],
-        "Robotics & Automation": [
+        "Data & Programming": [
             "ROS",
             "Arduino",
             "RoboCup @Home",
             "Production Automation",
         ],
-        "Data Engineering": [
+        "Backend & Full-Stack": [
             "Google BigQuery",
             "Microsoft SQL Server",
             "Supabase",
@@ -1108,7 +1106,7 @@ All personal content lives in a single `src/lib/data/profile.json`. Components r
 
 **Update flow:** Edit `profile.json` → rebuild/redeploy → all UI reflects changes. No component code changes needed. The build regenerates the VFS seed and bumps `SEED_VERSION` (§6.7), so returning visitors' IndexedDB is re-seeded too.
 
-**Source material:** the profile data (experience, education, etc.) is filled from `docs/Profile.pdf` (LinkedIn export). The resume file referenced by `meta.resumePdf` is copied from it into `static/assets/` in Phase 1 (the mobile layout's Download Resume button needs it).
+**Source material:** the profile data (experience, education, etc.) is filled from `docs/profile.md` (LinkedIn export). The resume file referenced by `meta.resumePdf` is copied from it into `static/assets/` in Phase 1 (the mobile layout's Download Resume button needs it).
 
 ---
 
@@ -1255,7 +1253,7 @@ All personal content lives in a single `src/lib/data/profile.json`. Components r
 - [x] Start menu restructured per §3.4 (pinned column, All Programs flyout, right column with social links, Shut Down)
 - [x] Context menu system (inherited — verify desktop/icon menus per §4.2)
 - [x] XP cursor overrides (verify; add missing cursors from `design/` packs)
-- [x] Create `src/lib/data/profile.json` with all personal data (source: `docs/Profile.pdf`) and copy the resume PDF into `static/assets/` — the mobile layout below needs both **now**; Phase 2's apps consume the same file
+- [x] Create `src/lib/data/profile.json` with all personal data (source: `docs/profile.md`) and copy the resume PDF into `static/assets/` — the mobile layout below needs both **now**; Phase 2's apps consume the same file
 - [x] Mobile experience (**new** — base has zero mobile support): portrait layout per §4.6; landscape prompt; >= 1024px full desktop
 
 **Exit criteria:** User can boot → login → see desktop → double-click icons to open/close/drag/resize windows → use taskbar and start menu. Unbuilt apps render a placeholder. Mobile visitors see the simplified portfolio.

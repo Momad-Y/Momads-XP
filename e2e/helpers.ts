@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { expect, type Page } from '@playwright/test';
 
 /**
@@ -57,3 +58,31 @@ export async function bootToDesktop(
         timeout: 10_000,
     });
 }
+
+/*
+ * Owner content, read once from profile.json.
+ *
+ * Specs that assert on the seeded portfolio used to spell these out, so a CV
+ * update turned into a dozen red E2Es and taught people to edit tests to match
+ * — the opposite of what the assertions are for. What each spec is really
+ * about is Explorer, CMD or Search behaviour on a name full of spaces and an
+ * em dash, which the first experience entry supplies whatever it says.
+ *
+ * Read rather than imported: Playwright's loader needs an import attribute for
+ * JSON that Vite supplies inside the app but the test runner does not.
+ */
+const profile_data = JSON.parse(
+    readFileSync('src/lib/data/profile.json', 'utf8'),
+) as {
+    meta: { name: string };
+    experience: { company: string; role: string }[];
+    skills: Record<string, string[]>;
+};
+
+export const OWNER_NAME = profile_data.meta.name;
+export const FIRST_SKILL_GROUP = Object.keys(profile_data.skills)[0] ?? '';
+
+/** `Printerpix — Agentic AI Engineer`, as Explorer shows it without `.txt`. */
+export const ENTRY_ROLE = profile_data.experience[0]?.role ?? '';
+export const ENTRY_BASENAME = `${profile_data.experience[0]?.company ?? ''} — ${ENTRY_ROLE}`;
+export const ENTRY_FILE = `${ENTRY_BASENAME}.txt`;

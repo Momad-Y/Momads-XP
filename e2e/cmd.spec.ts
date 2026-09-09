@@ -1,6 +1,14 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { bootToDesktop } from './helpers';
+import { ENTRY_FILE, bootToDesktop } from './helpers';
+import { readFileSync } from 'node:fs';
+
+/** Content is read, not spelled: a CV rewrite must not redden the terminal. */
+const ENTRY = (
+    JSON.parse(readFileSync('src/lib/data/profile.json', 'utf8')) as {
+        experience: { company: string; role: string; description: string[] }[];
+    }
+).experience[0] as { company: string; role: string; description: string[] };
 
 /**
  * CMD (SPECIFICATION.md §3.2). The command layer itself is pure and covered by
@@ -149,17 +157,19 @@ test('navigates the real filesystem with ls, cd, pwd and cat', async ({
     await expect.poll(async () => screen(page)).toContain('/c/Experience');
 
     await run(page, 'ls');
-    await expect
-        .poll(async () => screen(page))
-        .toContain('Printerpix — AI Engineer.txt');
+    await expect.poll(async () => screen(page)).toContain(ENTRY_FILE);
 
-    await run(page, 'cat Printerpix — AI Engineer.txt');
-    // NOT 'AI Engineer' — that is a substring of the filename `ls` printed two
-    // commands ago and still on screen, so it would pass even if `cat` printed
-    // nothing at all. The dim meta line only `cat` produces is the real proof.
-    await expect
-        .poll(async () => screen(page))
-        .toContain('Printerpix · October 2025');
+    await run(page, `cat ${ENTRY.company} — ${ENTRY.role}.txt`);
+    /*
+     * NOT the role — that is a substring of the filename `ls` printed two
+     * commands ago and still on screen, so it would pass even if `cat` printed
+     * nothing at all. The entry's LAST bullet is the real proof: only `cat`
+     * emits it, and being last it is still on screen after the entry scrolls.
+     * Read from profile.json so rewriting a CV does not redden this.
+     */
+    const bullets = ENTRY.description;
+    const tail = String(bullets[bullets.length - 1]).slice(-40);
+    await expect.poll(async () => screen(page)).toContain(tail);
 
     await run(page, 'cd ..');
     await expect.poll(async () => promptLine(page)).toBe('momad@xp:~$');
@@ -237,9 +247,7 @@ test('Tab completes a path containing spaces, and a directory keeps going', asyn
     await run(page, 'cd ~');
     await page.keyboard.type('cat Experience/Print');
     await page.keyboard.press('Tab');
-    await expect
-        .poll(async () => promptLine(page))
-        .toContain('Printerpix — AI Engineer.txt');
+    await expect.poll(async () => promptLine(page)).toContain(ENTRY_FILE);
 });
 
 test('the terminal sees a folder created on the desktop', async ({ page }) => {

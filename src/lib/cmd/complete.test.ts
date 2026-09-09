@@ -176,8 +176,10 @@ describe('completing a path', () => {
         // A trailing space after a directory would make the next word part of
         // the same segment, since the path is the raw remainder of the line.
         expect(tab('cd Experi').buffer).toBe('cd Experience/');
-        expect(tab('cat Experience/Printerpix').buffer).toBe(
-            'cat Experience/Printerpix — AI Engineer.txt ',
+        const entry = profile.experience[0];
+        const company = entry?.company ?? '';
+        expect(tab(`cat Experience/${company}`).buffer).toBe(
+            `cat Experience/${company} — ${entry?.role ?? ''}.txt `,
         );
     });
 
@@ -190,12 +192,8 @@ describe('completing a path', () => {
     });
 
     it('offers cd only directories, and ls both', () => {
-        expect(tab('cd ').candidates).not.toContain(
-            'Mohamed_Abdelnasser_Resume.pdf ',
-        );
-        expect(tab('ls ').candidates).toContain(
-            'Mohamed_Abdelnasser_Resume.pdf ',
-        );
+        expect(tab('cd ').candidates).not.toContain('CV.pdf ');
+        expect(tab('ls ').candidates).toContain('CV.pdf ');
     });
 
     it('offers hidden entries, which ls would not have listed', () => {

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { bootToDesktop } from './helpers';
+import { ENTRY_BASENAME, ENTRY_FILE, bootToDesktop } from './helpers';
 
 test('an uploaded PDF with a missing blob shows an error, not the résumé', async ({
     page,
@@ -92,13 +92,13 @@ test('a shortcut (.lnk) offers no "Add to archive" (would hang)', async ({
     await page.waitForTimeout(450);
     await win.locator('.fs-item', { hasText: 'Experience' }).first().dblclick();
     await page.waitForTimeout(450);
-    const entry = win.getByText('Printerpix — AI Engineer.txt');
+    const entry = win.getByText(ENTRY_FILE);
     await entry.click({ button: 'right' });
     await page
         .locator('.context-menu')
         .getByText('Create Shortcut', { exact: true })
         .click();
-    const shortcut = win.getByText('Shortcut to Printerpix — AI Engineer.lnk');
+    const shortcut = win.getByText(`Shortcut to ${ENTRY_BASENAME}.lnk`);
     await expect(shortcut).toBeVisible({ timeout: 15000 });
 
     // right-click the shortcut → the archive option must be absent

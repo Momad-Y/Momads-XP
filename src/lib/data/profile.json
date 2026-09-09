@@ -1,19 +1,21 @@
 {
     "meta": {
-        "name": "Mohamed Abdelnasser",
+        "name": "Mohamed Youssef Abdelnasser",
         "shortName": "Momad",
         "firstName": "Mohamed",
         "title": "AI Engineer",
-        "tagline": "AI Engineer | Automation Systems | Robotics | RoboCup @Home Champion",
+        "tagline": "AI Engineer | Agentic AI, LLMs, RAG | LangChain, LangGraph, Python",
         "location": "Dubai, United Arab Emirates",
         "email": "Mohamed.Y.Abdelnasser@gmail.com",
         "avatar": "/assets/images/avatar.png",
-        "resumePdf": "/assets/Mohamed_Abdelnasser_Resume.pdf"
+        "resumePdf": "/assets/CV.pdf"
     },
     "about": {
         "bio": [
-            "Hi, I'm Mohamed Abdelnasser, an AI Engineer with a B.Sc. in Artificial Intelligence (Intelligent Systems, Excellent with Honors) from AAST. I build production-ready AI systems, with a strong focus on automation and real-world impact.",
-            "I currently work at Printerpix, where I design and deploy AI-powered production systems across 9 international markets. Previously, I worked with Mentorness, Corporatica, and Udacity in research, development, and mentoring roles. I've built AI assistants, NLP pipelines, computer vision systems, and intelligent automations, and I led the AI and robotics stack for RoboCup @Home, earning 1st place nationally and 3rd place internationally."
+            "Hi, I'm Mohamed Youssef Abdelnasser, an AI Engineer in Dubai with 2+ years building agentic, LLM, RAG and machine-learning systems. I hold a B.Sc. in Artificial Intelligence (Intelligent Systems) from AAST — GPA 3.94/4.0, Excellent with Honours, ranked 2nd in class.",
+            "At Printerpix I ship production Generative AI across 9 international markets, where AI-written campaigns have driven up to 5x the revenue of human-written ones in A/B tests. I built a multi-tenant agentic email marketing platform on LangChain and LangGraph orchestrating GPT, Claude and Gemini, hardened it with an LLM-as-judge review loop and prompt-injection guardrails, and cut model API costs by an estimated 95% with an on-prem vLLM/LiteLLM stack. I co-lead the Dubai AI team of 4+ engineers.",
+            "Before that I optimised RAG pipelines and built ReAct agents at Corporatica, taught Python and AI as a Session Lead at Udacity, and led the AI software for the AAST RoboCup@Home team to 1st place in Egypt and 3rd internationally in the Netherlands. My graduation project, BeMo, is an edge-run conversational robot; its first-author research paper is under review.",
+            "I work AI-first — Claude Code and Cursor daily — in Python, TypeScript and SQL. Arabic (native), English (full professional). UAE resident, no visa sponsorship required."
         ]
     },
     "social": [
@@ -36,14 +38,17 @@
     "experience": [
         {
             "company": "Printerpix",
-            "role": "AI Engineer",
+            "role": "Agentic AI Engineer",
             "period": "October 2025 – Present",
-            "location": "Dubai, United Arab Emirates",
+            "location": "Dubai, United Arab Emirates · On-site",
             "description": [
-                "Architected an AI analytics pipeline using Python, BigQuery, and Gemini LLMs, automating marketing reporting and anomaly detection across 9 international markets, reducing manual analysis by ~80%.",
-                "Developed ML-powered pricing optimisation using scikit-learn and Monte Carlo simulation (10,000+ scenarios) with 95% CI statistical validation via SciPy.",
-                "Designed LangChain multi-chain LLM architecture with Gemini for automated multilingual content generation across 6 languages, with Pydantic validation and multi-platform API integration.",
-                "Deployed AI-powered QA system using Gemini Vision, Playwright, and FastAPI, automating cross-platform validation across 7 regional markets."
+                "Built a multi-tenant agentic email marketing platform — a LangGraph/LangChain Python pipeline orchestrating GPT, Claude and Gemini behind a Next.js front end for human steering — whose AI-written campaigns drove up to 5x the revenue of human-written ones in A/B tests.",
+                "Hardened the platform with a two-LLM generate-and-review (LLM-as-judge) copywriting loop, classifier-routed model selection cutting model costs 25% and hallucinations 15%, LangSmith tracing, and prompt-injection guardrails.",
+                "Cut the team's model API costs by an estimated 95% by standing up an on-prem LLM serving stack (vLLM, LiteLLM) in production, running an open-weight Qwen-3.8-27B model with tiered routing and per-user API keys.",
+                "Co-lead the Dubai AI team of 4+ engineers: run 3 weekly engineering syncs, translate CEO and marketing-director goals into technical plans, and co-conduct 15+ AI Engineer interviews across junior, mid and senior levels.",
+                "Built a Model Context Protocol (MCP) server with 30+ tools, resources and prompts for a third-party affiliate platform, cutting manual analytics by about 80%; shipped outreach and social pipelines that sent 25,000+ emails, drove 500+ conversions and generated 1,000+ social posts.",
+                "Developed an ML pricing engine: Elastic Net regression and Monte Carlo simulation (10,000+ scenarios, 95% confidence) across 900+ products, with Playwright + Gemini vision competitor monitoring over 82+ URLs feeding BigQuery back into the models.",
+                "Ship across AWS, GCP and Azure with Docker and CI/CD on GitHub Actions and GitLab CI; integration work spans n8n, webhooks, ETL pipelines and marketing APIs (Meta, Pinterest, Google Ads)."
             ],
             "images": [
                 {
@@ -54,7 +59,7 @@
         },
         {
             "company": "Udacity",
-            "role": "Session Lead",
+            "role": "Session Lead (Python & AI Instructor)",
             "period": "July 2025 – September 2025",
             "location": "Remote",
             "description": [
@@ -65,10 +70,10 @@
             "images": []
         },
         {
-            "company": "Robotics Club — AASTMT",
+            "company": "Robotics Club - AASTMT",
             "role": "Vice President of Software Development",
             "period": "October 2022 – June 2025",
-            "location": "El Alameen, Egypt",
+            "location": "El Alameen, Egypt · Hybrid",
             "description": [
                 "Organized RoboCup-inspired line-tracking and CPC-inspired programming competitions.",
                 "Conducted sessions teaching Python, C/C++, Competitive Programming, and Arduino to over 300 students.",
@@ -78,24 +83,24 @@
         },
         {
             "company": "Corporatica",
-            "role": "Natural Language Processing Intern",
+            "role": "AI Engineer Intern",
             "period": "September 2024 – November 2024",
-            "location": "Wyoming, USA (Remote)",
+            "location": "Wyoming, USA · Remote",
             "description": [
-                "Optimized LangChain and LangGraph RAG pipelines, improving retrieval efficiency and reducing response time by ~15%.",
-                "Developed a LangChain-based ReAct agent with custom and pre-built tools to fix LLM-generated code errors, decreasing failure rates and hallucinations by 20%.",
-                "Contributed to all stages of NLP pipelines—pre/post-processing, LLM integration, monitoring, and evaluation."
+                "Optimised RAG pipelines using LangChain, LangGraph and LangSmith tracing with a Pinecone vector database, improving retrieval efficiency and cutting response time by roughly 15%.",
+                "Implemented a LangChain ReAct agent with prompt engineering and custom tool-calling integrations (web search, database queries, API calls), reducing LLM hallucinations by 20%.",
+                "Contributed across NLP pipelines — pre/post-processing, LLM integration, monitoring and evaluation — handling structured and unstructured data for production deployment."
             ],
             "images": []
         },
         {
-            "company": "RoboCup Federation",
+            "company": "RoboCup@Home — AAST Robotics Team",
             "role": "AI & Robotics Engineer",
             "period": "December 2023 – August 2024",
-            "location": "Alexandria, Egypt & Eindhoven, Netherlands",
+            "location": "Alexandria, Egypt & Eindhoven, Netherlands · On-site",
             "description": [
-                "Led Team 3arfeen Hollanda to 1st place in the 2024 RoboCup @Home Education Competition (Egypt).",
-                "Led Team Wingardium Levioso to 3rd place in the RoboCup @Home Education Major Competition (Netherlands)."
+                "Developed real-time computer vision and NLP systems with OpenCV, PyTorch and Hugging Face Transformers on embedded hardware, reaching 30 FPS object detection and about 0.3s speech response latency.",
+                "Led the team's AI software architecture to 1st place nationally in Egypt and 3rd place internationally in the Netherlands at RoboCup@Home."
             ],
             "images": []
         },
@@ -103,7 +108,7 @@
             "company": "Mentorness",
             "role": "Machine Learning Intern",
             "period": "April 2024 – May 2024",
-            "location": "Ahmedabad, India (Remote)",
+            "location": "Remote",
             "description": [
                 "Built predictive models for disease diagnosis (Anemia, Diabetes, Thalassemia) and stock market forecasting using Scikit-learn, TensorFlow, and PyTorch.",
                 "Developed classifiers (Naive Bayes, Random Forest, Logistic Regression) and sequence models (LSTM, GRU).",
@@ -115,53 +120,12 @@
     "education": [
         {
             "institution": "Arab Academy for Science, Technology and Maritime Transport",
-            "degree": "Bachelor's degree, Artificial Intelligence (Intelligent Systems)",
-            "period": "October 2021 – July 2025",
-            "honors": "GPA 3.94 — Excellent with Honors",
-            "images": []
-        },
-        {
-            "institution": "Al Ma'arifa International Private School",
-            "degree": "High School Diploma",
-            "period": "September 2017 – July 2021",
+            "degree": "B.Sc. in Artificial Intelligence (Intelligent Systems)",
+            "period": "October 2021 – August 2025",
+            "honors": "GPA 3.94/4.0 — Excellent with Honours (Summa Cum Laude), ranked 2nd in class",
             "images": []
         }
     ],
-    "skills": {
-        "AI & Machine Learning": [
-            "TensorFlow",
-            "PyTorch",
-            "Scikit-learn",
-            "Computer Vision",
-            "Predictive Modeling"
-        ],
-        "NLP & LLMs": [
-            "LangChain",
-            "LangGraph",
-            "RAG Pipelines",
-            "ReAct Agents",
-            "Prompt Engineering"
-        ],
-        "Robotics & Automation": [
-            "ROS",
-            "Arduino",
-            "RoboCup @Home",
-            "Production Automation"
-        ],
-        "Data Engineering": [
-            "Google BigQuery",
-            "Microsoft SQL Server",
-            "Supabase",
-            "ETL Pipelines"
-        ],
-        "Software Development": [
-            "Python",
-            "TypeScript",
-            "React",
-            "Node.js",
-            "REST APIs"
-        ]
-    },
     "awards": [
         {
             "title": "1st Place – RoboCup @Home Education Competition (Egypt)",
@@ -182,88 +146,201 @@
             "title": "Certificate of Excellence – Graduation Honors",
             "year": "2025",
             "images": []
+        },
+        {
+            "title": "Certificate of Excellence",
+            "year": "2022",
+            "images": []
         }
     ],
     "certifications": [
         {
-            "title": "Certificate of Achievement – Mentorness Machine Learning Internship",
+            "title": "Certificate of Excellence – Graduation Honors (AAST, 2025)",
             "images": []
         },
         {
-            "title": "Certificate of Excellence – Graduation Honors",
+            "title": "Certificate of Excellence (AAST, 2022)",
             "images": []
         },
         {
-            "title": "3rd Place – RoboCup @Home Education Major Competition (Netherlands)",
+            "title": "IELTS Academic – Band 7.5 (IELTS Official, 2025)",
             "images": []
         },
         {
-            "title": "Certificate of Participation – RoboCup Junior",
-            "images": []
-        },
-        {
-            "title": "IELTS Academic Certificate",
+            "title": "Certificate of Achievement – Mentorness ML Internship (2024)",
             "images": []
         }
     ],
     "projects": [
         {
             "name": "Momad's XP",
-            "description": "This website — a faithful Windows XP recreation in the browser, serving as an interactive portfolio. Built with SvelteKit and strict TypeScript on top of a pruned win32.run base.",
+            "description": "This portfolio: a CI-gated Svelte + TypeScript recreation of Windows XP in the browser, with unit and E2E test suites, a working file system, a Python REPL and a Linux-speaking terminal.",
             "tech": [
                 "SvelteKit",
-                "Svelte 5",
+                "Svelte",
                 "TypeScript",
-                "Tailwind",
-                "IndexedDB"
+                "Vite",
+                "IndexedDB",
+                "Playwright"
             ],
             "url": "https://github.com/Momad-Y/Momads-XP",
             "images": []
         },
         {
-            "name": "RoboCup @Home Education 2024",
-            "description": "ROS1 task stack for the Eindhoven 2024 RoboCup@Home Education challenge, executed on the Jupiter robot by Lattel Robotics. Covers real-time object detection, person tracking, and speech interaction; the team placed 3rd internationally.",
-            "tech": ["ROS1", "C++", "OpenCV", "PyTorch"],
-            "url": "https://github.com/Momad-Y/Eindhoven-2024-RoboCup-at-HomeEDU",
+            "name": "BeMo (Be Modern) — Graduation Project",
+            "description": "A personal AI robotic assistant: a LangGraph agent with 4 function-calling tools (mail and tasks, smart home, learning resources, Q&A) running on a Raspberry Pi with local wake-word, speech and emotion models at about 0.5s latency. Modular star architecture over MQTT and WebSocket, with a Flutter desktop app for onboarding. First-author paper under review.",
+            "tech": [
+                "Python",
+                "LangGraph",
+                "LangChain",
+                "Raspberry Pi",
+                "MQTT",
+                "Flutter"
+            ],
+            "url": "",
             "images": []
         },
         {
             "name": "EUC RAG Agent",
-            "description": "A Retrieval-Augmented Generation agent for a fictional university, combining MiniLM/Gemini embeddings or TF-IDF retrieval with Gemini and Llama 2 generation to answer university-related inquiries from TXT, CSV, PDF, and DOC sources.",
-            "tech": ["Python", "RAG", "Gemini", "Sentence Transformers"],
+            "description": "A complete RAG system for a fictional university: TXT/CSV/PDF/DOCX preprocessing with cleaning, lemmatization and chunk caching feeding a Chroma vector store, three swappable embedding backends and three generation models selectable at runtime. Live demo: euc-rag.streamlit.app",
+            "tech": ["Python", "LangChain", "Chroma", "Gemini", "Streamlit"],
             "url": "https://github.com/Momad-Y/EUC-RAG-Agent",
             "images": []
         },
         {
-            "name": "Hikaru-Nakarmsen Chess Robot",
-            "description": "Fully automates a Dobot Magician robotic arm to play chess against a human opponent, with the Stockfish engine providing the moves.",
-            "tech": ["Python", "Stockfish", "Robotics"],
-            "url": "https://github.com/Momad-Y/Hikaru-Nakarmsen-Chess-Robot",
+            "name": "NexChat",
+            "description": "A multimodal AI chatbot: document Q&A over LangChain + FAISS, long-context summarization, image captioning via a vision LLM, and speech in and out — running entirely on free-tier hosted models with a full test suite. Live demo: nexchat.streamlit.app",
+            "tech": ["Python", "LangChain", "FAISS", "Streamlit"],
+            "url": "https://github.com/Momad-Y/NexChat",
             "images": []
         },
         {
             "name": "Lyric Logic",
-            "description": "An NLP project that predicts which artist a lyric belongs to using LSTM and CNN models, served through a Streamlit web app.",
-            "tech": ["Python", "TensorFlow", "Keras", "NLTK", "Streamlit"],
+            "description": "An NLP artist classifier: a text-classification pipeline (NLTK, TensorFlow LSTM/CNN) trained on 50k+ lyrics, served as a Dockerised FastAPI REST API orchestrated with Docker Compose and backed by PostgreSQL. Live demo: lyric-logic.streamlit.app",
+            "tech": [
+                "Python",
+                "TensorFlow",
+                "NLTK",
+                "FastAPI",
+                "Docker",
+                "PostgreSQL"
+            ],
             "url": "https://github.com/Momad-Y/Lyric-Logic",
             "images": []
         },
         {
+            "name": "Magnus & Hikaru Chess Robots",
+            "description": "Robotic arms that play chess, combining computer vision board-state detection with deep reinforcement learning and motion planning.",
+            "tech": [
+                "Python",
+                "OpenCV",
+                "Deep Reinforcement Learning",
+                "Robotics"
+            ],
+            "url": "https://github.com/Momad-Y/Magnus-Hikaru-Chess-Robots",
+            "images": []
+        },
+        {
             "name": "OptiCompanion",
-            "description": "An application designed to help blind and visually impaired individuals using AI.",
-            "tech": ["Dart"],
+            "description": "An application designed to help blind and visually impaired individuals using AI, delivered as a Flutter mobile app.",
+            "tech": ["Flutter", "Dart"],
             "url": "https://github.com/Momad-Y/OptiCompanion",
+            "images": []
+        },
+        {
+            "name": "Celebrity Look-a-Like CNN",
+            "description": "A convolutional neural network that matches a face to its closest celebrity look-alike.",
+            "tech": ["Python", "TensorFlow", "OpenCV", "Computer Vision"],
+            "url": "https://github.com/Momad-Y/Celebrity-look-a-like-CNN",
+            "images": []
+        },
+        {
+            "name": "Smart White Cane (AISC)",
+            "description": "An AI-assisted white cane for blind and visually impaired users, recognised with an Honorary Award at the White Cane Conference.",
+            "tech": ["Python", "Computer Vision", "Embedded Software", "IoT"],
+            "url": "https://github.com/YasserSalem1/Smart-Cane",
             "images": []
         }
     ],
+    "skills": {
+        "GenAI & LLM": [
+            "Large Language Models (LLMs)",
+            "Retrieval-Augmented Generation (RAG)",
+            "AI Agents",
+            "Prompt Engineering",
+            "Function Calling",
+            "LangChain",
+            "LangGraph",
+            "CrewAI",
+            "LlamaIndex",
+            "LangSmith",
+            "Pinecone",
+            "FAISS",
+            "Model Context Protocol (MCP)",
+            "vLLM",
+            "Gemini",
+            "OpenAI API"
+        ],
+        "ML & NLP": [
+            "Machine Learning",
+            "Natural Language Processing (NLP)",
+            "Computer Vision (OpenCV)",
+            "PyTorch",
+            "TensorFlow",
+            "scikit-learn",
+            "Hugging Face"
+        ],
+        "Data & Programming": [
+            "Python",
+            "SQL",
+            "TypeScript",
+            "JavaScript",
+            "PostgreSQL",
+            "Redis",
+            "BigQuery",
+            "pandas",
+            "NumPy",
+            "Pydantic"
+        ],
+        "Backend & Full-Stack": [
+            "FastAPI",
+            "Flask",
+            "REST APIs",
+            "Webhooks",
+            "ETL Pipelines",
+            "React",
+            "Next.js",
+            "Supabase",
+            "Playwright",
+            "n8n"
+        ],
+        "Cloud & DevOps": [
+            "AWS",
+            "GCP",
+            "Azure",
+            "Azure OpenAI",
+            "Docker",
+            "Docker Compose",
+            "Kubernetes",
+            "Git",
+            "CI/CD (GitHub Actions, GitLab CI)"
+        ],
+        "AI-First Development": [
+            "Claude Code",
+            "Cursor",
+            "Antigravity",
+            "GitHub Copilot",
+            "Codex"
+        ]
+    },
     "languages": [
         {
             "language": "Arabic",
-            "level": "Native"
+            "level": "Native or bilingual"
         },
         {
             "language": "English",
-            "level": "Full Professional"
+            "level": "Full professional"
         }
     ],
     "systemProperties": {

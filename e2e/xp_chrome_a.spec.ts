@@ -1,6 +1,11 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { bootToDesktop } from './helpers';
+import {
+    ENTRY_BASENAME,
+    ENTRY_FILE,
+    OWNER_NAME,
+    bootToDesktop,
+} from './helpers';
 import { stubBrowse } from './stub_browse';
 
 async function openMyComputer(page: Page) {
@@ -19,7 +24,7 @@ test('View System Information opens the funny System Properties', async ({
     const sys = page.locator('#work-space .window', {
         hasText: 'System Properties',
     });
-    await expect(sys.getByText('Mohamed Abdelnasser')).toBeVisible();
+    await expect(sys.getByText(OWNER_NAME)).toBeVisible();
     await expect(sys.getByText(/raw ambition/)).toBeVisible();
 
     // the other three tabs are implemented too (profile-driven funny content)
@@ -47,7 +52,7 @@ test('Create Shortcut makes a working .lnk that opens its target', async ({
     await page.waitForTimeout(450);
     await win.locator('.fs-item', { hasText: 'Experience' }).first().dblclick();
     await page.waitForTimeout(450);
-    const entry = win.getByText('Printerpix — AI Engineer.txt');
+    const entry = win.getByText(ENTRY_FILE);
     await expect(entry).toBeVisible();
 
     // right-click the entry file → Create Shortcut (lands beside it)
@@ -55,13 +60,15 @@ test('Create Shortcut makes a working .lnk that opens its target', async ({
     const menu = page.locator('.context-menu');
     await expect(menu).toBeVisible();
     await menu.getByText('Create Shortcut', { exact: true }).click();
-    const shortcut = win.getByText('Shortcut to Printerpix — AI Engineer.lnk');
+    const shortcut = win.getByText(`Shortcut to ${ENTRY_BASENAME}.lnk`);
     await expect(shortcut).toBeVisible({ timeout: 15000 });
 
     // opening the shortcut opens the target file's detail window
     await shortcut.dblclick();
     const detail = page.locator('#work-space .window').nth(1);
-    await expect(detail.getByText('AI Engineer', { exact: true })).toBeVisible({
+    await expect(
+        detail.getByText('Agentic AI Engineer', { exact: true }),
+    ).toBeVisible({
         timeout: 15000,
     });
 });
@@ -79,14 +86,16 @@ test('File menu > Create Shortcut works in Explorer once an item is selected', a
 
     // select an entry, then use the File menu (not the right-click menu)
     const entry = win
-        .locator('.fs-item', { hasText: 'Printerpix — AI Engineer.txt' })
+        .locator('.fs-item', {
+            hasText: ENTRY_FILE,
+        })
         .first();
     await entry.click();
     await win.locator('.toolbar-menu').getByText('File').click();
     await win.getByText('Create Shortcut', { exact: true }).click();
 
     await expect(
-        win.getByText('Shortcut to Printerpix — AI Engineer.lnk'),
+        win.getByText(`Shortcut to ${ENTRY_BASENAME}.lnk`),
     ).toBeVisible({ timeout: 15000 });
 });
 

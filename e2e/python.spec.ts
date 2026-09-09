@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import type { Frame, Page } from '@playwright/test';
-import { bootToDesktop } from './helpers';
+import { ENTRY_FILE, ENTRY_ROLE, bootToDesktop } from './helpers';
 
 /**
  * The Python REPL (SPECIFICATION.md §3.2) and — more importantly — the
@@ -517,11 +517,14 @@ test('/c is mounted, readable, and read-only @online', async ({ page }) => {
     // Plain open(), relative to the working directory, no await, no imports.
     await type(
         page,
-        'print("READ", open("Experience/Printerpix — AI Engineer.txt").read()[:20])',
+        `print("READ", open("Experience/${ENTRY_FILE}").read()[:20])`,
     );
     await expect
         .poll(async () => cmdScreen(page), { timeout: 30_000 })
-        .toContain('READ AI Engineer');
+        // the entry file opens with the ROLE, and the read is [:20] — both
+        // derived, so a CV update cannot leave the input and the expectation
+        // disagreeing the way a half-updated rename just did
+        .toContain(`READ ${ENTRY_ROLE.slice(0, 20)}`);
 
     // Read-only fails LOUDLY. This is honesty, not a security boundary —
     // MEMFS is the worker's own memory — but a silent no-op would be worse

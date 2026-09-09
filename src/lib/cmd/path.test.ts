@@ -14,6 +14,7 @@ import {
     strip_quotes,
 } from './path';
 import { to_hard_drive } from '../types';
+import { profile } from '../profile';
 import type { HardDrive, VfsItem } from '../types';
 
 /** The SHIPPED seed, narrowed rather than asserted into shape. */
@@ -31,7 +32,16 @@ const drive = load_seed();
 
 const C = 'cTbkbrM4qjwF3UfmCoFkEK';
 const EXPERIENCE = 'p2FolderExperience';
-const PRINTERPIX = 'p2ExpPrinterpixAIEngineer0';
+/*
+ * Derived, not spelled: the first experience entry is content the owner
+ * rewrites from their CV, and hardcoding its name made a CV update read as a
+ * code regression. What these tests are about is path behaviour on a name full
+ * of spaces and an em dash, which any real entry supplies.
+ */
+const PRINTERPIX_BASENAME = `${profile.experience[0]?.company ?? ''} — ${profile.experience[0]?.role ?? ''}`;
+const PRINTERPIX = required(
+    Object.values(drive).find((i) => i.basename === PRINTERPIX_BASENAME),
+).id;
 const RESUME = 'p2FileResumePdf';
 const WALLPAPERS = 'uZ7fBbvbzFvQgAmJZpVbEb';
 
@@ -63,7 +73,7 @@ describe('posix_path', () => {
     it('renders a drive and a nested file', () => {
         expect(posix_path(C, drive)).toBe('/c');
         expect(posix_path(PRINTERPIX, drive)).toBe(
-            '/c/Experience/Printerpix — AI Engineer.txt',
+            `/c/Experience/${PRINTERPIX_BASENAME}.txt`,
         );
     });
 
@@ -131,7 +141,7 @@ describe('children_of', () => {
         // Alphabetical would open the CV at the wrong employer. The seed order is
         // the CV order and Explorer renders the same array.
         const names = children_of(EXPERIENCE, drive).map((i) => i.basename);
-        expect(names[0]).toBe('Printerpix — AI Engineer');
+        expect(names[0]).toBe(PRINTERPIX_BASENAME);
         expect(names).not.toEqual(
             [...names].sort((a, b) => a.localeCompare(b)),
         );
@@ -153,14 +163,20 @@ describe('resolve', () => {
         // Tier 2 exists for exactly this: tier 3 compares against `basename`,
         // which has no extension, so it cannot answer a lowercased full name.
         expect(
-            got(resolve('printerpix — ai engineer.txt', EXPERIENCE, drive)),
+            got(
+                resolve(
+                    `${PRINTERPIX_BASENAME.toLowerCase()}.txt`,
+                    EXPERIENCE,
+                    drive,
+                ),
+            ),
         ).toBe(PRINTERPIX);
     });
 
     it('matches a name without its extension', () => {
-        expect(
-            got(resolve('Printerpix — AI Engineer', EXPERIENCE, drive)),
-        ).toBe(PRINTERPIX);
+        expect(got(resolve(PRINTERPIX_BASENAME, EXPERIENCE, drive))).toBe(
+            PRINTERPIX,
+        );
     });
 
     it('handles the en dash in Awards, not just the em dash in Experience', () => {
