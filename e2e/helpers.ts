@@ -83,5 +83,6 @@ export const OWNER_NAME = profile_data.meta.name;
 export const FIRST_SKILL_GROUP = Object.keys(profile_data.skills)[0] ?? '';
 
 /** `Printerpix — Agentic AI Engineer`, as Explorer shows it without `.txt`. */
-export const ENTRY_BASENAME = `${profile_data.experience[0]?.company ?? ''} — ${profile_data.experience[0]?.role ?? ''}`;
+export const ENTRY_ROLE = profile_data.experience[0]?.role ?? '';
+export const ENTRY_BASENAME = `${profile_data.experience[0]?.company ?? ''} — ${ENTRY_ROLE}`;
 export const ENTRY_FILE = `${ENTRY_BASENAME}.txt`;
