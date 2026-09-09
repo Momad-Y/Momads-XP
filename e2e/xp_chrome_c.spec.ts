@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { bootToDesktop } from './helpers';
+import { ENTRY_FILE, bootToDesktop } from './helpers';
 
 async function openMyComputer(page: Page) {
     await bootToDesktop(page);
@@ -23,9 +23,7 @@ test('Folders button shows a tree that navigates', async ({ page }) => {
     // File Transfer guide may appear on first folder entry
     const guide = win.locator('.dialog').getByText('OK');
     if (await guide.count()) await guide.click();
-    await expect(
-        win.getByText('Printerpix — Agentic AI Engineer.txt'),
-    ).toBeVisible();
+    await expect(win.getByText(ENTRY_FILE)).toBeVisible();
 });
 
 test('Search button finds files by name', async ({ page }) => {

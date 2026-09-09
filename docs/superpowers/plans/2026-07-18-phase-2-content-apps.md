@@ -554,8 +554,8 @@ export function build_portfolio(profile: Profile): PortfolioBuild {
     add({
         ...base_item(resume_file_id, ''), // parent stamped by the generator script
         type: 'file',
-        basename: 'CV',
-        name: 'CV.pdf',
+        basename: 'Mohamed_Abdelnasser_Resume',
+        name: 'Mohamed_Abdelnasser_Resume.pdf',
         ext: '.pdf',
         storage_type: 'remote',
         url: profile.meta.resumePdf,

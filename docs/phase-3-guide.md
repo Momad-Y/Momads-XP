@@ -304,7 +304,7 @@ The REPL has a filesystem. Spec and plan: `docs/python-fs-spec.md`,
 
 ```python
 >>> import os; os.getcwd()          # '/c'
->>> open('Experience/Printerpix — AI Engineer.txt').read()
+>>> open('Experience/Printerpix — Agentic AI Engineer.txt').read()
 >>> open('My Documents/Python/fib.py','w').write(code)   # persists
 ```
 

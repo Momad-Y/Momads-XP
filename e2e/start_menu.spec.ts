@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { bootToDesktop } from './helpers';
+import { OWNER_NAME, bootToDesktop } from './helpers';
 import { stubBrowse } from './stub_browse';
 
 test('start menu matches the §3.4 structure', async ({ page }) => {
@@ -10,7 +10,7 @@ test('start menu matches the §3.4 structure', async ({ page }) => {
     await expect(menu).toBeVisible();
 
     // identity header
-    await expect(menu.getByText('Mohamed Youssef Abdelnasser')).toBeVisible();
+    await expect(menu.getByText(OWNER_NAME)).toBeVisible();
     // pinned column
     await expect(menu.getByText('Internet Explorer')).toBeVisible();
     await expect(menu.getByText('Contact Me').first()).toBeVisible();

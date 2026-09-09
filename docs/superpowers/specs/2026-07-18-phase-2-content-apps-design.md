@@ -216,7 +216,7 @@ iOS; the base's 16MB Foxit-styled viewer was pruned in Phase 0). Scope decisions
   posture); exact pdfjs-dist major pinned at implementation after checking
   current release.
 - Registered as the `.pdf` handler in `doctypes` — a real
-  `CV.pdf` VFS file (storage_type `remote`) is seeded
+  `Mohamed_Abdelnasser_Resume.pdf` VFS file (storage_type `remote`) is seeded
   under the portfolio tree, so both the desktop "My CV.exe" and the VFS file
   open the same viewer and `.pdf` stops hitting the no-association dialog.
 - Program file is **`pdf_viewer.svelte`** (matches SPECIFICATION §8's file

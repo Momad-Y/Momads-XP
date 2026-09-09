@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { bootToDesktop } from './helpers';
+import { ENTRY_FILE, bootToDesktop } from './helpers';
 import { readFileSync } from 'node:fs';
 
 /** Content is read, not spelled: a CV rewrite must not redden the terminal. */
@@ -157,9 +157,7 @@ test('navigates the real filesystem with ls, cd, pwd and cat', async ({
     await expect.poll(async () => screen(page)).toContain('/c/Experience');
 
     await run(page, 'ls');
-    await expect
-        .poll(async () => screen(page))
-        .toContain('Printerpix — Agentic AI Engineer.txt');
+    await expect.poll(async () => screen(page)).toContain(ENTRY_FILE);
 
     await run(page, `cat ${ENTRY.company} — ${ENTRY.role}.txt`);
     /*
@@ -249,9 +247,7 @@ test('Tab completes a path containing spaces, and a directory keeps going', asyn
     await run(page, 'cd ~');
     await page.keyboard.type('cat Experience/Print');
     await page.keyboard.press('Tab');
-    await expect
-        .poll(async () => promptLine(page))
-        .toContain('Printerpix — Agentic AI Engineer.txt');
+    await expect.poll(async () => promptLine(page)).toContain(ENTRY_FILE);
 });
 
 test('the terminal sees a folder created on the desktop', async ({ page }) => {

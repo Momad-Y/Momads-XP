@@ -176,8 +176,10 @@ describe('completing a path', () => {
         // A trailing space after a directory would make the next word part of
         // the same segment, since the path is the raw remainder of the line.
         expect(tab('cd Experi').buffer).toBe('cd Experience/');
-        expect(tab('cat Experience/Printerpix').buffer).toBe(
-            `cat Experience/${profile.experience[0]?.company ?? ''} — ${profile.experience[0]?.role ?? ''}.txt `,
+        const entry = profile.experience[0];
+        const company = entry?.company ?? '';
+        expect(tab(`cat Experience/${company}`).buffer).toBe(
+            `cat Experience/${company} — ${entry?.role ?? ''}.txt `,
         );
     });
 

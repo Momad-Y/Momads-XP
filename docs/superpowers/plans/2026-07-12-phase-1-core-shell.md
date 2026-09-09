@@ -37,18 +37,18 @@ Branch: `git checkout dev && git pull && git checkout -b feature/phase-1-slice-1
 **Files:**
 - Create: `src/lib/data/profile.json`
 - Create: `src/lib/profile.ts`
-- Create: `static/assets/CV.pdf` (copied from `docs/Profile.pdf`)
+- Create: `static/assets/Mohamed_Abdelnasser_Resume.pdf` (copied from `docs/Profile.pdf`)
 - Test: `src/lib/profile.test.ts`
 
 **Interfaces:**
 - Consumes: nothing (leaf module).
-- Produces: `export const profile: Profile` (deep-frozen) from `src/lib/profile.ts`. Later tasks read `profile.meta.name`, `profile.meta.title`, `profile.meta.avatar` (`'/assets/images/avatar.png'`), `profile.meta.resumePdf` (`'/assets/CV.pdf'`), `profile.meta.email`, `profile.meta.tagline`, `profile.about.bio: string[]`, `profile.social: SocialLink[]` (platforms exactly `'GitHub' | 'LinkedIn' | 'Instagram'`), `profile.experience: ExperienceEntry[]`, `profile.education: EducationEntry[]`, `profile.skills: Record<string, string[]>`, `profile.projects: Project[]` (empty), `profile.languages`, `profile.awards`, `profile.certifications`.
+- Produces: `export const profile: Profile` (deep-frozen) from `src/lib/profile.ts`. Later tasks read `profile.meta.name`, `profile.meta.title`, `profile.meta.avatar` (`'/assets/images/avatar.png'`), `profile.meta.resumePdf` (`'/assets/Mohamed_Abdelnasser_Resume.pdf'`), `profile.meta.email`, `profile.meta.tagline`, `profile.about.bio: string[]`, `profile.social: SocialLink[]` (platforms exactly `'GitHub' | 'LinkedIn' | 'Instagram'`), `profile.experience: ExperienceEntry[]`, `profile.education: EducationEntry[]`, `profile.skills: Record<string, string[]>`, `profile.projects: Project[]` (empty), `profile.languages`, `profile.awards`, `profile.certifications`.
 
 - [ ] **Step 1: Copy the resume PDF and verify the avatar exists**
 
 ```bash
-cp docs/Profile.pdf static/assets/CV.pdf
-ls -la static/assets/CV.pdf static/assets/images/avatar.png
+cp docs/Profile.pdf static/assets/Mohamed_Abdelnasser_Resume.pdf
+ls -la static/assets/Mohamed_Abdelnasser_Resume.pdf static/assets/images/avatar.png
 ```
 
 Expected: both files listed (avatar already exists from Phase 0).
@@ -69,7 +69,7 @@ describe('profile integrity', () => {
         expect(profile.meta.email).toMatch(/^[^@\s]+@[^@\s]+\.[^@\s]+$/);
         expect(profile.meta.avatar).toBe('/assets/images/avatar.png');
         expect(profile.meta.resumePdf).toBe(
-            '/assets/CV.pdf',
+            '/assets/Mohamed_Abdelnasser_Resume.pdf',
         );
     });
 
@@ -148,7 +148,7 @@ Content per §7's sample, updated with the owner inputs (GitHub `Momad-Y`, Insta
         "email": "Mohamed.Y.Abdelnasser@gmail.com",
         "phone": "+971503429805",
         "avatar": "/assets/images/avatar.png",
-        "resumePdf": "/assets/CV.pdf"
+        "resumePdf": "/assets/Mohamed_Abdelnasser_Resume.pdf"
     },
     "about": {
         "bio": [
@@ -470,7 +470,7 @@ Expected: PASS — 8 tests.
 
 ```bash
 npm run check && npm run lint && npm run format:check && npx vitest run --coverage && npm run build
-git add src/lib/data/profile.json src/lib/profile.ts src/lib/profile.test.ts static/assets/CV.pdf
+git add src/lib/data/profile.json src/lib/profile.ts src/lib/profile.test.ts static/assets/Mohamed_Abdelnasser_Resume.pdf
 git commit -m "feat: add profile.json data model with typed frozen accessor"
 ```
 
@@ -2809,7 +2809,7 @@ test.describe('mobile portrait (390x844)', () => {
         // resume download + socials
         await expect(page.locator('a[download]')).toHaveAttribute(
             'href',
-            '/assets/CV.pdf',
+            '/assets/Mohamed_Abdelnasser_Resume.pdf',
         );
         await expect(
             page.locator('a[href="https://github.com/Momad-Y"]'),

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { bootToDesktop } from './helpers';
+import { ENTRY_FILE, bootToDesktop } from './helpers';
 
 /**
  * Regression cover for the red-team findings on Explorer's File menu. Each test
@@ -56,7 +56,7 @@ test('File > Open launches the file instead of navigating into it', async ({
     const win = await openExplorerAt(page, 'Experience');
     await win
         .locator('.fs-item', {
-            hasText: 'Printerpix — Agentic AI Engineer.txt',
+            hasText: ENTRY_FILE,
         })
         .first()
         .click();

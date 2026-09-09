@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { bootToDesktop } from './helpers';
+import { ENTRY_BASENAME, ENTRY_FILE, bootToDesktop } from './helpers';
 import { stubBrowse } from './stub_browse';
 
 async function openExperience(page: Page) {
@@ -117,7 +117,7 @@ test('a selected FILE can be favourited, and opens in its program', async ({
 
     await win
         .locator('.fs-item', {
-            hasText: 'Printerpix — Agentic AI Engineer.txt',
+            hasText: ENTRY_FILE,
         })
         .first()
         .click();
@@ -131,9 +131,7 @@ test('a selected FILE can be favourited, and opens in its program', async ({
         .last();
     await expect(dialog.getByText(/this file/)).toBeVisible();
     // the basename is offered, so a rename does not drag ".txt" along
-    await expect(dialog.locator('input').first()).toHaveValue(
-        'Printerpix — Agentic AI Engineer',
-    );
+    await expect(dialog.locator('input').first()).toHaveValue(ENTRY_BASENAME);
     await dialog.getByText('OK', { exact: true }).click();
     await page.waitForTimeout(500);
 
@@ -148,7 +146,7 @@ test('a selected FILE can be favourited, and opens in its program', async ({
         );
     expect(icons.some((src) => src.includes('TXT'))).toBe(true);
     await win
-        .locator('p', { hasText: /^Printerpix — Agentic AI Engineer$/ })
+        .locator('p', { hasText: new RegExp(`^${ENTRY_BASENAME}$`) })
         .first()
         .click();
     await page.waitForTimeout(1500);

@@ -364,7 +364,7 @@ while Size/Type/Date keep full width and the header reads "Date Modifiec". XP
 keeps column widths and scrolls horizontally.
 
 **F2 · HIGH — Thumbnails clips a long name at BOTH ends with no ellipsis.**
-Verified in `80-zoom-thumb-longname.png`: `CV.pdf`
+Verified in `80-zoom-thumb-longname.png`: `Mohamed_Abdelnasser_Resume.pdf`
 renders as `med_Abdelnasser_Resun`. Thumbnails is the only column-flex box, so
 the label sizes to `max-content` and the parent `overflow-hidden` cuts it
 symmetrically. The same label wraps correctly in Icons.

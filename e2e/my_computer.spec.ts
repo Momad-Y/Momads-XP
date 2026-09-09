@@ -85,12 +85,17 @@ test('an experience entry opens a detail window with bullets', async ({
     await win.getByText(`${ENTRY.company} — ${ENTRY.role}.txt`).dblclick();
     const detail = page.locator('#work-space .window').nth(1);
     await expect(detail.getByText(ENTRY.role, { exact: true })).toBeVisible();
-    // a slice of the entry's OWN first bullet — proves the detail rendered
-    // content, not just the heading, without pinning the CV's wording
+    /*
+     * The entry's LONGEST bullet, matched on its distinctive tail. A leading
+     * 40-char slice read "Built a multi-tenant agentic email marke" — true of
+     * almost any rewrite of that bullet, so it proved far less than the
+     * hardcoded claim it replaced.
+     */
+    const longest = [...ENTRY.description].sort(
+        (a, b) => b.length - a.length,
+    )[0];
     await expect(
-        detail.getByText(String(ENTRY.description[0]).slice(0, 40), {
-            exact: false,
-        }),
+        detail.getByText(String(longest).slice(-45), { exact: false }),
     ).toBeVisible();
 });
 

@@ -63,8 +63,9 @@
             "period": "July 2025 – September 2025",
             "location": "Remote",
             "description": [
-                "Led sessions for the DECI Summer Cohort, supporting 30+ students through Python and AI coursework.",
-                "Maintained an 80%+ graduation rate across the cohort."
+                "Led the DECI Summer Cohort (Level 1), delivering 3 weekly live online sessions to 30+ students.",
+                "Covered Python, HTML, CSS, fundamentals of AI, and data science, along with introductions to networks, cybersecurity, multimedia, and encoding/decoding.",
+                "Mentored students through hands-on projects and activities, achieving an 80%+ graduation rate."
             ],
             "images": []
         },
@@ -74,8 +75,9 @@
             "period": "October 2022 – June 2025",
             "location": "El Alameen, Egypt · Hybrid",
             "description": [
-                "Led the software side of the university robotics club, mentoring newcomers in AI, Arduino and robotics.",
-                "Coordinated competition teams and their software stacks across multiple robotics events."
+                "Organized RoboCup-inspired line-tracking and CPC-inspired programming competitions.",
+                "Conducted sessions teaching Python, C/C++, Competitive Programming, and Arduino to over 300 students.",
+                "Attended the 2023 Maker Faire in Cairo representing the Robotics Club."
             ],
             "images": []
         },
@@ -108,7 +110,9 @@
             "period": "April 2024 – May 2024",
             "location": "Remote",
             "description": [
-                "Completed a machine-learning internship track, delivering applied ML tasks and a final project."
+                "Built predictive models for disease diagnosis (Anemia, Diabetes, Thalassemia) and stock market forecasting using Scikit-learn, TensorFlow, and PyTorch.",
+                "Developed classifiers (Naive Bayes, Random Forest, Logistic Regression) and sequence models (LSTM, GRU).",
+                "Compared multiple models and selected top performers (90%+ accuracy) for deployment."
             ],
             "images": []
         }
@@ -135,7 +139,7 @@
         },
         {
             "title": "Honorary Award – Smart White Cane (AISC), White Cane Conference",
-            "year": "2024",
+            "year": "",
             "images": []
         },
         {
@@ -151,19 +155,19 @@
     ],
     "certifications": [
         {
-            "title": "Certificate of Excellence – Graduation Honors — AAST, August 2025",
+            "title": "Certificate of Excellence – Graduation Honors (AAST, 2025)",
             "images": []
         },
         {
-            "title": "Certificate of Excellence — AAST, February 2022",
+            "title": "Certificate of Excellence (AAST, 2022)",
             "images": []
         },
         {
-            "title": "IELTS Academic — Band 7.5, January 2025 (expires January 2027)",
+            "title": "IELTS Academic – Band 7.5 (IELTS Official, 2025)",
             "images": []
         },
         {
-            "title": "Certificate of Achievement – Mentorness Machine Learning Internship — The FastHire, June 2024",
+            "title": "Certificate of Achievement – Mentorness ML Internship (2024)",
             "images": []
         }
     ],
@@ -198,21 +202,21 @@
         },
         {
             "name": "EUC RAG Agent",
-            "description": "A complete RAG system for a fictional university: TXT/CSV/PDF/DOCX preprocessing with cleaning, lemmatization and chunk caching feeding a Chroma vector store, three swappable embedding backends and three generation models selectable at runtime.",
+            "description": "A complete RAG system for a fictional university: TXT/CSV/PDF/DOCX preprocessing with cleaning, lemmatization and chunk caching feeding a Chroma vector store, three swappable embedding backends and three generation models selectable at runtime. Live demo: euc-rag.streamlit.app",
             "tech": ["Python", "LangChain", "Chroma", "Gemini", "Streamlit"],
             "url": "https://github.com/Momad-Y/EUC-RAG-Agent",
             "images": []
         },
         {
             "name": "NexChat",
-            "description": "A multimodal AI chatbot: document Q&A over LangChain + FAISS, long-context summarization, image captioning via a vision LLM, and speech in and out — running entirely on free-tier hosted models with a full test suite.",
+            "description": "A multimodal AI chatbot: document Q&A over LangChain + FAISS, long-context summarization, image captioning via a vision LLM, and speech in and out — running entirely on free-tier hosted models with a full test suite. Live demo: nexchat.streamlit.app",
             "tech": ["Python", "LangChain", "FAISS", "Streamlit"],
             "url": "https://github.com/Momad-Y/NexChat",
             "images": []
         },
         {
             "name": "Lyric Logic",
-            "description": "An NLP artist classifier: a text-classification pipeline (NLTK, TensorFlow LSTM/CNN) trained on 50k+ lyrics, served as a Dockerised FastAPI REST API orchestrated with Docker Compose and backed by PostgreSQL.",
+            "description": "An NLP artist classifier: a text-classification pipeline (NLTK, TensorFlow LSTM/CNN) trained on 50k+ lyrics, served as a Dockerised FastAPI REST API orchestrated with Docker Compose and backed by PostgreSQL. Live demo: lyric-logic.streamlit.app",
             "tech": [
                 "Python",
                 "TensorFlow",
@@ -238,7 +242,7 @@
         },
         {
             "name": "OptiCompanion",
-            "description": "A mobile companion app built with Flutter and Dart, packaged for Android.",
+            "description": "An application designed to help blind and visually impaired individuals using AI, delivered as a Flutter mobile app.",
             "tech": ["Flutter", "Dart"],
             "url": "https://github.com/Momad-Y/OptiCompanion",
             "images": []
@@ -248,6 +252,13 @@
             "description": "A convolutional neural network that matches a face to its closest celebrity look-alike.",
             "tech": ["Python", "TensorFlow", "OpenCV", "Computer Vision"],
             "url": "https://github.com/Momad-Y/Celebrity-look-a-like-CNN",
+            "images": []
+        },
+        {
+            "name": "Smart White Cane (AISC)",
+            "description": "An AI-assisted white cane for blind and visually impaired users, recognised with an Honorary Award at the White Cane Conference.",
+            "tech": ["Python", "Computer Vision", "Embedded Software", "IoT"],
+            "url": "https://github.com/YasserSalem1/Smart-Cane",
             "images": []
         }
     ],

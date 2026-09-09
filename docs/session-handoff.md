@@ -112,7 +112,7 @@ cache-key fix. `main` and `dev` are level; the credit block that stopped the
 - Reverse with `netlify api updateSite ... {"build_settings":{"stop_builds":false}}`
 
 **Verified on production, not just locally:** boot -> login -> desktop -> start
-menu -> Explorer C:\ -> Details (`61 KB`, `PDF File`, `9 objects`) -> IE
+menu -> Explorer C:\ -> Details (`136 KB`, `PDF File`, `9 objects`) -> IE
 rendering the real wiby.me through `/api/browse`, with the iframe sandbox
 reading `allow-scripts allow-forms allow-popups` — no `allow-same-origin`, no
 `allow-popups-to-escape-sandbox`. Every SSRF form returns 400; every forged
@@ -313,7 +313,7 @@ The reset in `rename()` is defensive only.
 
 **Known coverage gap, deliberate.** The KB-vs-adaptive column rule has no E2E:
 every file reachable in Explorer is under 1 MB, because the larger ones live in
-the Desktop folder, which is in `hidden_items`. Both rules print "61 KB" there.
+the Desktop folder, which is in `hidden_items`. Both rules print "136 KB" there.
 `details_columns.test.ts` covers it instead; the e2e comment says so.
 
 **The test lesson, third time now.** Three of #95's claims were carried by tests

@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
+import { FIRST_SKILL_GROUP, OWNER_NAME } from './helpers';
 
 /** Content, read rather than spelled — the project list changes with the CV. */
 const FIRST_PROJECT = String(
@@ -19,7 +20,7 @@ test.describe('mobile portrait (390x844)', () => {
             timeout: 15_000,
         });
         await expect(
-            page.getByRole('heading', { name: 'Mohamed Youssef Abdelnasser' }),
+            page.getByRole('heading', { name: OWNER_NAME }),
         ).toBeVisible();
 
         // ≥1 Experience entry
@@ -28,7 +29,7 @@ test.describe('mobile portrait (390x844)', () => {
 
         // ≥1 Skills group
         await page.getByRole('button', { name: 'Skills' }).click();
-        await expect(page.getByText('GenAI & LLM')).toBeVisible();
+        await expect(page.getByText(FIRST_SKILL_GROUP)).toBeVisible();
 
         // Projects render real entries now (Phase 2 populated profile.projects)
         await page.getByRole('button', { name: 'Projects' }).click();
