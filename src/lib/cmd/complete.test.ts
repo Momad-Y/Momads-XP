@@ -177,7 +177,7 @@ describe('completing a path', () => {
         // the same segment, since the path is the raw remainder of the line.
         expect(tab('cd Experi').buffer).toBe('cd Experience/');
         expect(tab('cat Experience/Printerpix').buffer).toBe(
-            'cat Experience/Printerpix — AI Engineer.txt ',
+            `cat Experience/${profile.experience[0]?.company ?? ''} — ${profile.experience[0]?.role ?? ''}.txt `,
         );
     });
 

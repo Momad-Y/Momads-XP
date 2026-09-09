@@ -116,7 +116,9 @@ test('a selected FILE can be favourited, and opens in its program', async ({
     const win = await openExperience(page);
 
     await win
-        .locator('.fs-item', { hasText: 'Printerpix — AI Engineer.txt' })
+        .locator('.fs-item', {
+            hasText: 'Printerpix — Agentic AI Engineer.txt',
+        })
         .first()
         .click();
     await page.waitForTimeout(250);
@@ -130,7 +132,7 @@ test('a selected FILE can be favourited, and opens in its program', async ({
     await expect(dialog.getByText(/this file/)).toBeVisible();
     // the basename is offered, so a rename does not drag ".txt" along
     await expect(dialog.locator('input').first()).toHaveValue(
-        'Printerpix — AI Engineer',
+        'Printerpix — Agentic AI Engineer',
     );
     await dialog.getByText('OK', { exact: true }).click();
     await page.waitForTimeout(500);
@@ -146,7 +148,7 @@ test('a selected FILE can be favourited, and opens in its program', async ({
         );
     expect(icons.some((src) => src.includes('TXT'))).toBe(true);
     await win
-        .locator('p', { hasText: /^Printerpix — AI Engineer$/ })
+        .locator('p', { hasText: /^Printerpix — Agentic AI Engineer$/ })
         .first()
         .click();
     await page.waitForTimeout(1500);

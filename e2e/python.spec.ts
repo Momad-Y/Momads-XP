@@ -517,7 +517,7 @@ test('/c is mounted, readable, and read-only @online', async ({ page }) => {
     // Plain open(), relative to the working directory, no await, no imports.
     await type(
         page,
-        'print("READ", open("Experience/Printerpix — AI Engineer.txt").read()[:20])',
+        'print("READ", open("Experience/Printerpix — Agentic AI Engineer.txt").read()[:20])',
     );
     await expect
         .poll(async () => cmdScreen(page), { timeout: 30_000 })

@@ -1,15 +1,31 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { copy, fill_copy, profile, to_beat, to_tone } from './profile';
 
 describe('profile integrity', () => {
-    it('has complete meta with the Phase-1 asset paths', () => {
-        expect(profile.meta.name).toBe('Mohamed Abdelnasser');
-        expect(profile.meta.shortName).toBe('Momad');
-        expect(profile.meta.title).toBe('AI Engineer');
+    it('has complete meta, and its assets exist on disk', () => {
+        /*
+         * Shape and reachability, NOT specific values. This file used to
+         * assert the owner's name and a five-group skills map, so every CV
+         * update broke the suite and taught people to edit tests to match —
+         * the opposite of what a test is for. What genuinely cannot drift is
+         * that the paths resolve: renaming the résumé without updating
+         * profile.json is exactly the mistake this catches.
+         */
+        for (const key of [
+            'name',
+            'shortName',
+            'firstName',
+            'title',
+            'tagline',
+            'location',
+        ] as const) {
+            expect(profile.meta[key].trim(), key).not.toBe('');
+        }
         expect(profile.meta.email).toMatch(/^[^@\s]+@[^@\s]+\.[^@\s]+$/);
-        expect(profile.meta.avatar).toBe('/assets/images/avatar.png');
-        expect(profile.meta.resumePdf).toBe('/assets/CV.pdf');
+        expect(profile.meta.firstName).toBe(profile.meta.name.split(' ')[0]);
+        expect(existsSync(`static${profile.meta.avatar}`)).toBe(true);
+        expect(existsSync(`static${profile.meta.resumePdf}`)).toBe(true);
     });
 
     it('has the three social links with the real URLs', () => {
@@ -23,35 +39,45 @@ describe('profile integrity', () => {
         expect(by_platform['Instagram']).toBe('https://instagram.com/7.zsjj');
     });
 
-    it('has six experience entries, each with at least one bullet', () => {
-        expect(profile.experience).toHaveLength(6);
+    it('has experience entries, each with at least one bullet', () => {
+        expect(profile.experience.length).toBeGreaterThan(0);
         for (const entry of profile.experience) {
-            expect(entry.company.length).toBeGreaterThan(0);
-            expect(entry.role.length).toBeGreaterThan(0);
-            expect(entry.period.length).toBeGreaterThan(0);
+            expect(entry.company.trim()).not.toBe('');
+            expect(entry.role.trim()).not.toBe('');
+            expect(entry.period.trim()).not.toBe('');
             expect(entry.description.length).toBeGreaterThan(0);
-        }
-        expect(profile.experience[0]?.company).toBe('Printerpix');
-        expect(profile.experience[0]?.description).toHaveLength(4);
-    });
-
-    it('education includes the GPA honors line', () => {
-        expect(profile.education).toHaveLength(2);
-        expect(profile.education[0]?.honors).toBe(
-            'GPA 3.94 — Excellent with Honors',
-        );
-    });
-
-    it('has five non-empty skill groups', () => {
-        const groups = Object.values(profile.skills);
-        expect(groups).toHaveLength(5);
-        for (const group of groups) {
-            expect(group.length).toBeGreaterThan(0);
+            for (const bullet of entry.description) {
+                expect(bullet.trim()).not.toBe('');
+            }
         }
     });
 
-    it('has two bio paragraphs', () => {
-        expect(profile.about.bio).toHaveLength(2);
+    it('has education entries with a period and a degree', () => {
+        expect(profile.education.length).toBeGreaterThan(0);
+        for (const entry of profile.education) {
+            expect(entry.institution.trim()).not.toBe('');
+            expect(entry.degree.trim()).not.toBe('');
+            expect(entry.period.trim()).not.toBe('');
+            // optional, but an empty string would render as a blank line
+            if (entry.honors !== undefined) {
+                expect(entry.honors.trim()).not.toBe('');
+            }
+        }
+    });
+
+    it('has non-empty skill groups', () => {
+        const groups = Object.entries(profile.skills);
+        expect(groups.length).toBeGreaterThan(0);
+        for (const [name, group] of groups) {
+            expect(name.trim()).not.toBe('');
+            expect(group.length, name).toBeGreaterThan(0);
+            for (const skill of group) expect(skill.trim()).not.toBe('');
+        }
+    });
+
+    it('has bio paragraphs, none of them blank', () => {
+        expect(profile.about.bio.length).toBeGreaterThan(0);
+        for (const para of profile.about.bio) expect(para.trim()).not.toBe('');
     });
 
     it('projects are populated and well-formed (Phase 2)', () => {
@@ -243,5 +269,35 @@ describe('static/help.html is filled from profile.json', () => {
         expect(html.replace(/^<!--[\s\S]*?-->/, '')).not.toMatch(
             /\{[a-z]\w*\}/i,
         );
+    });
+});
+
+describe('profile content cannot produce an unreachable VFS name', () => {
+    /*
+     * Every portfolio entry becomes a file NAME in the seeded drive, and
+     * `cmd/path.ts` splits paths on `/`. A LinkedIn role like "Agentic AI
+     * Engineer (Machine Learning / GenAI)" therefore produced a file that
+     * Explorer listed and CMD could not open — `resolve` failed with
+     * `missing: "Printerpix — Agentic AI Engineer (Machine Learning "`.
+     *
+     * This is content the owner edits from a CV, so it is guarded here rather
+     * than trusted: the same reasoning as the music scanner's filename check.
+     */
+    const names = [
+        ...profile.experience.map((e) => `${e.company} — ${e.role}`),
+        ...profile.projects.map((p) => p.name),
+        ...profile.education.map((e) => e.institution),
+        ...profile.awards.map((a) => a.title),
+        ...profile.certifications.map((c) => c.title),
+        ...Object.keys(profile.skills),
+    ];
+
+    it.each(names)('%s has no path separator', (name) => {
+        expect(name).not.toContain('/');
+        expect(name).not.toContain('\\');
+    });
+
+    it('and none is blank once trimmed', () => {
+        for (const name of names) expect(name.trim()).not.toBe('');
     });
 });

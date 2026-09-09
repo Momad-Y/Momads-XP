@@ -10,7 +10,7 @@ test('start menu matches the §3.4 structure', async ({ page }) => {
     await expect(menu).toBeVisible();
 
     // identity header
-    await expect(menu.getByText('Mohamed Abdelnasser')).toBeVisible();
+    await expect(menu.getByText('Mohamed Youssef Abdelnasser')).toBeVisible();
     // pinned column
     await expect(menu.getByText('Internet Explorer')).toBeVisible();
     await expect(menu.getByText('Contact Me').first()).toBeVisible();

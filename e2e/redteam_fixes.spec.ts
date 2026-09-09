@@ -92,13 +92,15 @@ test('a shortcut (.lnk) offers no "Add to archive" (would hang)', async ({
     await page.waitForTimeout(450);
     await win.locator('.fs-item', { hasText: 'Experience' }).first().dblclick();
     await page.waitForTimeout(450);
-    const entry = win.getByText('Printerpix — AI Engineer.txt');
+    const entry = win.getByText('Printerpix — Agentic AI Engineer.txt');
     await entry.click({ button: 'right' });
     await page
         .locator('.context-menu')
         .getByText('Create Shortcut', { exact: true })
         .click();
-    const shortcut = win.getByText('Shortcut to Printerpix — AI Engineer.lnk');
+    const shortcut = win.getByText(
+        'Shortcut to Printerpix — Agentic AI Engineer.lnk',
+    );
     await expect(shortcut).toBeVisible({ timeout: 15000 });
 
     // right-click the shortcut → the archive option must be absent

@@ -55,7 +55,9 @@ test('File > Open launches the file instead of navigating into it', async ({
 }) => {
     const win = await openExplorerAt(page, 'Experience');
     await win
-        .locator('.fs-item', { hasText: 'Printerpix — AI Engineer.txt' })
+        .locator('.fs-item', {
+            hasText: 'Printerpix — Agentic AI Engineer.txt',
+        })
         .first()
         .click();
     await win.locator('.toolbar-menu').getByText('File').click();
@@ -63,7 +65,9 @@ test('File > Open launches the file instead of navigating into it', async ({
 
     // a second window opens with the entry's content …
     const detail = page.locator('#work-space .window').nth(1);
-    await expect(detail.getByText('AI Engineer', { exact: true })).toBeVisible({
+    await expect(
+        detail.getByText('Agentic AI Engineer', { exact: true }),
+    ).toBeVisible({
         timeout: 15000,
     });
     // … and Explorer did NOT navigate inside the file.

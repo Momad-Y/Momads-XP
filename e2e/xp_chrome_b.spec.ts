@@ -24,7 +24,9 @@ test('Explorer Back dropdown lists history and jumps to a page', async ({
     await page.waitForTimeout(450);
     await win.locator('.fs-item', { hasText: 'Experience' }).first().dblclick();
     await page.waitForTimeout(450);
-    await expect(win.getByText('Printerpix — AI Engineer.txt')).toBeVisible();
+    await expect(
+        win.getByText('Printerpix — Agentic AI Engineer.txt'),
+    ).toBeVisible();
 
     // open the Back dropdown (Back button = the RButton wrapping "Back")
     await backArrow(win, page).click();
@@ -42,7 +44,9 @@ test('Explorer Back dropdown lists history and jumps to a page', async ({
         win.locator('.fs-item', { hasText: 'Local Disk (C:)' }),
     ).toBeVisible();
     // the portfolio entry from Experience is no longer shown
-    await expect(win.getByText('Printerpix — AI Engineer.txt')).toBeHidden();
+    await expect(
+        win.getByText('Printerpix — Agentic AI Engineer.txt'),
+    ).toBeHidden();
 });
 
 test('IE Back dropdown lists visited pages', async ({ page }) => {

@@ -170,13 +170,13 @@ test('Details renders real CELL values, not just headers', async ({ page }) => {
     });
     // the cells, not the column captions: blanking column_value used to pass
     await expect(row.locator('[data-cell="type"]')).toHaveText('PDF File');
-    // the exact string: /KB|MB|GB/ was unanchored AND the fixture is 61 KB,
+    // the exact string: /KB|MB|GB/ was unanchored AND the fixture is 136 KB,
     // so it matched the old formatter, the new one, and a hardcoded '0 KB'.
     // NOTE: the KB-vs-adaptive rule itself cannot be asserted here — every
     // file reachable in Explorer is under 1 MB (the only larger ones live in
     // the Desktop folder, which is in `hidden_items`), so both rules print
-    // "61 KB". details_columns.test.ts covers it with 13,323 / 5,000,000 KB.
-    await expect(row.locator('[data-cell="size"]')).toHaveText('61 KB');
+    // "136 KB". details_columns.test.ts covers it with 13,323 / 5,000,000 KB.
+    await expect(row.locator('[data-cell="size"]')).toHaveText('136 KB');
     await expect(row.locator('[data-cell="date_modified"]')).toHaveText(
         /^\d+\/\d+\/\d{4} \d+:\d{2} [AP]M$/,
     );
@@ -267,7 +267,7 @@ test('Escape does NOT close an Explorer Bar — that was never XP', async ({
     await pickSub(win, 'Explorer Bar', 'Search');
     const query = win.getByPlaceholder('All or part of a name');
     await query.click();
-    await query.fill('Resume');
+    await query.fill('CV');
     await win.getByRole('button', { name: 'Search', exact: true }).click();
     // the panel's own result row, not the same file in the folder listing
     const hit = win.getByRole('button', {
@@ -278,7 +278,7 @@ test('Escape does NOT close an Explorer Bar — that was never XP', async ({
     await page.keyboard.press('Escape');
     // the query and its results survive — both are component-local `let`s and
     // died with the panel when Escape closed the bar
-    await expect(query).toHaveValue('Resume');
+    await expect(query).toHaveValue('CV');
     await expect(hit).toBeVisible();
 });
 

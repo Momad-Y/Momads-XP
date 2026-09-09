@@ -1,6 +1,22 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { bootToDesktop } from './helpers';
+import { readFileSync } from 'node:fs';
+
+/** From profile.json — the honours line is content and its wording changes. */
+const ENTRY = (
+    JSON.parse(readFileSync('src/lib/data/profile.json', 'utf8')) as {
+        experience: { company: string; role: string; description: string[] }[];
+    }
+).experience[0] as { company: string; role: string; description: string[] };
+
+const HONORS = String(
+    (
+        JSON.parse(readFileSync('src/lib/data/profile.json', 'utf8')) as {
+            education: { honors?: string }[];
+        }
+    ).education[0]?.honors,
+);
 
 async function openMyComputer(page: Page) {
     await bootToDesktop(page);
@@ -66,12 +82,16 @@ test('an experience entry opens a detail window with bullets', async ({
 }) => {
     await openMyComputer(page);
     const win = await enterFolder(page, 'Experience');
-    await win.getByText('Printerpix — AI Engineer.txt').dblclick();
+    await win.getByText(`${ENTRY.company} — ${ENTRY.role}.txt`).dblclick();
     const detail = page.locator('#work-space .window').nth(1);
+    await expect(detail.getByText(ENTRY.role, { exact: true })).toBeVisible();
+    // a slice of the entry's OWN first bullet — proves the detail rendered
+    // content, not just the heading, without pinning the CV's wording
     await expect(
-        detail.getByText('AI Engineer', { exact: true }),
+        detail.getByText(String(ENTRY.description[0]).slice(0, 40), {
+            exact: false,
+        }),
     ).toBeVisible();
-    await expect(detail.getByText(/9 international markets/)).toBeVisible();
 });
 
 test('a project entry shows tech chips and link', async ({ page }) => {
@@ -256,5 +276,5 @@ test('an education entry shows honors', async ({ page }) => {
         .first()
         .dblclick();
     const detail = page.locator('#work-space .window').nth(1);
-    await expect(detail.getByText('Excellent with Honors')).toBeVisible();
+    await expect(detail.getByText(HONORS)).toBeVisible();
 });

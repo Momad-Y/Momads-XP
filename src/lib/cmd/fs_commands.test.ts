@@ -4,6 +4,7 @@ import { FS_COMMANDS, remainder, run_fs } from './fs_commands';
 import { ROOT } from './path';
 import { strip_ansi } from '../term/ansi';
 import { required, to_hard_drive } from '../types';
+import { profile } from '../profile';
 import type { HardDrive } from '../types';
 
 /** The SHIPPED seed, narrowed rather than asserted into shape. */
@@ -16,7 +17,17 @@ function load_seed(): HardDrive {
 const drive = load_seed();
 const C = 'cTbkbrM4qjwF3UfmCoFkEK';
 const EXPERIENCE = 'p2FolderExperience';
-const PRINTERPIX = 'p2ExpPrinterpixAIEngineer0';
+/*
+ * Derived, not spelled. These fixtures use the FIRST experience entry because
+ * its name exercises the real hazards — spaces, an em dash, a long name — but
+ * the entry itself is content the owner rewrites from their CV, and hardcoding
+ * it made a CV update look like a code regression.
+ */
+const PRINTERPIX_NAME = `${profile.experience[0]?.company ?? ''} — ${profile.experience[0]?.role ?? ''}.txt`;
+const PRINTERPIX = required(
+    Object.values(drive).find((i) => i.name === PRINTERPIX_NAME),
+    `seed entry ${PRINTERPIX_NAME}`,
+).id;
 
 function out(name: string, rest = '', cwd = C): string {
     return run_fs(name, rest, { drive, cwd }).lines.map(strip_ansi).join('\n');
@@ -32,8 +43,8 @@ describe('ls', () => {
 
     it('marks directories with a trailing slash and files without', () => {
         const text = out('ls', '', EXPERIENCE);
-        expect(text).toContain('Printerpix — AI Engineer.txt');
-        expect(text).not.toContain('Printerpix — AI Engineer.txt/');
+        expect(text).toContain(PRINTERPIX_NAME);
+        expect(text).not.toContain(`${PRINTERPIX_NAME}/`);
     });
 
     it('shows hidden entries with -a', () => {
@@ -48,8 +59,8 @@ describe('ls', () => {
     });
 
     it('names a file rather than printing nothing', () => {
-        expect(out('ls', 'Experience/Printerpix — AI Engineer.txt')).toBe(
-            'Printerpix — AI Engineer.txt',
+        expect(out('ls', `Experience/${PRINTERPIX_NAME}`)).toBe(
+            PRINTERPIX_NAME,
         );
     });
 
@@ -99,13 +110,13 @@ describe('cd', () => {
     });
 
     it('refuses a file, and says why', () => {
-        const result = run_fs('cd', 'Printerpix — AI Engineer.txt', {
+        const result = run_fs('cd', PRINTERPIX_NAME, {
             drive,
             cwd: EXPERIENCE,
         });
         expect(result.cwd).toBeUndefined();
         expect(result.lines.map(strip_ansi)).toEqual([
-            'cd: Printerpix — AI Engineer.txt: Not a directory',
+            `cd: ${PRINTERPIX_NAME}: Not a directory`,
         ]);
     });
 
@@ -134,13 +145,13 @@ describe('pwd', () => {
 
 describe('cat', () => {
     it('renders a portfolio entry from the ref the generator stamped', () => {
-        const text = out('cat', 'Printerpix — AI Engineer.txt', EXPERIENCE);
+        const text = out('cat', PRINTERPIX_NAME, EXPERIENCE);
         expect(text).toContain('AI Engineer');
         expect(text).toContain('Printerpix');
     });
 
     it('names the images it cannot show instead of dropping them', () => {
-        const text = out('cat', 'Printerpix — AI Engineer.txt', EXPERIENCE);
+        const text = out('cat', PRINTERPIX_NAME, EXPERIENCE);
         expect(text).toMatch(/\[\d+ images? — open this file in My Computer/);
     });
 
@@ -176,7 +187,7 @@ describe('cat', () => {
                 portfolio_ref: { section: 'experience', key: 999 },
             },
         };
-        const lines = run_fs('cat', 'Printerpix — AI Engineer.txt', {
+        const lines = run_fs('cat', PRINTERPIX_NAME, {
             drive: drifted,
             cwd: EXPERIENCE,
         }).lines.map(strip_ansi);
@@ -233,7 +244,7 @@ describe('cat on a visitor-owned file', () => {
     });
 
     it('prefers the portfolio rendering when the file has a ref', () => {
-        const result = run_fs('cat', 'Printerpix — AI Engineer.txt', {
+        const result = run_fs('cat', PRINTERPIX_NAME, {
             drive,
             cwd: EXPERIENCE,
         });
