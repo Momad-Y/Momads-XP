@@ -38,7 +38,7 @@ test('Search button finds files by name', async ({ page }) => {
     // the panel's own Search button, not the toolbar one
     await win.getByRole('button', { name: 'Search', exact: true }).click();
 
-    await expect(win.getByText('Mohamed_Abdelnasser_Resume.pdf')).toBeVisible();
+    await expect(win.getByText('CV.pdf')).toBeVisible();
 
     // a nonsense query yields the empty state
     await win.getByPlaceholder('All or part of a name').click();

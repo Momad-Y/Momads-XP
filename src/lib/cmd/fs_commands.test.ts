@@ -26,7 +26,7 @@ describe('ls', () => {
     it('lists the working directory, hiding what Explorer hides', () => {
         const text = out('ls');
         expect(text).toContain('Experience/');
-        expect(text).toContain('Mohamed_Abdelnasser_Resume.pdf');
+        expect(text).toContain('CV.pdf');
         expect(text).not.toContain('Recycle Bin');
     });
 
@@ -154,7 +154,7 @@ describe('cat', () => {
     });
 
     it('describes a file it has no text for, with its size', () => {
-        const text = out('cat', 'Mohamed_Abdelnasser_Resume.pdf');
+        const text = out('cat', 'CV.pdf');
         expect(text).toContain('PDF file');
         expect(text).toContain('KB');
         expect(text).toContain('open it from My Computer');

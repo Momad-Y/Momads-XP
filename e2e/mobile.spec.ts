@@ -30,7 +30,7 @@ test.describe('mobile portrait (390x844)', () => {
         // resume download + socials
         await expect(page.locator('a[download]')).toHaveAttribute(
             'href',
-            '/assets/Mohamed_Abdelnasser_Resume.pdf',
+            '/assets/CV.pdf',
         );
         await expect(
             page.locator('a[href="https://github.com/Momad-Y"]'),

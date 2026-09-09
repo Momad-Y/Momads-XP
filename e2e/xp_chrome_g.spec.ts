@@ -38,7 +38,7 @@ async function enterC(
 ): Promise<void> {
     await win.getByText('Local Disk (C:)').dblclick();
     if (first_entry) await win.locator('.dialog').getByText('OK').click();
-    await expect(win.getByText('Mohamed_Abdelnasser_Resume.pdf')).toBeVisible();
+    await expect(win.getByText('CV.pdf')).toBeVisible();
 }
 
 async function openMenu(win: Locator, name: string): Promise<void> {
@@ -136,14 +136,10 @@ test('a desktop selection is not deleted by an Explorer right-click', async ({
     // the selection has to be made AFTER the window mounts — mounting a viewer
     // clears the global selection, which is what made earlier attempts vacuous
     await desktop_file.click();
-    await win
-        .getByText('Mohamed_Abdelnasser_Resume.pdf')
-        .click({ modifiers: ['Control'] });
+    await win.getByText('CV.pdf').click({ modifiers: ['Control'] });
 
     // right-click Delete in Explorer must act on Explorer's item alone
-    await win
-        .getByText('Mohamed_Abdelnasser_Resume.pdf')
-        .click({ button: 'right' });
+    await win.getByText('CV.pdf').click({ button: 'right' });
     await page.locator('.context-menu').getByText('Delete').click();
     const prompt = win.locator('.dialog');
     await expect(prompt).toBeVisible();
@@ -153,9 +149,7 @@ test('a desktop selection is not deleted by an Explorer right-click', async ({
     await prompt.getByText('OK').click();
     await expect(prompt).toBeHidden();
     // the Explorer file went …
-    await expect(win.getByText('Mohamed_Abdelnasser_Resume.pdf')).toHaveCount(
-        0,
-    );
+    await expect(win.getByText('CV.pdf')).toHaveCount(0);
     // … and the desktop file, which the user never targeted, survived
     await expect(
         page.locator('#work-space p', { hasText: 'New Text Document.txt' }),
@@ -172,7 +166,7 @@ test('Details renders real CELL values, not just headers', async ({ page }) => {
         .click();
 
     const row = win.locator('.fs-item', {
-        hasText: 'Mohamed_Abdelnasser_Resume.pdf',
+        hasText: 'CV.pdf',
     });
     // the cells, not the column captions: blanking column_value used to pass
     await expect(row.locator('[data-cell="type"]')).toHaveText('PDF File');
@@ -244,7 +238,7 @@ test('F5 does not refresh underneath the DELETE confirmation', async ({
     // the window and set no flag. This is one of those.
     const win = await openMyComputer(page);
     await enterC(win, { first_entry: true });
-    await win.getByText('Mohamed_Abdelnasser_Resume.pdf').click();
+    await win.getByText('CV.pdf').click();
     await openMenu(win, 'File');
     await menuRow(win, 'Delete').click();
     const prompt = win.locator('.dialog');
@@ -258,7 +252,7 @@ test('F5 does not refresh underneath the DELETE confirmation', async ({
     // and Escape is Cancel here, as on any XP dialog
     await page.keyboard.press('Escape');
     await expect(prompt).toBeHidden();
-    await expect(win.getByText('Mohamed_Abdelnasser_Resume.pdf')).toBeVisible();
+    await expect(win.getByText('CV.pdf')).toBeVisible();
 });
 
 test('Escape does NOT close an Explorer Bar — that was never XP', async ({
@@ -277,7 +271,7 @@ test('Escape does NOT close an Explorer Bar — that was never XP', async ({
     await win.getByRole('button', { name: 'Search', exact: true }).click();
     // the panel's own result row, not the same file in the folder listing
     const hit = win.getByRole('button', {
-        name: 'Mohamed_Abdelnasser_Resume.pdf',
+        name: 'CV.pdf',
     });
     await expect(hit).toBeVisible();
 

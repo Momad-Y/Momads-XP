@@ -881,7 +881,7 @@ All personal content lives in a single `src/lib/data/profile.json`. Components r
         "email": "Mohamed.Y.Abdelnasser@gmail.com",
         "phone": "+971503429805",
         "avatar": "/assets/avatar.png",
-        "resumePdf": "/assets/Mohamed_Abdelnasser_Resume.pdf",
+        "resumePdf": "/assets/CV.pdf",
     },
 
     "about": {

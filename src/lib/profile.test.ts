@@ -9,9 +9,7 @@ describe('profile integrity', () => {
         expect(profile.meta.title).toBe('AI Engineer');
         expect(profile.meta.email).toMatch(/^[^@\s]+@[^@\s]+\.[^@\s]+$/);
         expect(profile.meta.avatar).toBe('/assets/images/avatar.png');
-        expect(profile.meta.resumePdf).toBe(
-            '/assets/Mohamed_Abdelnasser_Resume.pdf',
-        );
+        expect(profile.meta.resumePdf).toBe('/assets/CV.pdf');
     });
 
     it('has the three social links with the real URLs', () => {

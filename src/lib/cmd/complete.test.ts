@@ -190,12 +190,8 @@ describe('completing a path', () => {
     });
 
     it('offers cd only directories, and ls both', () => {
-        expect(tab('cd ').candidates).not.toContain(
-            'Mohamed_Abdelnasser_Resume.pdf ',
-        );
-        expect(tab('ls ').candidates).toContain(
-            'Mohamed_Abdelnasser_Resume.pdf ',
-        );
+        expect(tab('cd ').candidates).not.toContain('CV.pdf ');
+        expect(tab('ls ').candidates).toContain('CV.pdf ');
     });
 
     it('offers hidden entries, which ls would not have listed', () => {
