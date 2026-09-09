@@ -34,7 +34,7 @@ jobs:
               run: |
                   npx tsc --noEmit --strict --skipLibCheck --resolveJsonModule --module esnext --moduleResolution bundler --target es2022 scripts/generate-vfs.ts
                   npm run generate:vfs
-                  git diff --exit-code static/json/hard_drive.json src/lib/generated
+                  git diff --exit-code static/json/hard_drive.json src/lib/generated static/help.html
                   # Album art is extracted into static/assets/covers, which the
                   # generator OWNS (clears and rewrites). `git diff` cannot see
                   # this directory's failure modes: it exits 0 for an UNTRACKED

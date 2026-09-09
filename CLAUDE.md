@@ -5,7 +5,7 @@ Source of truth: `docs/SPECIFICATION.md` (features, architecture, phases, §11 s
 ## Hard rules
 
 - **npm 10 locks.** CI's `npm ci` runs npm 10 (Node 22); locks written by npm 11+ fail it. After ANY `package.json`/lockfile change (including `npm audit fix`), regenerate: `npx -y npm@10 install`.
-- **Never hand-edit generated files:** `static/json/hard_drive.json`, `src/lib/generated/*`. Edit `src/lib/data/profile.json` (content) or `scripts/vfs-base.json` (inherited shell items), then `npm run generate:vfs`. CI has a freshness gate.
+- **Never hand-edit generated files:** `static/json/hard_drive.json`, `src/lib/generated/*`, `static/help.html` (edit `scripts/help.template.html`). Edit `src/lib/data/profile.json` (content) or `scripts/vfs-base.json` (inherited shell items), then `npm run generate:vfs`. CI has a freshness gate.
 - **Strict TS:** 0 svelte-check errors; ESLint `no-explicit-any` + `no-unsafe-type-assertion` are errors over `src/`. Do not grow the inherited warning count (131 as of Phase 2; burned to zero in Phase 6).
 - **No hardcoded personal content in components** — everything reads `profile` from `src/lib/profile.ts`.
 - **`$lib/server/*` is server-only** (SvelteKit build-time guard). Client-shared constants go in plain `src/lib/` (e.g. `email_limits.ts`).
