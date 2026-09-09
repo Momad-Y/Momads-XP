@@ -1,4 +1,15 @@
 import { test, expect } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import { FIRST_SKILL_GROUP, OWNER_NAME } from './helpers';
+
+/** Content, read rather than spelled — the project list changes with the CV. */
+const FIRST_PROJECT = String(
+    (
+        JSON.parse(readFileSync('src/lib/data/profile.json', 'utf8')) as {
+            projects: { name: string }[];
+        }
+    ).projects[0]?.name,
+);
 
 test.describe('mobile portrait (390x844)', () => {
     test.use({ viewport: { width: 390, height: 844 } });
@@ -9,7 +20,7 @@ test.describe('mobile portrait (390x844)', () => {
             timeout: 15_000,
         });
         await expect(
-            page.getByRole('heading', { name: 'Mohamed Abdelnasser' }),
+            page.getByRole('heading', { name: OWNER_NAME }),
         ).toBeVisible();
 
         // ≥1 Experience entry
@@ -18,19 +29,19 @@ test.describe('mobile portrait (390x844)', () => {
 
         // ≥1 Skills group
         await page.getByRole('button', { name: 'Skills' }).click();
-        await expect(page.getByText('AI & Machine Learning')).toBeVisible();
+        await expect(page.getByText(FIRST_SKILL_GROUP)).toBeVisible();
 
         // Projects render real entries now (Phase 2 populated profile.projects)
         await page.getByRole('button', { name: 'Projects' }).click();
         await expect(
-            page.getByText('RoboCup @Home Education 2024'),
+            page.getByText(FIRST_PROJECT, { exact: true }),
         ).toBeVisible();
         await expect(page.getByText(/coming soon/)).toHaveCount(0);
 
         // resume download + socials
         await expect(page.locator('a[download]')).toHaveAttribute(
             'href',
-            '/assets/Mohamed_Abdelnasser_Resume.pdf',
+            '/assets/CV.pdf',
         );
         await expect(
             page.locator('a[href="https://github.com/Momad-Y"]'),

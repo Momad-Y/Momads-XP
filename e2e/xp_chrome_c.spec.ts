@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { bootToDesktop } from './helpers';
+import { ENTRY_FILE, bootToDesktop } from './helpers';
 
 async function openMyComputer(page: Page) {
     await bootToDesktop(page);
@@ -23,7 +23,7 @@ test('Folders button shows a tree that navigates', async ({ page }) => {
     // File Transfer guide may appear on first folder entry
     const guide = win.locator('.dialog').getByText('OK');
     if (await guide.count()) await guide.click();
-    await expect(win.getByText('Printerpix — AI Engineer.txt')).toBeVisible();
+    await expect(win.getByText(ENTRY_FILE)).toBeVisible();
 });
 
 test('Search button finds files by name', async ({ page }) => {
@@ -34,11 +34,11 @@ test('Search button finds files by name', async ({ page }) => {
     // click before typing: fill() focuses without dispatching a click, so it
     // can drive a path no user can reach (see e2e/favorites.spec.ts)
     await win.getByPlaceholder('All or part of a name').click();
-    await win.getByPlaceholder('All or part of a name').fill('Resume');
+    await win.getByPlaceholder('All or part of a name').fill('CV');
     // the panel's own Search button, not the toolbar one
     await win.getByRole('button', { name: 'Search', exact: true }).click();
 
-    await expect(win.getByText('Mohamed_Abdelnasser_Resume.pdf')).toBeVisible();
+    await expect(win.getByText('CV.pdf')).toBeVisible();
 
     // a nonsense query yields the empty state
     await win.getByPlaceholder('All or part of a name').click();

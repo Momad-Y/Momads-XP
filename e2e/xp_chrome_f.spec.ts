@@ -104,7 +104,7 @@ test('View > Status Bar counts what the folder holds, and toggles off', async ({
     await expect(status).not.toHaveText('0 objects');
 
     // selecting an item switches the count to the selection, like XP
-    await win.getByText('Mohamed_Abdelnasser_Resume.pdf').click();
+    await win.getByText('CV.pdf').click();
     await expect(win.getByText('1 object selected')).toBeVisible();
 
     await openMenu(win, 'View');
@@ -210,7 +210,7 @@ test('View > Go To navigates, and Refresh keeps the folder listed', async ({
     page,
 }) => {
     const win = await openDriveC(page);
-    await expect(win.getByText('Mohamed_Abdelnasser_Resume.pdf')).toBeVisible();
+    await expect(win.getByText('CV.pdf')).toBeVisible();
 
     // Refresh really re-reads the folder: it drops back to the loading state
     // and re-sorts. The flash is too brief to poll for, so a MutationObserver
@@ -234,7 +234,7 @@ test('View > Go To navigates, and Refresh keeps the folder listed', async ({
     expect(await page.title()).not.toBe('REFRESH_OBSERVED');
     await menuRow(win, 'Refresh').click();
     await expect.poll(() => page.title()).toBe('REFRESH_OBSERVED');
-    await expect(win.getByText('Mohamed_Abdelnasser_Resume.pdf')).toBeVisible();
+    await expect(win.getByText('CV.pdf')).toBeVisible();
 
     // Go To > Up One Level lands on the My Computer root
     await openMenu(win, 'View');
@@ -244,7 +244,7 @@ test('View > Go To navigates, and Refresh keeps the folder listed', async ({
     // …and Back returns to C:
     await openMenu(win, 'View');
     await pickSub(win, 'Go To', 'Back');
-    await expect(win.getByText('Mohamed_Abdelnasser_Resume.pdf')).toBeVisible();
+    await expect(win.getByText('CV.pdf')).toBeVisible();
 
     // the visited-folder list at the bottom of Go To is live too — deleting
     // the whole history_entries spread used to pass
@@ -259,5 +259,5 @@ test('View > Go To navigates, and Refresh keeps the folder listed', async ({
     await expect(win.getByText('Files Stored on This Computer')).toBeVisible();
     await openMenu(win, 'View');
     await pickSub(win, 'Go To', 'Forward');
-    await expect(win.getByText('Mohamed_Abdelnasser_Resume.pdf')).toBeVisible();
+    await expect(win.getByText('CV.pdf')).toBeVisible();
 });

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import type { Frame, Page } from '@playwright/test';
-import { bootToDesktop } from './helpers';
+import { ENTRY_FILE, bootToDesktop } from './helpers';
 
 /**
  * The Python REPL (SPECIFICATION.md §3.2) and — more importantly — the
@@ -517,7 +517,7 @@ test('/c is mounted, readable, and read-only @online', async ({ page }) => {
     // Plain open(), relative to the working directory, no await, no imports.
     await type(
         page,
-        'print("READ", open("Experience/Printerpix — AI Engineer.txt").read()[:20])',
+        `print("READ", open("Experience/${ENTRY_FILE}").read()[:20])`,
     );
     await expect
         .poll(async () => cmdScreen(page), { timeout: 30_000 })

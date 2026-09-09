@@ -114,9 +114,7 @@ test('a failed PDF load shows the connection message and Try Again recovers', as
     page,
 }) => {
     // simulate a dead connection for the resume asset
-    await page.route('**/Mohamed_Abdelnasser_Resume.pdf', (route) =>
-        route.abort(),
-    );
+    await page.route('**/CV.pdf', (route) => route.abort());
     await bootToDesktop(page);
     await page.locator('#work-space p', { hasText: 'My CV' }).dblclick();
     const win = page.locator('#work-space .window').first();
@@ -125,7 +123,7 @@ test('a failed PDF load shows the connection message and Try Again recovers', as
     });
 
     // connection recovers
-    await page.unroute('**/Mohamed_Abdelnasser_Resume.pdf');
+    await page.unroute('**/CV.pdf');
     // .last(): RButton's wrapper and its inner text node both match
     await win.getByText('Try Again', { exact: true }).last().click();
     await expect(win.locator('canvas').first()).toBeVisible({

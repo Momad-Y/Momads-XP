@@ -24,12 +24,16 @@ describe('resolve_portfolio_ref', () => {
     });
 
     it('maps a skills category via string key', () => {
+        // the group NAME is content and gets renamed whenever the CV is
+        // reorganised; what this test is about is the string-key lookup
+        const key = Object.keys(profile.skills)[0];
+        expect(key).toBeDefined();
         const d = resolve_portfolio_ref({
             section: 'skills',
-            key: 'NLP & LLMs',
+            key: String(key),
         });
-        expect(d?.heading).toBe('NLP & LLMs');
-        expect(d?.bullets).toEqual(profile.skills['NLP & LLMs']);
+        expect(d?.heading).toBe(key);
+        expect(d?.bullets).toEqual(profile.skills[String(key)]);
     });
 
     it('maps education with honors as a meta line', () => {
@@ -39,11 +43,22 @@ describe('resolve_portfolio_ref', () => {
         expect(d?.meta_lines).toContain(profile.education[0]?.honors);
     });
 
-    it('tolerates an award with empty year', () => {
-        const idx = profile.awards.findIndex((a) => a.year === '');
-        const d = resolve_portfolio_ref({ section: 'awards', key: idx });
-        expect(d).not.toBeNull();
-        expect(d?.meta_lines).toEqual([]);
+    it('lists an award year as a meta line, and omits an empty one', () => {
+        /*
+         * This used to hunt profile.awards for an entry with `year: ''` and
+         * assert the empty case — so it silently stopped testing anything the
+         * moment every award got a year, and `findIndex` returning -1 made it
+         * fail rather than skip. Asserted per entry instead: whatever the data
+         * holds, the rule is the same.
+         */
+        expect(profile.awards.length).toBeGreaterThan(0);
+        profile.awards.forEach((award, i) => {
+            const d = resolve_portfolio_ref({ section: 'awards', key: i });
+            expect(d, award.title).not.toBeNull();
+            expect(d?.meta_lines).toEqual(
+                award.year === '' ? [] : [award.year],
+            );
+        });
     });
 
     it('returns null on out-of-range or unknown keys', () => {

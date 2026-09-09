@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { bootToDesktop } from './helpers';
+import { ENTRY_FILE, bootToDesktop } from './helpers';
 
 /**
  * Explorer's address-bar Go arrow was a bare <div> with no click handler and
@@ -25,7 +25,7 @@ test('the address bar Go arrow navigates, like Enter does', async ({
     await expect(guide).toBeVisible({ timeout: 15000 });
     await guide.click();
 
-    await expect(win.getByText('Printerpix — AI Engineer.txt')).toBeVisible({
+    await expect(win.getByText(ENTRY_FILE)).toBeVisible({
         timeout: 15000,
     });
 });
@@ -69,7 +69,7 @@ test('Go on an unresolvable path leaves you where you were', async ({
     const guide = win.locator('.dialog').getByText('OK');
     await expect(guide).toBeVisible({ timeout: 15000 });
     await guide.click();
-    await expect(win.getByText('Printerpix — AI Engineer.txt')).toBeVisible({
+    await expect(win.getByText(ENTRY_FILE)).toBeVisible({
         timeout: 15000,
     });
 
@@ -78,6 +78,6 @@ test('Go on an unresolvable path leaves you where you were', async ({
     await win.getByRole('button', { name: 'Go' }).click();
 
     // still in Experience — no navigation, no crash, no jump to the root
-    await expect(win.getByText('Printerpix — AI Engineer.txt')).toBeVisible();
+    await expect(win.getByText(ENTRY_FILE)).toBeVisible();
     await expect(win.getByText('Files Stored on This Computer')).toBeHidden();
 });

@@ -193,7 +193,7 @@ export function build_portfolio(profile: Profile): PortfolioBuild {
         ext: resume_dot > 0 ? resume_filename.slice(resume_dot) : '',
         storage_type: 'remote',
         url: resume_url,
-        size: 61,
+        size: 136,
     });
 
     return {

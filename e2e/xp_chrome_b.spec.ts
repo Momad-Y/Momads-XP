@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { bootToDesktop } from './helpers';
+import { ENTRY_FILE, bootToDesktop } from './helpers';
 import { stubBrowse } from './stub_browse';
 
 /** The Back RButton's expand-arrow: the 10px wrapper inside its .p-2 root. */
@@ -24,7 +24,7 @@ test('Explorer Back dropdown lists history and jumps to a page', async ({
     await page.waitForTimeout(450);
     await win.locator('.fs-item', { hasText: 'Experience' }).first().dblclick();
     await page.waitForTimeout(450);
-    await expect(win.getByText('Printerpix — AI Engineer.txt')).toBeVisible();
+    await expect(win.getByText(ENTRY_FILE)).toBeVisible();
 
     // open the Back dropdown (Back button = the RButton wrapping "Back")
     await backArrow(win, page).click();
@@ -42,7 +42,7 @@ test('Explorer Back dropdown lists history and jumps to a page', async ({
         win.locator('.fs-item', { hasText: 'Local Disk (C:)' }),
     ).toBeVisible();
     // the portfolio entry from Experience is no longer shown
-    await expect(win.getByText('Printerpix — AI Engineer.txt')).toBeHidden();
+    await expect(win.getByText(ENTRY_FILE)).toBeHidden();
 });
 
 test('IE Back dropdown lists visited pages', async ({ page }) => {

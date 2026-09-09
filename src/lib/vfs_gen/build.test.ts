@@ -81,7 +81,7 @@ describe('build_portfolio', () => {
         // CEIL, not round: `size_label` (details_columns.ts:72) ceils, fs.ts's
         // upload paths ceil, and XP ceils. Rounding here would make the seed
         // the only size in the drive that disagrees with the column rendering
-        // it — 61,621 bytes is 60.2 KB, which XP shows as 61 KB.
+        // it — 138,780 bytes is 135.5 KB, which XP shows as 136 KB.
         const bytes = statSync(`static${profile.meta.resumePdf}`).size;
         expect(built.items[built.resume_file_id]?.size).toBe(
             Math.ceil(bytes / 1024),

@@ -30,7 +30,7 @@ test('Explorer view modes switch the layout', async ({ page }) => {
 
     // Thumbnails: still shows the items (larger)
     await pickView('Thumbnails');
-    await expect(win.getByText('Mohamed_Abdelnasser_Resume.pdf')).toBeVisible();
+    await expect(win.getByText('CV.pdf')).toBeVisible();
 });
 
 test('view modes are greyed at the My Computer root, where they do nothing', async ({
