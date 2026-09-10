@@ -142,6 +142,45 @@ function check_name(kind: string, value: string): void {
 }
 
 /**
+ * The display name for a track.
+ *
+ * THE FILENAME WINS, not the ID3 title. The plan originally preferred the tag
+ * as the richer source; the real library disproved that. Files downloaded from
+ * YouTube carry tags like `Ed Sheeran - Shape Of You [Official Video]` and
+ * `Wegz - LAQTTA | ويجز - لقطة prod ...`, while the owner had already named the
+ * files `01 - Shape Of You.mp3` — deliberately, since filename order is what
+ * sets playback order. Taking the tag threw that away and put a download title
+ * in Explorer and the player.
+ *
+ * The leading track number goes with it: it exists to order the folder, not to
+ * be read out on screen.
+ */
+export function display_title(filename: string): string {
+    return filename
+        .replace(/\.mp3$/i, '')
+        .replace(/^\s*\d{1,3}\s*[-._)]?\s+/, '')
+        .trim();
+}
+
+/**
+ * Tidies an ID3 artist, or drops it.
+ *
+ * Two YouTube artefacts only, both unambiguous: the `- Topic` auto-channels
+ * (`Kanye West - Topic`) and VEVO suffixes (`KendrickLamarVEVO`). Anything
+ * else is left exactly as tagged — guessing at artist names from noisy strings
+ * would replace a wrong-but-honest value with a wrong-and-invented one.
+ */
+export function clean_artist(artist: string | undefined): string | null {
+    const value = artist?.trim();
+    if (value == null || value === '') return null;
+    const tidied = value
+        .replace(/\s*-\s*Topic$/i, '')
+        .replace(/VEVO$/i, '')
+        .trim();
+    return tidied === '' ? null : tidied;
+}
+
+/**
  * Walks the declared genres and returns the library plus the covers to write.
  *
  * Every failure here is LOUD. The worst outcome this feature can have is a
@@ -260,6 +299,22 @@ export async function scan_music(
                 );
             }
 
+            /*
+             * The display title becomes the VFS entry NAME, so it needs the
+             * same check the filename gets — `cmd/path.ts` splits names on
+             * `/`, and a slash here would list in Explorer and be unopenable
+             * from CMD. Checked separately because a tag, or a stripped track
+             * number, can differ from the filename that was already checked.
+             */
+            const title = display_title(filename);
+            if (title === '') {
+                throw new Error(
+                    `${path} has no name left once its track number is ` +
+                        'stripped — rename it to something readable',
+                );
+            }
+            check_name('track title', title);
+
             let cover: string | null = null;
             if (tags.picture != null) {
                 const ext = cover_extension(tags.picture.format);
@@ -279,8 +334,8 @@ export async function scan_music(
 
             tracks.push({
                 id,
-                title: tags.title?.trim() ?? filename.replace(/\.mp3$/i, ''),
-                artist: tags.artist?.trim() ?? null,
+                title,
+                artist: clean_artist(tags.artist),
                 filename,
                 url: `/audio/music/${encodeURI(genre.dir)}/${encodeURI(filename)}`,
                 // KB, per VfsItem.size — a byte value renders as "512,986 KB"

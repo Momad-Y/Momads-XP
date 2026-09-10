@@ -528,8 +528,24 @@
     "music": {
         "genres": [
             {
-                "dir": "demo",
-                "name": "Demo Tracks"
+                "dir": "arabic-pop",
+                "name": "Arabic Pop"
+            },
+            {
+                "dir": "arabic-rap",
+                "name": "Arabic Rap"
+            },
+            {
+                "dir": "english-pop",
+                "name": "English Pop"
+            },
+            {
+                "dir": "hip-hop",
+                "name": "Hip Hop"
+            },
+            {
+                "dir": "scores",
+                "name": "Scores"
             }
         ],
         "notice": "All music legally acquired™ · personal listening only, not for distribution."
