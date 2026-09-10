@@ -359,6 +359,7 @@ writeFileSync(
                 duration_s: t.duration_s,
                 genre: t.genre,
                 cover: t.cover,
+                cover_box: t.cover_box,
             })),
         ),
         null,

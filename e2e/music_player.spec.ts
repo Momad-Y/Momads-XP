@@ -72,19 +72,28 @@ test('opens with the discovered track list, grouped by genre', async ({
     // The library is scanned from static/audio/music/<genre>/*.mp3 and ordered
     // genre-by-genre, then by filename, so these are positions in a flat list
     // that the headers only visually divide.
-    const rows = page.getByTestId('track-row');
-    await expect(rows).toHaveCount(TRACKS.length);
-    await expect(rows.nth(0)).toContainText(String(TRACKS[0]?.title));
-    await expect(rows.nth(TRACKS.length - 1)).toContainText(
-        String(TRACKS[TRACKS.length - 1]?.title),
-    );
-
     // one header per genre, in profile.json's declared order
     const headers = page.getByTestId('genre-header');
     await expect(headers).toHaveCount(GENRES.length);
     for (const [i, genre] of GENRES.entries()) {
-        await expect(headers.nth(i)).toHaveText(genre.name);
+        await expect(headers.nth(i)).toContainText(genre.name);
     }
+
+    /*
+     * Genres collapse, and only the one being played is open — 15 tracks under
+     * 5 headers was a 20-row list that pushed the transport controls out of a
+     * 470px window. So the visible rows are the FIRST genre's, not the whole
+     * library.
+     */
+    const rows = page.getByTestId('track-row');
+    const first_group = TRACKS.filter((t) => t.genre === GENRES[0]?.dir);
+    await expect(rows).toHaveCount(first_group.length);
+    await expect(rows.nth(0)).toContainText(String(first_group[0]?.title));
+
+    // opening a second genre ADDS to it rather than closing the first
+    const second = TRACKS.filter((t) => t.genre === GENRES[1]?.dir);
+    await headers.nth(1).click();
+    await expect(rows).toHaveCount(first_group.length + second.length);
 
     // art slot always renders — the icon stands in when a file carries no cover
     await expect(page.getByTestId('cover-art')).toBeVisible();
@@ -162,9 +171,13 @@ test('clicking a track row switches to it', async ({ page }) => {
 
     // nth(2) counts across the flat list, so a genre header between rows must
     // not shift the mapping — which is exactly what `group.offset` guarantees.
-    // a row in the SECOND genre group, so a header between rows must not shift
-    // the index mapping — which is what `group.offset` guarantees
+    /*
+     * A row in the SECOND genre, reached by expanding it first. A header
+     * between rows must not shift the index mapping — `group.offset` is what
+     * guarantees that, and picking a row past a header is what tests it.
+     */
     const target = TRACKS.findIndex((t) => t.genre !== TRACKS[0]?.genre);
+    await page.getByTestId('genre-header').nth(1).click();
     await page.getByTestId('track-row').nth(target).click();
     await expect
         .poll(async () =>
@@ -259,4 +272,64 @@ test('Details shows KB while the status bar shows MB — in ONE window', async (
         win.getByText(`${String(group.length)} objects selected`),
     ).toBeVisible();
     await expect(win.getByText(`${mb} MB`)).toBeVisible();
+});
+
+test('a genre collapses and reopens, and the playing one opens itself', async ({
+    page,
+}) => {
+    await bootToDesktop(page);
+    await openPlayer(page);
+
+    const rows = page.getByTestId('track-row');
+    const headers = page.getByTestId('genre-header');
+    const first = TRACKS.filter((t) => t.genre === GENRES[0]?.dir);
+
+    // the playing genre starts open; a header reports its own track count
+    await expect(rows).toHaveCount(first.length);
+    await expect(headers.nth(0)).toContainText(String(first.length));
+
+    // collapsing the playing genre is allowed — it is the visitor's call
+    await headers.nth(0).click();
+    await expect(rows).toHaveCount(0);
+    await headers.nth(0).click();
+    await expect(rows).toHaveCount(first.length);
+
+    /*
+     * Playing into a COLLAPSED genre must open it, or the visitor is left
+     * looking at five closed headers with no idea where the sound is coming
+     * from. Stepping back from the first track wraps to the last, which is in
+     * the final genre.
+     */
+    await headers.nth(0).click();
+    await expect(rows).toHaveCount(0);
+    await page.getByRole('button', { name: 'Previous' }).click();
+    await expect(rows).toHaveCount(
+        TRACKS.filter((t) => t.genre === TRACKS[TRACKS.length - 1]?.genre)
+            .length,
+    );
+});
+
+test('cover art is cropped past the letterboxing', async ({ page }) => {
+    /*
+     * Art pulled from YouTube is a 16:9 thumbnail padded into a square, so a
+     * plain object-cover renders two flat bands and a strip of picture. The
+     * box is measured at build time (`cover_box`) and applied here; asserting
+     * the rendered image is WIDER than its slot is what proves the zoom
+     * happened, since an uncropped cover would exactly fill it.
+     */
+    await bootToDesktop(page);
+    await openPlayer(page);
+
+    const slot = page.getByTestId('cover-art');
+    await expect(slot).toBeVisible();
+    const box = await slot.boundingBox();
+    const img = await slot.locator('img').boundingBox();
+    expect(box).not.toBeNull();
+    expect(img).not.toBeNull();
+
+    const cropped = TRACKS[0]?.cover_box;
+    expect(cropped, 'first track should have a measured crop').toBeTruthy();
+    expect(img?.width ?? 0).toBeGreaterThan((box?.width ?? 0) + 1);
+    // and it stays square — the slot must not letterbox it a second time
+    expect(Math.abs((box?.width ?? 0) - (box?.height ?? 0))).toBeLessThan(2);
 });

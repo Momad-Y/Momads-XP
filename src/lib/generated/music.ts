@@ -14,6 +14,14 @@ export const TRACKS: readonly Track[] = [
         duration_s: 188,
         genre: 'arabic-pop',
         cover: '/assets/covers/b083c7541fc6b354.png',
+        cover_box: {
+            x: 110,
+            y: 110,
+            w: 281,
+            h: 281,
+            iw: 500,
+            ih: 500,
+        },
     },
     {
         id: '2a523242830f20ae',
@@ -25,6 +33,14 @@ export const TRACKS: readonly Track[] = [
         duration_s: 213,
         genre: 'arabic-pop',
         cover: '/assets/covers/2d9fb974120a4d8e.png',
+        cover_box: {
+            x: 90,
+            y: 90,
+            w: 320,
+            h: 320,
+            iw: 500,
+            ih: 500,
+        },
     },
     {
         id: 'fffd2d30ea72a722',
@@ -36,6 +52,14 @@ export const TRACKS: readonly Track[] = [
         duration_s: 248,
         genre: 'arabic-pop',
         cover: '/assets/covers/e6314129d9b6f06f.png',
+        cover_box: {
+            x: 110,
+            y: 110,
+            w: 281,
+            h: 281,
+            iw: 500,
+            ih: 500,
+        },
     },
     {
         id: '8637d95c16a6ca8f',
@@ -47,6 +71,14 @@ export const TRACKS: readonly Track[] = [
         duration_s: 161,
         genre: 'arabic-rap',
         cover: '/assets/covers/02ad4b9479a31679.png',
+        cover_box: {
+            x: 90,
+            y: 90,
+            w: 320,
+            h: 320,
+            iw: 500,
+            ih: 500,
+        },
     },
     {
         id: 'e3a39bf5d49aaeb6',
@@ -58,6 +90,14 @@ export const TRACKS: readonly Track[] = [
         duration_s: 261,
         genre: 'arabic-rap',
         cover: '/assets/covers/f0c201ad3ddd3949.png',
+        cover_box: {
+            x: 108,
+            y: 101,
+            w: 309,
+            h: 309,
+            iw: 500,
+            ih: 500,
+        },
     },
     {
         id: '0cb3144d81ea7beb',
@@ -69,6 +109,14 @@ export const TRACKS: readonly Track[] = [
         duration_s: 218,
         genre: 'arabic-rap',
         cover: '/assets/covers/b3a6d23ed53c2486.png',
+        cover_box: {
+            x: 110,
+            y: 110,
+            w: 281,
+            h: 281,
+            iw: 500,
+            ih: 500,
+        },
     },
     {
         id: '4c3b16ffec684780',
@@ -80,6 +128,14 @@ export const TRACKS: readonly Track[] = [
         duration_s: 253,
         genre: 'arabic-rap',
         cover: '/assets/covers/0d8134a3f8aec9c8.png',
+        cover_box: {
+            x: 90,
+            y: 90,
+            w: 320,
+            h: 320,
+            iw: 500,
+            ih: 500,
+        },
     },
     {
         id: 'a81f013b65b8cd29',
@@ -91,6 +147,14 @@ export const TRACKS: readonly Track[] = [
         duration_s: 179,
         genre: 'arabic-rap',
         cover: '/assets/covers/4252f89c64035262.png',
+        cover_box: {
+            x: 90,
+            y: 90,
+            w: 320,
+            h: 320,
+            iw: 500,
+            ih: 500,
+        },
     },
     {
         id: 'b6b4a3568a265300',
@@ -102,6 +166,14 @@ export const TRACKS: readonly Track[] = [
         duration_s: 235,
         genre: 'english-pop',
         cover: '/assets/covers/e7cf5558b10b2f71.png',
+        cover_box: {
+            x: 90,
+            y: 90,
+            w: 320,
+            h: 320,
+            iw: 500,
+            ih: 500,
+        },
     },
     {
         id: 'f97bb8491f1f7b4e',
@@ -113,6 +185,14 @@ export const TRACKS: readonly Track[] = [
         duration_s: 237,
         genre: 'english-pop',
         cover: '/assets/covers/fbc4b34afc3ed25c.png',
+        cover_box: {
+            x: 90,
+            y: 90,
+            w: 320,
+            h: 320,
+            iw: 500,
+            ih: 500,
+        },
     },
     {
         id: 'f46dcb7793f8b7a5',
@@ -124,6 +204,14 @@ export const TRACKS: readonly Track[] = [
         duration_s: 170,
         genre: 'english-pop',
         cover: '/assets/covers/1f3e086212f6150b.png',
+        cover_box: {
+            x: 90,
+            y: 90,
+            w: 320,
+            h: 320,
+            iw: 500,
+            ih: 500,
+        },
     },
     {
         id: '64d1afd5e2e44715',
@@ -135,6 +223,14 @@ export const TRACKS: readonly Track[] = [
         duration_s: 231,
         genre: 'hip-hop',
         cover: '/assets/covers/76274dd8c2c34715.png',
+        cover_box: {
+            x: 90,
+            y: 90,
+            w: 320,
+            h: 320,
+            iw: 500,
+            ih: 500,
+        },
     },
     {
         id: '16213f0bfc1072ea',
@@ -146,6 +242,14 @@ export const TRACKS: readonly Track[] = [
         duration_s: 204,
         genre: 'hip-hop',
         cover: '/assets/covers/c22627e8f42423a7.png',
+        cover_box: {
+            x: 90,
+            y: 90,
+            w: 320,
+            h: 320,
+            iw: 500,
+            ih: 500,
+        },
     },
     {
         id: 'cd4928155d24cbdd',
@@ -157,6 +261,14 @@ export const TRACKS: readonly Track[] = [
         duration_s: 293,
         genre: 'hip-hop',
         cover: '/assets/covers/0e9a53c98358b32a.png',
+        cover_box: {
+            x: 90,
+            y: 90,
+            w: 320,
+            h: 320,
+            iw: 500,
+            ih: 500,
+        },
     },
     {
         id: 'abe8ca228e9f32d5',
@@ -168,6 +280,14 @@ export const TRACKS: readonly Track[] = [
         duration_s: 188,
         genre: 'scores',
         cover: '/assets/covers/9202ae5fe2f3de5c.png',
+        cover_box: {
+            x: 110,
+            y: 110,
+            w: 281,
+            h: 281,
+            iw: 500,
+            ih: 500,
+        },
     },
 ];
 

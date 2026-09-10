@@ -16,6 +16,7 @@
  * whose diff looks like reordered JSON with no cause.
  */
 import { createHash } from 'node:crypto';
+import { cover_crop } from './cover_box';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -45,6 +46,15 @@ export interface GenreDecl {
     name: string;
 }
 
+export interface CoverBox {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    iw: number;
+    ih: number;
+}
+
 export interface ScannedTrack {
     id: string;
     title: string;
@@ -57,6 +67,8 @@ export interface ScannedTrack {
     genre: string;
     /** URL of the extracted cover, or null when the file carries no art. */
     cover: string | null;
+    /** Crop that removes a cover's letterboxing, or null when it has none. */
+    cover_box: CoverBox | null;
 }
 
 export interface ScannedGenre {
@@ -316,6 +328,7 @@ export async function scan_music(
             check_name('track title', title);
 
             let cover: string | null = null;
+            let cover_box: CoverBox | null = null;
             if (tags.picture != null) {
                 const ext = cover_extension(tags.picture.format);
                 const hash = createHash('sha256')
@@ -330,6 +343,11 @@ export async function scan_music(
                     });
                 }
                 cover = `/assets/covers/${cover_name}`;
+                const crop = cover_crop(tags.picture.data);
+                cover_box =
+                    crop == null
+                        ? null
+                        : { ...crop.box, iw: crop.image.w, ih: crop.image.h };
             }
 
             tracks.push({
@@ -343,6 +361,7 @@ export async function scan_music(
                 duration_s: Math.round(duration),
                 genre: genre.dir,
                 cover,
+                cover_box,
             });
         }
 
