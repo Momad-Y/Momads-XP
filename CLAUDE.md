@@ -28,5 +28,6 @@ Source of truth: `docs/SPECIFICATION.md` (features, architecture, phases, §11 s
 - vitest can't resolve `$env/dynamic/private` — `vi.mock` it before importing a `+server.ts`.
 - Explorer shows a one-time "File Transfer" dialog on first folder entry — E2E must dismiss it.
 - Long Svelte `style:` values must be mustached (`style:background={'...'}`) or prettier/svelte2tsx break.
+- **Svelte 5 legacy `$:`: state written from inside a reactive statement does NOT invalidate the other `$:` statements.** The write lands, and every `$:` deriving from it stays frozen at its initial value — no error, no warning. The Music Player opened with the right `src` loaded and "No track" in the title for exactly this reason. The identical call from a click handler propagates fine. Do one-shot initialisation in `onMount`, not in a `$:` block. Related: a `$:` guard should depend only on values it reads itself, never on another `$:` result, since legacy blocks run in source order rather than dependency order.
 - pdfjs-dist v6: `getDocument({ url })`, `render({ canvas, viewport })`, `destroy()` on the loading task.
 - Resend sandbox (no verified domain): delivers only to the account's own email, compared case-sensitively — recipient is lowercased in `/api/email`.
