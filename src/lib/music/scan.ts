@@ -203,6 +203,7 @@ export async function scan_music(
     genres: readonly GenreDecl[],
     read_tags: ReadTags,
     root: string = MUSIC_ROOT,
+    artists: Readonly<Record<string, string>> = {},
 ): Promise<ScanResult> {
     if (genres.length === 0)
         throw new Error('no music genres declared in profile.json');
@@ -248,6 +249,7 @@ export async function scan_music(
         );
     }
 
+    const used_overrides = new Set<string>();
     const covers = new Map<string, CoverFile>();
     const seen_ids = new Map<string, string>();
     const seen_audio = new Map<string, string>();
@@ -318,6 +320,16 @@ export async function scan_music(
              * from CMD. Checked separately because a tag, or a stripped track
              * number, can differ from the filename that was already checked.
              */
+            /*
+             * A correction from profile.json wins over the tag. Keyed by
+             * `<genre>/<file>` because that is the pair that identifies a
+             * track on disk; the title is derived and the tag is the thing
+             * being corrected, so neither can be the key.
+             */
+            const override_key = `${genre.dir}/${filename}`;
+            const override = artists[override_key];
+            if (override != null) used_overrides.add(override_key);
+
             const title = display_title(filename);
             if (title === '') {
                 throw new Error(
@@ -353,7 +365,7 @@ export async function scan_music(
             tracks.push({
                 id,
                 title,
-                artist: clean_artist(tags.artist),
+                artist: override ?? clean_artist(tags.artist),
                 filename,
                 url: `/audio/music/${encodeURI(genre.dir)}/${encodeURI(filename)}`,
                 // KB, per VfsItem.size — a byte value renders as "512,986 KB"
@@ -371,6 +383,21 @@ export async function scan_music(
             name: genre.name,
             tracks,
         });
+    }
+
+    /*
+     * An override nobody used means the file it names was renamed or removed,
+     * and the correction silently stopped applying — the artist would quietly
+     * revert to the wrong tag. Loud, for the same reason an undeclared genre
+     * folder is loud.
+     */
+    const stale = Object.keys(artists).filter((k) => !used_overrides.has(k));
+    if (stale.length > 0) {
+        throw new Error(
+            `profile.json "music".artists names ${String(stale.length)} file(s) that ` +
+                `do not exist: ${stale.join(', ')}. Update the key or drop it ` +
+                '— left alone, the artist silently reverts to the ID3 tag.',
+        );
     }
 
     return {

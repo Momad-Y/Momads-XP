@@ -26,7 +26,7 @@ export const TRACKS: readonly Track[] = [
     {
         id: '2a523242830f20ae',
         title: 'Wailli',
-        artist: 'MuzicUp',
+        artist: 'Mohamed Mounir',
         filename: '02 - Wailli.mp3',
         url: '/audio/music/arabic-pop/02%20-%20Wailli.mp3',
         size_kb: 3568,
@@ -102,7 +102,7 @@ export const TRACKS: readonly Track[] = [
     {
         id: '0cb3144d81ea7beb',
         title: 'Free',
-        artist: 'Marwan Pablo',
+        artist: 'Marwan Pablo x Molotof',
         filename: '03 - Free.mp3',
         url: '/audio/music/arabic-rap/03%20-%20Free.mp3',
         size_kb: 3553,
@@ -121,7 +121,7 @@ export const TRACKS: readonly Track[] = [
     {
         id: '4c3b16ffec684780',
         title: 'MANTIKA',
-        artist: 'BLTNM بلاتنم',
+        artist: 'Shabjdeed',
         filename: '04 - MANTIKA.mp3',
         url: '/audio/music/arabic-rap/04%20-%20MANTIKA.mp3',
         size_kb: 4139,
@@ -178,7 +178,7 @@ export const TRACKS: readonly Track[] = [
     {
         id: 'f97bb8491f1f7b4e',
         title: 'All The Stars',
-        artist: 'KendrickLamar',
+        artist: 'Kendrick Lamar, SZA',
         filename: '02 - All The Stars.mp3',
         url: '/audio/music/english-pop/02%20-%20All%20The%20Stars.mp3',
         size_kb: 3839,
@@ -197,7 +197,7 @@ export const TRACKS: readonly Track[] = [
     {
         id: 'f46dcb7793f8b7a5',
         title: 'Far Away',
-        artist: 'Ahmad F Elyan',
+        artist: 'Demis Roussos',
         filename: '03 - Far Away.mp3',
         url: '/audio/music/english-pop/03%20-%20Far%20Away.mp3',
         size_kb: 2807,
@@ -216,7 +216,7 @@ export const TRACKS: readonly Track[] = [
     {
         id: '64d1afd5e2e44715',
         title: 'i (Single Version)',
-        artist: 'KendrickLamar',
+        artist: 'Kendrick Lamar',
         filename: '01 - i (Single Version).mp3',
         url: '/audio/music/hip-hop/01%20-%20i%20(Single%20Version).mp3',
         size_kb: 3760,

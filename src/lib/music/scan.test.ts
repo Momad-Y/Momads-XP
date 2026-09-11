@@ -276,3 +276,47 @@ describe('clean_artist', () => {
         expect(clean_artist('VEVO')).toBeNull();
     });
 });
+
+describe('artist corrections from profile.json', () => {
+    it('wins over the ID3 tag', async () => {
+        put('tarab', '01 - Song.mp3');
+        const result = await scan_music(
+            [TARAB],
+            tags({ '01 - Song.mp3': { duration_s: 100, artist: 'SomeVEVO' } }),
+            root,
+            { 'tarab/01 - Song.mp3': 'The Real Artist' },
+        );
+        expect(result.genres[0]?.tracks[0]?.artist).toBe('The Real Artist');
+    });
+
+    it('leaves an untouched track on its tag', async () => {
+        put('tarab', '01 - Song.mp3');
+        put('tarab', '02 - Other.mp3');
+        const result = await scan_music(
+            [TARAB],
+            tags({
+                '01 - Song.mp3': { duration_s: 1, artist: 'Tagged One' },
+                '02 - Other.mp3': { duration_s: 1, artist: 'Tagged Two' },
+            }),
+            root,
+            { 'tarab/01 - Song.mp3': 'Corrected' },
+        );
+        const [a, b] = result.genres[0]?.tracks ?? [];
+        expect(a?.artist).toBe('Corrected');
+        expect(b?.artist).toBe('Tagged Two');
+    });
+
+    it('refuses a correction whose file is gone', async () => {
+        /*
+         * Renaming a track would otherwise drop its correction in silence and
+         * the artist would revert to the wrong tag — the failure is invisible
+         * precisely because the track still plays.
+         */
+        put('tarab', '01 - Song.mp3');
+        await expect(
+            scan_music([TARAB], tags(), root, {
+                'tarab/99 - Renamed.mp3': 'Nobody',
+            }),
+        ).rejects.toThrow(/do not exist: tarab\/99 - Renamed\.mp3/);
+    });
+});
