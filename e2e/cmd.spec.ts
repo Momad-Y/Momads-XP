@@ -849,6 +849,15 @@ test('an input line longer than the window redraws without duplicating the promp
     await page.locator('.xterm-helper-textarea').last().fill('');
     await page.keyboard.type(`echo ${payload}`);
 
+    /*
+     * Polled, not read once. `keyboard.type` resolves when the keystrokes are
+     * DISPATCHED, not when the terminal has finished redrawing 140 of them —
+     * so a single read raced the render and this failed on two consecutive CI
+     * cutovers while passing on every local run. The assertions below are
+     * unchanged; only the wait is.
+     */
+    await expect.poll(async () => rows(page)).toContain(`echo ${payload}`);
+
     const joined = await rows(page);
 
     // One prompt on screen: the one the banner left. The bug printed a fresh
