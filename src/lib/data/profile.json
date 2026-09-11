@@ -528,10 +528,34 @@
     "music": {
         "genres": [
             {
-                "dir": "demo",
-                "name": "Demo Tracks"
+                "dir": "arabic-pop",
+                "name": "Arabic Pop"
+            },
+            {
+                "dir": "arabic-rap",
+                "name": "Arabic Rap"
+            },
+            {
+                "dir": "english-pop",
+                "name": "English Pop"
+            },
+            {
+                "dir": "hip-hop",
+                "name": "Hip Hop"
+            },
+            {
+                "dir": "scores",
+                "name": "Scores"
             }
         ],
+        "artists": {
+            "arabic-pop/02 - Wailli.mp3": "Mohamed Mounir",
+            "arabic-rap/03 - Free.mp3": "Marwan Pablo x Molotof",
+            "arabic-rap/04 - MANTIKA.mp3": "Shabjdeed",
+            "english-pop/02 - All The Stars.mp3": "Kendrick Lamar, SZA",
+            "english-pop/03 - Far Away.mp3": "Demis Roussos",
+            "hip-hop/01 - i (Single Version).mp3": "Kendrick Lamar"
+        },
         "notice": "All music legally acquired™ · personal listening only, not for distribution."
     },
     "copy": {

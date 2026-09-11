@@ -67,8 +67,14 @@ test('drive Properties draws its pie locally', async ({ page }) => {
     const chart = page.locator('.window .chart svg');
     await expect(chart).toBeVisible();
 
-    await expect(chart.locator('[fill="#ec4899"]')).toHaveCount(1);
-    await expect(chart.locator('[fill="#b13673"]')).toHaveCount(1);
+    /*
+     * Presence, not counts. How many shapes each slice contributes depends on
+     * where the seam falls: past 6 o'clock a slice owns a radial face as well
+     * as its wall, so pinning the count made the test a function of how full
+     * the drive happens to be — it broke when real music took C: to 59%.
+     */
+    await expect(chart.locator('[fill="#ec4899"]').first()).toBeVisible();
+    await expect(chart.locator('[fill="#b13673"]').first()).toBeVisible();
 
     /*
      * The used wedge must be VISIBLE, not merely present. At the drive's old
@@ -80,7 +86,7 @@ test('drive Properties draws its pie locally', async ({ page }) => {
      */
     const used = chart.locator('[fill="#1d4ed8"]');
     await expect(used).toHaveCount(1);
-    const box = await used.boundingBox();
+    const box = await used.first().boundingBox();
     expect(box).not.toBeNull();
     expect(box?.width ?? 0).toBeGreaterThan(20);
     expect(box?.height ?? 0).toBeGreaterThan(10);

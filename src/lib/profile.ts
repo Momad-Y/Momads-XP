@@ -194,6 +194,17 @@ export interface MusicGenre {
 
 export interface ProfileMusic {
     genres: MusicGenre[];
+    /**
+     * Corrections for artists the ID3 tag gets wrong, keyed `<genre>/<file>`.
+     *
+     * The folder stays the source of truth for what EXISTS; this only fixes
+     * metadata. Files pulled from YouTube are tagged with the uploading
+     * channel or the label rather than the artist — `MuzicUp` for a Mohamed
+     * Mounir track, `BLTNM` (the label) for Shabjdeed — and the scanner will
+     * not guess, because guessing replaces a wrong-but-honest value with an
+     * invented one. Naming the few that are wrong is the honest fix.
+     */
+    artists: Record<string, string>;
     /** Shown in the player. Content, so it lives here and not in the component. */
     notice: string;
 }
