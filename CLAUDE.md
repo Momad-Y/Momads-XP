@@ -11,10 +11,13 @@ Source of truth: `docs/SPECIFICATION.md` (features, architecture, phases, §11 s
 - **`$lib/server/*` is server-only** (SvelteKit build-time guard). Client-shared constants go in plain `src/lib/` (e.g. `email_limits.ts`).
 - **E2E asserts exact UI strings** — copy changes update `e2e/*.spec.ts` in the same commit.
 - **API routes** (`src/routes/api/*`) must export `const prerender = false` or adapter-netlify emits no function.
+- **Two Netlify sites exist and `.netlify/state.json` points at the WRONG one.** A bare `netlify deploy --prod` publishes to `poetic-mandazi-c62488` and looks entirely successful — it prints a Production URL — while `momad-xp.netlify.app` keeps serving the old build. Always pass `--site 73331ef4-01f7-4fc4-9848-f22261cc9dab`, and probe the production host afterwards rather than the URL the CLI echoed.
 
 ## Workflow
 
-- Branches: `feature/*` off `dev` → CI-gated PR into `dev` → cutover PR `dev`→`main` (production = `main` only).
+- Branches: `feature/*` off `dev` → CI-gated PR into `dev`. **Stop at `dev`.**
+- **The cutover `dev`→`main` and the production deploy happen ONLY when the owner asks.** Work accumulates on `dev` and ships in batches he chooses; do not open a `dev`→`main` PR speculatively. Say what is sitting on `dev` awaiting a cutover and leave it there. (Production = `main` only.)
+- When he does call for it: cutover PR → wait for BOTH CI projects (`@online` runs only on cutovers, so it is the first time some tests execute at all) → merge → deploy → probe the production host → merge `main` back into `dev`. That last resync is not optional: `gh pr merge --merge` leaves `main` one commit ahead and the next cutover reads `BEHIND` without it.
 - Gates before every push: `npm run check` && `npm run lint` && `npm run format:check` && `npx vitest run --coverage` && `npm run build` && `npx playwright test`.
 - Phases run the §11 six-gate loop (spec → red-team → plan → red-team → implement → fresh-context review + parity + phase guide). Red-team subagents get fresh context and a find-problems framing.
 - `gh pr merge` can lag after checks pass: verify with `gh pr view N --json state`, retry after ~15s; use `gh pr update-branch` when BEHIND.
