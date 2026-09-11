@@ -16,6 +16,7 @@
  * whose diff looks like reordered JSON with no cause.
  */
 import { createHash } from 'node:crypto';
+import { cover_crop } from './cover_box';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -45,6 +46,15 @@ export interface GenreDecl {
     name: string;
 }
 
+export interface CoverBox {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    iw: number;
+    ih: number;
+}
+
 export interface ScannedTrack {
     id: string;
     title: string;
@@ -57,6 +67,8 @@ export interface ScannedTrack {
     genre: string;
     /** URL of the extracted cover, or null when the file carries no art. */
     cover: string | null;
+    /** Crop that removes a cover's letterboxing, or null when it has none. */
+    cover_box: CoverBox | null;
 }
 
 export interface ScannedGenre {
@@ -142,6 +154,45 @@ function check_name(kind: string, value: string): void {
 }
 
 /**
+ * The display name for a track.
+ *
+ * THE FILENAME WINS, not the ID3 title. The plan originally preferred the tag
+ * as the richer source; the real library disproved that. Files downloaded from
+ * YouTube carry tags like `Ed Sheeran - Shape Of You [Official Video]` and
+ * `Wegz - LAQTTA | ويجز - لقطة prod ...`, while the owner had already named the
+ * files `01 - Shape Of You.mp3` — deliberately, since filename order is what
+ * sets playback order. Taking the tag threw that away and put a download title
+ * in Explorer and the player.
+ *
+ * The leading track number goes with it: it exists to order the folder, not to
+ * be read out on screen.
+ */
+export function display_title(filename: string): string {
+    return filename
+        .replace(/\.mp3$/i, '')
+        .replace(/^\s*\d{1,3}\s*[-._)]?\s+/, '')
+        .trim();
+}
+
+/**
+ * Tidies an ID3 artist, or drops it.
+ *
+ * Two YouTube artefacts only, both unambiguous: the `- Topic` auto-channels
+ * (`Kanye West - Topic`) and VEVO suffixes (`KendrickLamarVEVO`). Anything
+ * else is left exactly as tagged — guessing at artist names from noisy strings
+ * would replace a wrong-but-honest value with a wrong-and-invented one.
+ */
+export function clean_artist(artist: string | undefined): string | null {
+    const value = artist?.trim();
+    if (value == null || value === '') return null;
+    const tidied = value
+        .replace(/\s*-\s*Topic$/i, '')
+        .replace(/VEVO$/i, '')
+        .trim();
+    return tidied === '' ? null : tidied;
+}
+
+/**
  * Walks the declared genres and returns the library plus the covers to write.
  *
  * Every failure here is LOUD. The worst outcome this feature can have is a
@@ -152,6 +203,7 @@ export async function scan_music(
     genres: readonly GenreDecl[],
     read_tags: ReadTags,
     root: string = MUSIC_ROOT,
+    artists: Readonly<Record<string, string>> = {},
 ): Promise<ScanResult> {
     if (genres.length === 0)
         throw new Error('no music genres declared in profile.json');
@@ -197,6 +249,7 @@ export async function scan_music(
         );
     }
 
+    const used_overrides = new Set<string>();
     const covers = new Map<string, CoverFile>();
     const seen_ids = new Map<string, string>();
     const seen_audio = new Map<string, string>();
@@ -260,7 +313,34 @@ export async function scan_music(
                 );
             }
 
+            /*
+             * The display title becomes the VFS entry NAME, so it needs the
+             * same check the filename gets — `cmd/path.ts` splits names on
+             * `/`, and a slash here would list in Explorer and be unopenable
+             * from CMD. Checked separately because a tag, or a stripped track
+             * number, can differ from the filename that was already checked.
+             */
+            /*
+             * A correction from profile.json wins over the tag. Keyed by
+             * `<genre>/<file>` because that is the pair that identifies a
+             * track on disk; the title is derived and the tag is the thing
+             * being corrected, so neither can be the key.
+             */
+            const override_key = `${genre.dir}/${filename}`;
+            const override = artists[override_key];
+            if (override != null) used_overrides.add(override_key);
+
+            const title = display_title(filename);
+            if (title === '') {
+                throw new Error(
+                    `${path} has no name left once its track number is ` +
+                        'stripped — rename it to something readable',
+                );
+            }
+            check_name('track title', title);
+
             let cover: string | null = null;
+            let cover_box: CoverBox | null = null;
             if (tags.picture != null) {
                 const ext = cover_extension(tags.picture.format);
                 const hash = createHash('sha256')
@@ -275,12 +355,17 @@ export async function scan_music(
                     });
                 }
                 cover = `/assets/covers/${cover_name}`;
+                const crop = cover_crop(tags.picture.data);
+                cover_box =
+                    crop == null
+                        ? null
+                        : { ...crop.box, iw: crop.image.w, ih: crop.image.h };
             }
 
             tracks.push({
                 id,
-                title: tags.title?.trim() ?? filename.replace(/\.mp3$/i, ''),
-                artist: tags.artist?.trim() ?? null,
+                title,
+                artist: override ?? clean_artist(tags.artist),
                 filename,
                 url: `/audio/music/${encodeURI(genre.dir)}/${encodeURI(filename)}`,
                 // KB, per VfsItem.size — a byte value renders as "512,986 KB"
@@ -288,6 +373,7 @@ export async function scan_music(
                 duration_s: Math.round(duration),
                 genre: genre.dir,
                 cover,
+                cover_box,
             });
         }
 
@@ -297,6 +383,21 @@ export async function scan_music(
             name: genre.name,
             tracks,
         });
+    }
+
+    /*
+     * An override nobody used means the file it names was renamed or removed,
+     * and the correction silently stopped applying — the artist would quietly
+     * revert to the wrong tag. Loud, for the same reason an undeclared genre
+     * folder is loud.
+     */
+    const stale = Object.keys(artists).filter((k) => !used_overrides.has(k));
+    if (stale.length > 0) {
+        throw new Error(
+            `profile.json "music".artists names ${String(stale.length)} file(s) that ` +
+                `do not exist: ${stale.join(', ')}. Update the key or drop it ` +
+                '— left alone, the artist silently reverts to the ID3 tag.',
+        );
     }
 
     return {

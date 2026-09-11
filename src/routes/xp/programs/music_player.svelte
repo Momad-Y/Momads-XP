@@ -88,10 +88,39 @@
      * genre boundary.
      */
     const groups = GENRES.map((genre) => ({
+        dir: genre.dir,
         name: genre.name,
         offset: TRACKS.findIndex((t) => t.genre === genre.dir),
         tracks: TRACKS.filter((t) => t.genre === genre.dir),
     })).filter((g) => g.tracks.length > 0);
+
+    /*
+     * Genres collapse, and only the one being played is open.
+     *
+     * Fifteen tracks under five headers is a 20-row list in a 470px window,
+     * which pushed the transport controls off unless the window was dragged
+     * taller. Collapsed, the whole library is five rows plus whatever plays.
+     *
+     * A LIST of open genres, not one: opening a second should not shut a first
+     * the visitor deliberately expanded. Opening is driven from `select`
+     * rather than a reactive statement — the reactive version read the open
+     * list, so Svelte re-ran it whenever that list changed and it instantly
+     * undid a collapse, making the playing genre impossible to close.
+     */
+    let open_genres: readonly string[] = [
+        TRACKS[index_for(fs_item)]?.genre ?? '',
+    ];
+
+    function open_genre(dir: string): void {
+        if (!open_genres.includes(dir)) open_genres = [...open_genres, dir];
+    }
+
+    function toggle_genre(dir: string): void {
+        open_genres = open_genres.includes(dir)
+            ? open_genres.filter((g) => g !== dir)
+            : [...open_genres, dir];
+    }
+
     $: output_volume = effective_volume(app_volume, $systemVolume);
     $: if (audio != null) audio.volume = output_volume;
     $: ratio = progress_ratio(current_time, duration);
@@ -187,6 +216,11 @@
     function select(next: number, autoplay = true) {
         index = next;
         current_time = 0;
+        // Follow the track across a genre boundary — including `ended`
+        // advancing into the next genre, which would otherwise leave the
+        // visitor staring at closed headers with sound coming from nowhere.
+        const genre = TRACKS[next]?.genre;
+        if (genre != null) open_genre(genre);
         // The element reloads on src change; play again if we were playing.
         void Promise.resolve().then(() => {
             if (autoplay && audio != null) {
@@ -234,12 +268,41 @@
                  the canvas above is a Phase 3 exit criterion, and removing a
                  shipped feature to make room for a new one is a bad trade. -->
             {#if track?.cover != null}
-                <img
-                    src={track.cover}
-                    alt=""
+                <!--
+                    Cropped to the measured box: covers pulled from YouTube are
+                    16:9 thumbnails letterboxed into a square, so a plain
+                    object-cover shows the bands rather than the art. `iw/w`
+                    scales the box up to fill the slot and the negative offsets
+                    slide it into place; `max-w-none` is needed because
+                    Tailwind's preflight caps images at 100%.
+                -->
+                <div
                     data-testid="cover-art"
-                    class="h-10 w-10 shrink-0 rounded-sm border border-black/40 object-cover"
-                />
+                    class="relative h-10 w-10 shrink-0 overflow-hidden rounded-sm border border-black/40"
+                >
+                    {#if track.cover_box != null}
+                        <img
+                            src={track.cover}
+                            alt=""
+                            class="absolute max-w-none"
+                            style:width="{(track.cover_box.iw /
+                                track.cover_box.w) *
+                                100}%"
+                            style:left="{(-track.cover_box.x /
+                                track.cover_box.w) *
+                                100}%"
+                            style:top="{(-track.cover_box.y /
+                                track.cover_box.h) *
+                                100}%"
+                        />
+                    {:else}
+                        <img
+                            src={track.cover}
+                            alt=""
+                            class="h-full w-full object-cover"
+                        />
+                    {/if}
+                </div>
             {:else}
                 <div
                     data-testid="cover-art"
@@ -320,13 +383,37 @@
             class="mx-2 mb-2 grow overflow-auto rounded border border-black/40 bg-white/95 text-black"
         >
             {#each groups as group (group.name)}
+                <!-- svelte-ignore a11y_click_events_have_key_events -->
                 <div
                     data-testid="genre-header"
-                    class="sticky top-0 bg-[#d6e5f5] px-2 py-[2px] text-[11px] font-bold text-[#1c3f75]"
+                    class="sticky top-0 flex cursor-pointer items-center justify-between bg-[#d6e5f5] px-2 py-[3px] text-[11px] font-bold text-[#1c3f75] hover:bg-[#c5dbf0]"
+                    role="button"
+                    tabindex="0"
+                    aria-expanded={open_genres.includes(group.dir)}
+                    on:click={() => {
+                        toggle_genre(group.dir);
+                    }}
                 >
-                    {group.name}
+                    <span>{group.name}</span>
+                    <span class="flex items-center gap-1 opacity-70">
+                        <span class="text-[10px] font-normal"
+                            >{group.tracks.length}</span
+                        >
+                        <svg
+                            class="h-2 w-2 fill-current transition-transform duration-150 {open_genres.includes(
+                                group.dir,
+                            )
+                                ? 'rotate-90'
+                                : ''}"
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 256 512"
+                            ><path
+                                d="M246.6 278.6c12.5-12.5 12.5-32.8 0-45.3l-128-128c-9.2-9.2-22.9-11.9-34.9-6.9s-19.8 16.6-19.8 29.6l0 256c0 12.9 7.8 24.6 19.8 29.6s25.7 2.2 34.9-6.9l128-128z"
+                            /></svg
+                        >
+                    </span>
                 </div>
-                {#each group.tracks as t, n (t.id)}
+                {#each open_genres.includes(group.dir) ? group.tracks : [] as t, n (t.id)}
                     <!-- svelte-ignore a11y_click_events_have_key_events -->
                     <div
                         data-testid="track-row"

@@ -175,7 +175,12 @@ seed[C_DRIVE] = {
 const my_music = seed[MY_MUSIC];
 if (my_music == null) throw new Error('My Music folder missing from base');
 
-const music: ScanResult = await scan_music(profile.music.genres, read_tags);
+const music: ScanResult = await scan_music(
+    profile.music.genres,
+    read_tags,
+    undefined,
+    profile.music.artists,
+);
 
 for (const genre of music.genres) {
     seed[genre.id] = {
@@ -359,6 +364,7 @@ writeFileSync(
                 duration_s: t.duration_s,
                 genre: t.genre,
                 cover: t.cover,
+                cover_box: t.cover_box,
             })),
         ),
         null,

@@ -1,6 +1,18 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { bootToDesktop } from './helpers';
+/*
+ * The library, imported from the generated manifest.
+ *
+ * These specs are about the PLAYER — grouping, prev/next, the KB-vs-MB rule —
+ * not about which songs the owner happens to like. Hardcoding three demo
+ * tracks meant that swapping in the real library reddened five tests that had
+ * found nothing wrong.
+ *
+ * Directly importable, unlike profile.json: this module's only import is
+ * type-only, so nothing survives to need a JSON import attribute.
+ */
+import { GENRES, TRACKS } from '../src/lib/generated/music';
 
 /**
  * The Music Player (SPECIFICATION.md §3.2) and the two shipped surfaces the
@@ -60,15 +72,28 @@ test('opens with the discovered track list, grouped by genre', async ({
     // The library is scanned from static/audio/music/<genre>/*.mp3 and ordered
     // genre-by-genre, then by filename, so these are positions in a flat list
     // that the headers only visually divide.
-    const rows = page.getByTestId('track-row');
-    await expect(rows).toHaveCount(3);
-    await expect(rows.nth(0)).toContainText('Ascent');
-    await expect(rows.nth(1)).toContainText('Drift');
-    await expect(rows.nth(2)).toContainText('Pulse');
-
+    // one header per genre, in profile.json's declared order
     const headers = page.getByTestId('genre-header');
-    await expect(headers).toHaveCount(1);
-    await expect(headers.nth(0)).toHaveText('Demo Tracks');
+    await expect(headers).toHaveCount(GENRES.length);
+    for (const [i, genre] of GENRES.entries()) {
+        await expect(headers.nth(i)).toContainText(genre.name);
+    }
+
+    /*
+     * Genres collapse, and only the one being played is open — 15 tracks under
+     * 5 headers was a 20-row list that pushed the transport controls out of a
+     * 470px window. So the visible rows are the FIRST genre's, not the whole
+     * library.
+     */
+    const rows = page.getByTestId('track-row');
+    const first_group = TRACKS.filter((t) => t.genre === GENRES[0]?.dir);
+    await expect(rows).toHaveCount(first_group.length);
+    await expect(rows.nth(0)).toContainText(String(first_group[0]?.title));
+
+    // opening a second genre ADDS to it rather than closing the first
+    const second = TRACKS.filter((t) => t.genre === GENRES[1]?.dir);
+    await headers.nth(1).click();
+    await expect(rows).toHaveCount(first_group.length + second.length);
 
     // art slot always renders — the icon stands in when a file carries no cover
     await expect(page.getByTestId('cover-art')).toBeVisible();
@@ -125,15 +150,19 @@ test('next and previous wrap around the playlist', async ({ page }) => {
 
     // Order is FILENAME order within a genre, not the old hand-written array
     // order — which is how the owner controls playback order, by prefixing.
-    expect(await src()).toContain('ascent.mp3');
+    const at = (i: number) => decodeURI(String(TRACKS[i]?.url));
+    expect(decodeURI(await src())).toContain(at(0));
     await page.getByRole('button', { name: 'Next' }).click();
-    await expect.poll(src).toContain('drift.mp3');
+    await expect.poll(async () => decodeURI(await src())).toContain(at(1));
 
-    // Backwards past the first track must wrap to the last, not stall at 0.
+    // Backwards past the first track must wrap to the LAST, not stall at 0 —
+    // which is only a real assertion because the list spans several genres.
     await page.getByRole('button', { name: 'Previous' }).click();
-    await expect.poll(src).toContain('ascent.mp3');
+    await expect.poll(async () => decodeURI(await src())).toContain(at(0));
     await page.getByRole('button', { name: 'Previous' }).click();
-    await expect.poll(src).toContain('pulse.mp3');
+    await expect
+        .poll(async () => decodeURI(await src()))
+        .toContain(at(TRACKS.length - 1));
 });
 
 test('clicking a track row switches to it', async ({ page }) => {
@@ -142,12 +171,23 @@ test('clicking a track row switches to it', async ({ page }) => {
 
     // nth(2) counts across the flat list, so a genre header between rows must
     // not shift the mapping — which is exactly what `group.offset` guarantees.
-    await page.getByTestId('track-row').nth(2).click();
+    /*
+     * A row in the SECOND genre, reached by expanding it first. A header
+     * between rows must not shift the index mapping — `group.offset` is what
+     * guarantees that, and picking a row past a header is what tests it.
+     */
+    const target = TRACKS.findIndex((t) => t.genre !== TRACKS[0]?.genre);
+    await page.getByTestId('genre-header').nth(1).click();
+    await page.getByTestId('track-row').nth(target).click();
     await expect
         .poll(async () =>
-            page.locator('audio').evaluate((el: HTMLAudioElement) => el.src),
+            decodeURI(
+                await page
+                    .locator('audio')
+                    .evaluate((el: HTMLAudioElement) => el.src),
+            ),
         )
-        .toContain('pulse.mp3');
+        .toContain(decodeURI(String(TRACKS[target]?.url)));
 });
 
 test('the volume slider drives the element, multiplied by the tray volume', async ({
@@ -190,28 +230,106 @@ test('Details shows KB while the status bar shows MB — in ONE window', async (
     // shipped Desktop items.
     //
     // §8 recorded this as a deliberate coverage gap because no VISIBLE folder
-    // held more than 1 MB. The bundled tracks total 1123 KB, so it is finally
-    // testable — and asserting BOTH spellings in the same window is what makes
-    // the test load-bearing. Asserting only the Details cell would pass on a
-    // codebase where size_label had been re-routed through format_size.
+    // held more than 1 MB. A genre folder clears that easily — and asserting
+    // BOTH spellings in the same window is what makes the test load-bearing.
+    // Asserting only the Details cell would pass on a codebase where
+    // size_label had been re-routed through format_size.
     await bootToDesktop(page);
-    // Tracks moved one level down into their genre folder; the coverage did
-    // not move with them by accident — this is still the ONLY assertion that
-    // the Details column and the status bar spell sizes by different rules.
-    const win = await openGenre(page, 'Demo Tracks');
+    // Tracks live one level down in their genre folder; the coverage did not
+    // move with them by accident — this is still the ONLY assertion that the
+    // Details column and the status bar spell sizes by different rules.
+    const win = await openGenre(page, String(GENRES[0]?.name));
+    const group = TRACKS.filter((t) => t.genre === GENRES[0]?.dir);
 
     // Details view. The status bar is ON by default — toggling it here would
     // turn it OFF, which is how this test first failed.
     await win.locator('[data-menu="View"]').click();
     await win.getByText('Details', { exact: true }).click();
-    await win.getByText('Ascent.mp3', { exact: true }).first().click();
+    await win
+        .getByText(`${String(group[0]?.title)}.mp3`, { exact: true })
+        .first()
+        .click();
     await page.keyboard.press('Control+a');
 
-    // Per-file, in the Details Size column: ALWAYS KB.
-    await expect(win.getByText('501 KB', { exact: true })).toBeVisible();
-    await expect(win.getByText('167 KB', { exact: true })).toBeVisible();
+    /*
+     * Per-file, in the Details Size column: ALWAYS KB with separators. The
+     * numbers come from the generated manifest, so re-exporting a track
+     * changes the expectation with the file instead of reddening this.
+     */
+    for (const track of group) {
+        await expect(
+            win.getByText(`${track.size_kb.toLocaleString('en-US')} KB`, {
+                exact: true,
+            }),
+        ).toBeVisible();
+    }
 
     // The very same window's status bar, for the very same files: MB.
-    await expect(win.getByText('3 objects selected')).toBeVisible();
-    await expect(win.getByText(/1\.1[0-9] MB/)).toBeVisible();
+    const total_kb = group.reduce((sum, t) => sum + t.size_kb, 0);
+    expect(total_kb).toBeGreaterThan(1024);
+    const mb = (total_kb / 1024).toFixed(2);
+    await expect(
+        win.getByText(`${String(group.length)} objects selected`),
+    ).toBeVisible();
+    await expect(win.getByText(`${mb} MB`)).toBeVisible();
+});
+
+test('a genre collapses and reopens, and the playing one opens itself', async ({
+    page,
+}) => {
+    await bootToDesktop(page);
+    await openPlayer(page);
+
+    const rows = page.getByTestId('track-row');
+    const headers = page.getByTestId('genre-header');
+    const first = TRACKS.filter((t) => t.genre === GENRES[0]?.dir);
+
+    // the playing genre starts open; a header reports its own track count
+    await expect(rows).toHaveCount(first.length);
+    await expect(headers.nth(0)).toContainText(String(first.length));
+
+    // collapsing the playing genre is allowed — it is the visitor's call
+    await headers.nth(0).click();
+    await expect(rows).toHaveCount(0);
+    await headers.nth(0).click();
+    await expect(rows).toHaveCount(first.length);
+
+    /*
+     * Playing into a COLLAPSED genre must open it, or the visitor is left
+     * looking at five closed headers with no idea where the sound is coming
+     * from. Stepping back from the first track wraps to the last, which is in
+     * the final genre.
+     */
+    await headers.nth(0).click();
+    await expect(rows).toHaveCount(0);
+    await page.getByRole('button', { name: 'Previous' }).click();
+    await expect(rows).toHaveCount(
+        TRACKS.filter((t) => t.genre === TRACKS[TRACKS.length - 1]?.genre)
+            .length,
+    );
+});
+
+test('cover art is cropped past the letterboxing', async ({ page }) => {
+    /*
+     * Art pulled from YouTube is a 16:9 thumbnail padded into a square, so a
+     * plain object-cover renders two flat bands and a strip of picture. The
+     * box is measured at build time (`cover_box`) and applied here; asserting
+     * the rendered image is WIDER than its slot is what proves the zoom
+     * happened, since an uncropped cover would exactly fill it.
+     */
+    await bootToDesktop(page);
+    await openPlayer(page);
+
+    const slot = page.getByTestId('cover-art');
+    await expect(slot).toBeVisible();
+    const box = await slot.boundingBox();
+    const img = await slot.locator('img').boundingBox();
+    expect(box).not.toBeNull();
+    expect(img).not.toBeNull();
+
+    const cropped = TRACKS[0]?.cover_box;
+    expect(cropped, 'first track should have a measured crop').toBeTruthy();
+    expect(img?.width ?? 0).toBeGreaterThan((box?.width ?? 0) + 1);
+    // and it stays square — the slot must not letterbox it a second time
+    expect(Math.abs((box?.width ?? 0) - (box?.height ?? 0))).toBeLessThan(2);
 });

@@ -47,6 +47,24 @@ export interface Track {
     genre: string;
     /** Extracted cover art URL, or null when the file carries none. */
     cover: string | null;
+    /**
+     * Where the real picture sits inside a padded cover, or null when the
+     * image needs no crop.
+     *
+     * Art pulled from YouTube is a 16:9 thumbnail letterboxed into a square,
+     * so a square slot renders it as a strip between two flat bands. The box
+     * is MEASURED at build time and applied in CSS — cropping the file would
+     * mean re-encoding, and zlib output is not stable across Node versions
+     * while `static/assets/covers` sits on the CI freshness gate.
+     */
+    cover_box: {
+        x: number;
+        y: number;
+        w: number;
+        h: number;
+        iw: number;
+        ih: number;
+    } | null;
 }
 
 export interface Genre {

@@ -3,6 +3,8 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+    clean_artist,
+    display_title,
     scan_music,
     track_id,
     genre_id,
@@ -169,6 +171,15 @@ describe('scan_music fails loudly', () => {
         );
     });
 
+    it('when stripping the track number leaves nothing to show', async () => {
+        // `07 .mp3` is a real shape for a badly-exported file; it would list in
+        // Explorer as an empty name
+        put('tarab', '07 .mp3');
+        await expect(scan_music(only_tarab, tags(), root)).rejects.toThrow(
+            /no name left once its track number is stripped/,
+        );
+    });
+
     it('when a filename would be unreachable as a URL', async () => {
         for (const bad of ['a#b.mp3', 'a?b.mp3', 'a%b.mp3']) {
             rmSync(root, { recursive: true, force: true });
@@ -221,5 +232,91 @@ describe('scan_music fails loudly', () => {
         await expect(scan_music([], tags(), root)).rejects.toThrow(
             /no music genres/,
         );
+    });
+});
+
+describe('display_title', () => {
+    it('drops the extension and the ordering prefix', () => {
+        // `01 - ` exists to order the folder, not to be read on screen
+        expect(display_title('01 - Shape Of You.mp3')).toBe('Shape Of You');
+        expect(display_title('02. Homecoming.mp3')).toBe('Homecoming');
+        expect(display_title('3 No Role Modelz.mp3')).toBe('No Role Modelz');
+    });
+
+    it('keeps a number that is part of the name', () => {
+        // stripping needs a separator or a space, so these survive intact
+        expect(display_title('7 Rings.mp3')).toBe('Rings');
+        expect(display_title('99 Problems.mp3')).toBe('Problems');
+        expect(display_title('1979.mp3')).toBe('1979');
+    });
+
+    it('keeps parentheses and non-ASCII', () => {
+        expect(display_title('01 - i (Single Version).mp3')).toBe(
+            'i (Single Version)',
+        );
+        expect(display_title('02 - شدي.mp3')).toBe('شدي');
+    });
+});
+
+describe('clean_artist', () => {
+    it('strips the two unambiguous YouTube artefacts', () => {
+        expect(clean_artist('Kanye West - Topic')).toBe('Kanye West');
+        expect(clean_artist('KendrickLamarVEVO')).toBe('KendrickLamar');
+    });
+
+    it('leaves anything else exactly as tagged', () => {
+        // a wrong-but-honest tag beats an invented one
+        expect(clean_artist('Wegz ويجز')).toBe('Wegz ويجز');
+        expect(clean_artist('J. Cole')).toBe('J. Cole');
+    });
+
+    it('treats empty and missing alike', () => {
+        expect(clean_artist(undefined)).toBeNull();
+        expect(clean_artist('   ')).toBeNull();
+        expect(clean_artist('VEVO')).toBeNull();
+    });
+});
+
+describe('artist corrections from profile.json', () => {
+    it('wins over the ID3 tag', async () => {
+        put('tarab', '01 - Song.mp3');
+        const result = await scan_music(
+            [TARAB],
+            tags({ '01 - Song.mp3': { duration_s: 100, artist: 'SomeVEVO' } }),
+            root,
+            { 'tarab/01 - Song.mp3': 'The Real Artist' },
+        );
+        expect(result.genres[0]?.tracks[0]?.artist).toBe('The Real Artist');
+    });
+
+    it('leaves an untouched track on its tag', async () => {
+        put('tarab', '01 - Song.mp3');
+        put('tarab', '02 - Other.mp3');
+        const result = await scan_music(
+            [TARAB],
+            tags({
+                '01 - Song.mp3': { duration_s: 1, artist: 'Tagged One' },
+                '02 - Other.mp3': { duration_s: 1, artist: 'Tagged Two' },
+            }),
+            root,
+            { 'tarab/01 - Song.mp3': 'Corrected' },
+        );
+        const [a, b] = result.genres[0]?.tracks ?? [];
+        expect(a?.artist).toBe('Corrected');
+        expect(b?.artist).toBe('Tagged Two');
+    });
+
+    it('refuses a correction whose file is gone', async () => {
+        /*
+         * Renaming a track would otherwise drop its correction in silence and
+         * the artist would revert to the wrong tag — the failure is invisible
+         * precisely because the track still plays.
+         */
+        put('tarab', '01 - Song.mp3');
+        await expect(
+            scan_music([TARAB], tags(), root, {
+                'tarab/99 - Renamed.mp3': 'Nobody',
+            }),
+        ).rejects.toThrow(/do not exist: tarab\/99 - Renamed\.mp3/);
     });
 });
