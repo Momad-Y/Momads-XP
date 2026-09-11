@@ -141,3 +141,57 @@ test('My CV opens the PDF viewer and renders a page', async ({ page }) => {
     });
     await expect(win.getByText(/page/)).toBeVisible();
 });
+
+test('renders at device resolution, not CSS resolution', async ({ page }) => {
+    /*
+     * The CV is pure vector — LaTeX Type 1 fonts, zero raster images — so any
+     * softness on screen is the renderer's, not the file's. The canvas backing
+     * store used to be sized in CSS pixels, so on a HiDPI display the browser
+     * upscaled the result and the text came out blurry.
+     *
+     * Asserted as backing store vs laid-out size, which is the thing that was
+     * wrong. At dpr 1 they match and this proves only that the CSS size is
+     * declared; the deviceScaleFactor context below is what makes it bite.
+     */
+    await bootToDesktop(page);
+    await page.locator('#work-space p', { hasText: 'My CV' }).dblclick();
+    const canvas = page.locator('#work-space .window canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15000 });
+
+    const { backing, css, dpr } = await canvas.evaluate((el) => {
+        const c = el as HTMLCanvasElement;
+        return {
+            backing: c.width,
+            css: c.getBoundingClientRect().width,
+            dpr: globalThis.devicePixelRatio || 1,
+        };
+    });
+
+    expect(css).toBeGreaterThan(0);
+    // the backing store tracks the display, not the layout
+    expect(backing).toBeCloseTo(css * Math.min(dpr, 3), 0);
+    // and the CSS size is declared, or the canvas would lay out at its
+    // backing size and overflow the window on a HiDPI screen
+    expect(css).toBeLessThan(backing + 1);
+});
+
+test.describe('on a HiDPI display', () => {
+    test.use({ deviceScaleFactor: 2 });
+
+    test('doubles the backing store while keeping the layout size', async ({
+        page,
+    }) => {
+        await bootToDesktop(page);
+        await page.locator('#work-space p', { hasText: 'My CV' }).dblclick();
+        const canvas = page.locator('#work-space .window canvas').first();
+        await expect(canvas).toBeVisible({ timeout: 15000 });
+
+        const { backing, css } = await canvas.evaluate((el) => {
+            const c = el as HTMLCanvasElement;
+            return { backing: c.width, css: c.getBoundingClientRect().width };
+        });
+        // this is the assertion the old code failed: it sized the backing
+        // store to the CSS width and let the browser upscale
+        expect(backing).toBeCloseTo(css * 2, 0);
+    });
+});

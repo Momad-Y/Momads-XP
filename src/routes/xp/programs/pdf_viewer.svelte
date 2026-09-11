@@ -89,11 +89,33 @@
                 if (token !== render_token) break;
                 const page = await doc.getPage(i);
                 const base = page.getViewport({ scale: 1 });
-                const scale = ((node.clientWidth - 24) / base.width) * zoom;
-                const viewport = page.getViewport({ scale });
+                /*
+                 * Rendered at DEVICE pixels, laid out at CSS pixels.
+                 *
+                 * The canvas backing store used to be sized in CSS pixels, so
+                 * on any HiDPI screen the browser upscaled the result and the
+                 * CV — which is pure vector, LaTeX Type 1 fonts with no raster
+                 * images in it at all — came out visibly soft. Rendering at
+                 * `css_scale * dpr` and then declaring the smaller CSS size is
+                 * what makes pdf.js draw the glyphs at the resolution the
+                 * display actually has.
+                 *
+                 * DPR is capped at 3: a 4x phone screen would otherwise
+                 * allocate a backing store several times the size of the one a
+                 * desktop needs, for a page nobody can read at that size
+                 * anyway.
+                 */
+                // `globalThis`, not `window`: this component takes a
+                // `window` PROP — the XP window controller — which shadows
+                // the browser global.
+                const dpr = Math.min(globalThis.devicePixelRatio || 1, 3);
+                const css_scale = ((node.clientWidth - 24) / base.width) * zoom;
+                const viewport = page.getViewport({ scale: css_scale * dpr });
                 const canvas = document.createElement('canvas');
                 canvas.width = viewport.width;
                 canvas.height = viewport.height;
+                canvas.style.width = `${String(viewport.width / dpr)}px`;
+                canvas.style.height = `${String(viewport.height / dpr)}px`;
                 canvas.className = 'mx-auto mb-3 shadow-md bg-white';
                 if (token !== render_token) break;
                 node.appendChild(canvas);
