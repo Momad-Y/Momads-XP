@@ -59,6 +59,11 @@ test('All Programs flyout lists the programs and the Games flyout', async ({
         'Python',
         'Paint',
         'Music Player',
+        // Missing for as long as the video player has existed. The list is now
+        // derived from src/lib/start_menu_programs.ts, whose unit test walks
+        // the programs folder and fails on any component that is neither
+        // listed nor explained — so a future program cannot go missing either.
+        'Media Player Classic',
         'Games',
     ]) {
         await expect(flyout.getByText(label)).toBeVisible();
@@ -98,4 +103,23 @@ test('All Programs launches Contact Me', async ({ page }) => {
     await expect(
         page.locator('#work-space .window', { hasText: 'Contact Me' }),
     ).toBeVisible();
+});
+
+test('All Programs launches the video player, which opens usable', async ({
+    page,
+}) => {
+    // Launching matters more than listing: a file handler put in this menu
+    // would open a window with nothing in it, or throw. The video player earns
+    // its place by bringing its own front door.
+    await bootToDesktop(page);
+    await page.locator('#start-menu-btn').click();
+    await page.locator('#start-menu').getByText('All Programs').hover();
+    await page
+        .locator('#all-programs-flyout')
+        .getByText('Media Player Classic')
+        .click();
+
+    const win = page.locator('#work-space .window').first();
+    await expect(win).toBeVisible({ timeout: 15_000 });
+    await expect(win.getByText('Open files...')).toBeVisible();
 });
