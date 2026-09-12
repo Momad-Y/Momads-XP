@@ -13,6 +13,18 @@ import type { HardDrive, VfsItem } from './types';
 
 export { SEED_VERSION } from './generated/seed_version';
 import { SEED_VERSION } from './generated/seed_version';
+import RETIRED_IDS_LIST from './generated/retired_seed_ids.json';
+
+/**
+ * Every id the seed has ever shipped and no longer ships, as a Set — this is
+ * consulted once per cached item on every re-seed.
+ *
+ * A collision with a visitor's own id would delete their file. Their ids come
+ * from `short.generate()`: 22 characters of flickrBase58, so matching one of
+ * these exactly is a 1-in-58²² event, and `is_dropped_seed_item` already
+ * staked the same assumption on the same id space before this existed.
+ */
+const RETIRED_SEED_IDS = new Set<string>(RETIRED_IDS_LIST);
 
 export function shouldReseed(stored: string | null | undefined): boolean {
     return stored !== SEED_VERSION;
@@ -182,10 +194,56 @@ function is_dropped_seed_item(
     item: VfsItem,
     previous: SeedFieldSnapshot | undefined,
 ): boolean {
+    // Guard first, whichever evidence answers below: `clone_fs` stamps
+    // `authored` on every copy a visitor makes — paste, shortcut, bin clone —
+    // so this one check covers all of them regardless of `storage_type`.
+    if (item.authored === true) return false;
+
+    /*
+     * EVIDENCE 1: the ledger — ids we shipped and no longer ship, generated at
+     * build time (`scripts/generate-vfs.ts`, backfilled from git history by
+     * `scripts/backfill-retired-ids.ts`).
+     *
+     * THIS MUST COME BEFORE THE `previous == null` RETURN BELOW, and that is
+     * the whole point of it. Provenance used to be inferred purely from the
+     * visitor's own stored snapshot, which only shipped on 2026-08-23 — so on
+     * an older drive nothing was reapable and every item a later seed dropped
+     * was carried forever: music tracks pointing at 404 URLs after the library
+     * rewrite, and a ghost `C:\Awards` folder after the Certificates & Awards
+     * merge whose `.txt` files rendered "This file cannot be displayed."
+     * Permanently, too — the snapshot written after that boot describes the NEW
+     * seed, so the ghosts never appear in a `previous` again.
+     *
+     * The ledger is also strictly MORE complete than any one snapshot: it
+     * knows ids from seeds older than the one this visitor happens to have
+     * received. Hence one predicate for both, rather than a legacy-only branch
+     * that would drift from this one.
+     */
+    if (RETIRED_SEED_IDS.has(item.id)) {
+        // Their bytes are in it. `save_file` (Paint ▸ Save over a seeded
+        // wallpaper or `my drawing.png`) flips `storage_type` to 'local' and
+        // `url` to an idb key on the SAME id, and `get_file`/`get_url`
+        // dereference idb only for 'local' — so this is exactly the set of
+        // items holding the visitor's own bytes. Carrying a stale icon forever
+        // is a cosmetic cost; deleting someone's drawing is not.
+        if (item.storage_type === 'local') return false;
+        // With a snapshot, prefer its sharper question — did this field change
+        // since the seed they were GIVEN — over the blunt rule above.
+        const was = previous?.[item.id];
+        if (
+            was?.storage_type !== undefined &&
+            item.storage_type !== was.storage_type
+        ) {
+            return false;
+        }
+        return true;
+    }
+
+    // EVIDENCE 2: the visitor's own snapshot, for ids the ledger cannot speak
+    // to — anything shipped by a seed that predates the ledger's own history.
     if (previous == null) return false;
     const was = previous[item.id];
     if (was == null) return false;
-    if (item.authored === true) return false;
     if (
         was.storage_type !== undefined &&
         item.storage_type !== was.storage_type
