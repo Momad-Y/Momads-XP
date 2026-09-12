@@ -76,7 +76,7 @@ export function resolve_portfolio_ref(
                 heading: e.degree,
                 subheading: e.institution,
                 meta_lines: non_empty([e.period, e.honors]),
-                bullets: [],
+                bullets: e.description,
                 chips: [],
                 images: e.images,
             };
@@ -115,7 +115,7 @@ export function resolve_portfolio_ref(
                         ? undefined
                         : document_path(`${c.title}${extname_of(c.pdf)}`),
                 ]),
-                bullets: [],
+                bullets: c.description,
                 chips: [],
                 images: c.images,
             };

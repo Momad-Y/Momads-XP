@@ -60,6 +60,17 @@ export interface EducationEntry {
     degree: string;
     period: string;
     honors?: string;
+    /**
+     * What the degree actually involved, one bullet per line — the same shape
+     * as `ExperienceEntry.description`, and rendered through the same
+     * `PortfolioDetail.bullets` channel.
+     *
+     * LinkedIn splits this into "Activities and societies" and a description;
+     * three of the four activities restate a description bullet almost word
+     * for word, so `profile.json` carries ONE list rather than printing the
+     * same fact twice in a 300px window.
+     */
+    description: string[];
     images: ProfileImage[];
 }
 
@@ -76,8 +87,18 @@ export interface EducationEntry {
  */
 export interface CertificateOrAward {
     title: string;
-    /** Empty for a credential with no date — the honorary award has none. */
+    /** Empty for a credential with no date. */
     year: string;
+    /**
+     * What it was for, one bullet per line.
+     *
+     * Empty for a credential that has no story to tell beyond its own
+     * existence — a language certificate is a score, not an achievement with
+     * detail — which is also all LinkedIn holds for those: an issuer, a date
+     * and a credential ID. The IDs are deliberately not seeded; the IELTS
+     * document was dropped for carrying identifiers.
+     */
+    description: string[];
     images: ProfileImage[];
     /**
      * The credential itself, as a PDF under `static/`.

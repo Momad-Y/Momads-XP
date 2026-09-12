@@ -291,6 +291,52 @@ describe('profile content cannot produce an unreachable VFS name', () => {
         ...Object.keys(profile.skills),
     ];
 
+    /*
+     * Descriptions are pasted from LinkedIn, which prefixes every line with
+     * its own "•" — and every renderer here adds its own marker (`<li>` in the
+     * viewer, `- ` in `entry_text`). A glyph that came along for the ride
+     * shows up as "- • Led Team…" in CMD, which is the kind of thing nobody
+     * notices in a diff.
+     */
+    describe('description bullets are bullets, not pre-bulleted text', () => {
+        const bullet_lists: [string, string[]][] = [
+            ...profile.certificatesAndAwards.map((c): [string, string[]] => [
+                c.title,
+                c.description,
+            ]),
+            ...profile.education.map((e): [string, string[]] => [
+                e.institution,
+                e.description,
+            ]),
+            ...profile.experience.map((e): [string, string[]] => [
+                e.company,
+                e.description,
+            ]),
+        ];
+
+        it('carries prose for more than a couple of entries', () => {
+            expect(
+                bullet_lists.filter(([, list]) => list.length > 0).length,
+            ).toBeGreaterThan(5);
+        });
+
+        it.each(bullet_lists)('%s', (_label, list) => {
+            for (const line of list) {
+                expect(line.trim()).toBe(line);
+                expect(line.length).toBeGreaterThan(0);
+                for (const marker of ['•', '- ', '* ', '· ']) {
+                    expect(
+                        line.startsWith(marker),
+                        `starts with ${marker}`,
+                    ).toBe(false);
+                }
+            }
+            // one entry must not restate itself — the education list merges
+            // LinkedIn's activities into its description by hand
+            expect(list).toHaveLength(new Set(list).size);
+        });
+    });
+
     it.each(names)('%s has no path separator', (name) => {
         expect(name).not.toContain('/');
         expect(name).not.toContain('\\');

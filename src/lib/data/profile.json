@@ -178,6 +178,17 @@
             "degree": "B.Sc. in Artificial Intelligence (Intelligent Systems)",
             "period": "October 2021 – August 2025",
             "honors": "GPA 3.94/4.0 — Excellent with Honours (Summa Cum Laude), ranked 2nd in class",
+            "description": [
+                "Specialized in Intelligent Systems with a focus on ML, NLP, and CV.",
+                "Proficient in Python, C, C++, JavaScript, with experience in TensorFlow, PyTorch, scikit-learn, LangChain, and OpenCV.",
+                "Built multiple projects such as AI Smart Cane, Robotic Chess Arm, and Celebrity Look-Alike CNN.",
+                "Developed BeMo (AI Assistant Robot) as a graduation project, integrating NLP, CV, robotics, and IoT, later adopted by Dr. Aly Fahmy, Dean of AAST AI College.",
+                "Graduation project research paper (first author) under review: \"Tiny Pi, Big Impact: Edge-Driven Hybrid LLM for Real-Time Conversational Robotics\".",
+                "Represented the college at multiple occasions, including VR and Robotics shows across the Alamein campus and the Abu Qir (Alexandria main campus).",
+                "Served as Vice-President of Software Engineering in the Robotics Club, mentoring newcomers in AI, Arduino, and robotics.",
+                "Led multiple teams to 1st place RoboCup @Home Education Egypt 2024 and 3rd place Major Competition Netherlands 2024.",
+                "ICPC Volunteer: contributed to organizing and supporting the 2024 Luxor contest."
+            ],
             "images": [
                 {
                     "src": "/assets/images/education/aast-bachelor-degree.jpg",
@@ -222,6 +233,11 @@
         {
             "title": "1st Place – RoboCup @Home Education Competition (Egypt)",
             "year": "2024",
+            "description": [
+                "Led Team 3arfeen Hollanda to 1st place in the national RoboCup @Home Education Competition.",
+                "Designed and implemented solutions for vision, speech, and localization tasks, enabling the robot to perceive its environment, interact naturally, and navigate effectively.",
+                "Secured qualification for the RoboCup @Home Education Major Competition."
+            ],
             "images": [
                 {
                     "src": "/assets/images/experience/robocup-first-place-certificate.jpg",
@@ -240,6 +256,11 @@
         {
             "title": "3rd Place – RoboCup @Home Education Major Competition (Netherlands)",
             "year": "2024",
+            "description": [
+                "Led Team Wingardium Levioso to 3rd place in the RoboCup @Home Education Major Competition.",
+                "Competed in challenges focused on vision, speech, and localization for autonomous robots.",
+                "Represented Egypt in international robotics competitions, gaining valuable experience."
+            ],
             "images": [
                 {
                     "src": "/assets/images/experience/robocup-participation-certificate.jpg",
@@ -265,7 +286,10 @@
         },
         {
             "title": "Honorary Award – Smart White Cane (AISC), White Cane Conference",
-            "year": "",
+            "year": "2022",
+            "description": [
+                "Presented the Smart White Cane (AISC) at the White Cane Conference in the Taha Hussein Library, Bibliotheca Alexandrina, where the project received an honorary award for innovation in assistive technology."
+            ],
             "images": [
                 {
                     "src": "/assets/images/awards/smart-white-cane-3.jpg",
@@ -284,6 +308,9 @@
         {
             "title": "Certificate of Excellence – Graduation Honors (AAST)",
             "year": "2025",
+            "description": [
+                "Awarded by the Arab Academy for Science, Technology & Maritime Transport for graduating with a B.Sc. in Artificial Intelligence (Intelligent Systems Major), with a GPA of 3.94 (Excellent with Honors – Summa Cum Laude)."
+            ],
             "images": [
                 {
                     "src": "/assets/images/certifications/graduation-honors-2025.jpg",
@@ -303,11 +330,13 @@
         {
             "title": "IELTS Academic – Band 7.5 (IELTS Official)",
             "year": "2025",
+            "description": [],
             "images": []
         },
         {
             "title": "Certificate of Achievement – Mentorness ML Internship",
             "year": "2024",
+            "description": [],
             "images": [
                 {
                     "src": "/assets/images/certifications/mentorness-ml-internship-2024.jpg",
@@ -319,6 +348,9 @@
         {
             "title": "Certificate of Excellence (AAST)",
             "year": "2022",
+            "description": [
+                "Awarded by the Arab Academy for Science, Technology & Maritime Transport for excellent academic achievement in the B.Sc. Artificial Intelligence program."
+            ],
             "images": [
                 {
                     "src": "/assets/images/certifications/certificate-of-excellence-2022.jpg",
