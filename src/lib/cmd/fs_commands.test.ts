@@ -24,6 +24,16 @@ const EXPERIENCE = 'p2FolderExperience';
  * it made a CV update look like a code regression.
  */
 const PRINTERPIX_NAME = `${profile.experience[0]?.company ?? ''} — ${profile.experience[0]?.role ?? ''}.txt`;
+
+/**
+ * The first experience entry that actually carries media, DERIVED rather than
+ * named: this test used to point at Printerpix because it was the only entry
+ * with an image, and that image was a placeholder whose own alt text said
+ * "(test image)". Real media arrived and the placeholder went, which broke the
+ * test — so it now asks the profile which entry has pictures.
+ */
+const WITH_IMAGES = profile.experience.find((e) => e.images.length > 0);
+const WITH_IMAGES_NAME = `${WITH_IMAGES?.company ?? ''} — ${WITH_IMAGES?.role ?? ''}.txt`;
 const PRINTERPIX = required(
     Object.values(drive).find((i) => i.name === PRINTERPIX_NAME),
     `seed entry ${PRINTERPIX_NAME}`,
@@ -151,7 +161,9 @@ describe('cat', () => {
     });
 
     it('names the images it cannot show instead of dropping them', () => {
-        const text = out('cat', PRINTERPIX_NAME, EXPERIENCE);
+        // Fails loudly if NOTHING has media, rather than passing vacuously.
+        expect(WITH_IMAGES, 'no experience entry has images').toBeDefined();
+        const text = out('cat', WITH_IMAGES_NAME, EXPERIENCE);
         expect(text).toMatch(/\[\d+ images? — open this file in My Computer/);
     });
 
