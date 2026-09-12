@@ -333,13 +333,7 @@
         },
         {
             "title": "IELTS Academic – Band 7.5 (IELTS Official, 2025)",
-            "images": [
-                {
-                    "src": "/assets/images/certifications/ielts-academic-2025.jpg",
-                    "alt": "IELTS Academic test report form, overall band 7.5"
-                }
-            ],
-            "pdf": "/assets/certificates/ielts-academic-2025.pdf"
+            "images": []
         },
         {
             "title": "Certificate of Achievement – Mentorness ML Internship (2024)",
