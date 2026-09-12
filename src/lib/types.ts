@@ -56,6 +56,25 @@ export interface VfsItem {
     portfolio_ref?: PortfolioRef;
     /** A shortcut (.lnk): opening resolves and opens this target item's id. */
     shortcut_target?: string;
+    /**
+     * RECYCLE-BIN BREADCRUMBS, written by `recycle_fs` on the clone it puts in
+     * the bin and read only by `restore_fs`.
+     *
+     * `restore_parent` is where the item came from. `restore_name` is the name
+     * it had BEFORE the bin's collision-dedupe renamed it, so restoring a
+     * second `Shedeeny.mp3` does not put `Shedeeny 2.mp3` back in My Music.
+     *
+     * `restore_id` is the id the item had while it was live. It is NOT a
+     * restore target — restoring re-clones under a fresh id, deliberately (see
+     * docs/music-library-vfs-plan.md: restoring at the original id produces an
+     * item the re-seed reaper can never collect once the owner renames the
+     * file it came from). Its only job is to let a child's `restore_parent`
+     * find the bin clone of the folder it used to live in, so that restoring
+     * the child can restore that folder first.
+     */
+    restore_id?: string;
+    restore_parent?: string;
+    restore_name?: string;
 }
 
 export type PortfolioSection =

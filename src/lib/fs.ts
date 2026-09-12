@@ -1,5 +1,11 @@
 import { clipboard, selectingItems, hardDrive, clipboard_op } from './store';
-import { protected_items, SortOptions, SortOrders } from './system';
+import {
+    protected_items,
+    recycle_bin_id,
+    desktop_folder,
+    SortOptions,
+    SortOrders,
+} from './system';
 import * as utils from './utils';
 import { get } from 'svelte/store';
 import short from 'short-uuid';
@@ -229,6 +235,12 @@ export function clone_fs(
     obj_current_id: string,
     parent_id: string,
     new_id: string | null = null,
+    /**
+     * Applied BEFORE the collision-dedupe below, so an override of `basename`
+     * is what gets deduped. Used by `restore_fs` to put an item back under the
+     * name it had when it was deleted rather than the one the bin gave it.
+     */
+    overrides: Partial<VfsItem> | null = null,
 ): void {
     if (dir_contains_dir(obj_current_id, parent_id)) {
         return;
@@ -242,6 +254,14 @@ export function clone_fs(
         // merge deletes it as a stale placeholder.
         authored: true,
     };
+
+    // Recycle breadcrumbs belong to the bin entry alone. Copying an item OUT
+    // of the bin — which is exactly what a restore is — must not carry them,
+    // or the restored item claims to have come from somewhere it now is.
+    delete obj.restore_id;
+    delete obj.restore_parent;
+    delete obj.restore_name;
+    if (overrides != null) Object.assign(obj, overrides);
 
     if (new_id == null) {
         obj.id = short.generate();
@@ -289,6 +309,111 @@ export function clone_fs(
     for (const child of [...children]) {
         clone_fs(child, obj.id);
     }
+}
+
+/**
+ * Move an item to the Recycle Bin.
+ *
+ * WHY THIS IS A CLONE AND A DELETE RATHER THAN A MOVE, which would be simpler
+ * and would make restoring nearly free: `parent` is not one of `USER_FIELDS`
+ * (seed.ts), so the next re-seed would not carry it and every recycled seed
+ * item would leap back out of the bin into the folder it came from. Adding
+ * `parent` to that list instead is worse — `merge_on_reseed` rebuilds
+ * `children` from the seed, so a carried `parent` with a seed-owned `children`
+ * array is the documented dangling-child trap.
+ *
+ * It carries the `protected_items` guard that `clone_fs` lacks. Both delete
+ * surfaces filter protected ids before calling (the right-click menu hides the
+ * entry, `plan_delete` skips them), but the cut/paste path did too — right up
+ * until the keyboard shortcut bypassed it and cloned the whole portfolio tree
+ * while `del_fs` no-opped on the original, once per repeat. The guard belongs
+ * where the damage happens.
+ */
+export function recycle_fs(id: string): void {
+    if (protected_items.includes(id)) return;
+    const item = drive_snapshot()[id];
+    if (item == null) return;
+    clone_fs(id, recycle_bin_id, null, {
+        restore_id: id,
+        restore_parent: item.parent,
+        restore_name: item.name,
+    });
+    del_fs(id);
+}
+
+/** Guards a malformed drive whose restore breadcrumbs form a cycle. */
+const MAX_RESTORE_DEPTH = 32;
+
+/**
+ * Where a bin entry should go back to.
+ *
+ * Three steps, in order of how faithful they are:
+ *   1. The folder it came from is still there — use it.
+ *   2. It is not, but the bin still holds the clone of that folder (matched on
+ *      `restore_id`). Restore THAT first and land inside the result. This is
+ *      what "recreate the original folder" means in practice, and reusing the
+ *      bin's own copy brings the folder's icon and dates back with it.
+ *   3. Neither — the Desktop, which is protected and so always exists. Reached
+ *      by a legacy bin entry written before breadcrumbs shipped, or by
+ *      permanently deleting the folder from inside the bin.
+ */
+function restore_target(item: VfsItem, depth: number): string {
+    const parent = item.restore_parent;
+    if (parent == null) return desktop_folder;
+    if (drive_snapshot()[parent] != null) return parent;
+    if (depth >= MAX_RESTORE_DEPTH) return desktop_folder;
+
+    const data = drive_snapshot();
+    const bin = data[recycle_bin_id];
+    const clone_of_parent = bin?.children
+        .map((child_id) => data[child_id])
+        .find((child) => child != null && child.restore_id === parent);
+    if (clone_of_parent == null) return desktop_folder;
+
+    // The folder comes back under a FRESH id (restoring is a re-clone), so the
+    // child cannot be reunited with it by `restore_parent` — it has to be told
+    // the new id directly.
+    return restore_fs(clone_of_parent.id, depth + 1) ?? desktop_folder;
+}
+
+/**
+ * Take an item out of the Recycle Bin, returning the id it came back as.
+ *
+ * RESTORING IS A RE-CLONE, under a fresh id, which is a deliberate choice and
+ * not the obvious one. Putting the item back at the id it used to have reads
+ * better — it would make a restored song the seed's item again, still
+ * receiving content updates — but it breaks the moment the owner renames the
+ * file it came from: the re-seed drops the old id, the visitor's snapshot no
+ * longer holds it, and `is_dropped_seed_item` can then never collect the
+ * restored copy. The result is an undeletable row pointing at a 404, which is
+ * the exact failure that predicate exists to prevent. A re-clone is honestly
+ * the visitor's own file and every existing rule already handles it.
+ *
+ * THE COST, stated because it is real: a restored seeded song stops tracking
+ * future updates to that song.
+ *
+ * Clone FIRST, delete second. `del_fs` releases an upload's bytes once no item
+ * references its key, and the restored copy shares that key — so the copy has
+ * to exist before the bin entry goes, or restoring an uploaded file would hand
+ * back an item whose bytes were freed on the way out.
+ */
+export function restore_fs(id: string, depth = 0): string | undefined {
+    const item = drive_snapshot()[id];
+    if (item == null) return undefined;
+
+    const target = restore_target(item, depth);
+    const restored_id = short.generate();
+    const name = item.restore_name;
+    // `basename`, not `name`: clone_fs re-derives `name` after resolving a
+    // collision in the destination, which a restore can hit just as a copy can.
+    const basename =
+        name != null && item.ext !== '' && name.endsWith(item.ext)
+            ? name.slice(0, -item.ext.length)
+            : name;
+    clone_fs(id, target, restored_id, basename == null ? null : { basename });
+    if (drive_snapshot()[restored_id] == null) return undefined;
+    del_fs(id);
+    return restored_id;
 }
 
 export async function new_fs_item(
