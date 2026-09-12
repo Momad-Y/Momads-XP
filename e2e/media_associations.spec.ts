@@ -113,7 +113,7 @@ test('opening the player from the Start menu does NOT start playing', async ({
     await page.locator('#start-menu').getByText('All Programs').hover();
     const flyout = page.locator('#all-programs-flyout');
     await expect(flyout).toBeVisible();
-    await flyout.getByText('Music Player', { exact: true }).click();
+    await flyout.getByText('Windows Media Player', { exact: true }).click();
     await expect(player(page)).toBeVisible({ timeout: 15_000 });
     await page.waitForTimeout(1200);
 
