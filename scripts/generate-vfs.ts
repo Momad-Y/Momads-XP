@@ -22,7 +22,13 @@
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { execSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import {
+    mkdirSync,
+    readFileSync,
+    writeFileSync,
+    rmSync,
+    statSync,
+} from 'node:fs';
 import { parseFile } from 'music-metadata';
 import { copy, fill_copy, profile } from '../src/lib/profile';
 import { SEED_EPOCH, build_portfolio } from '../src/lib/vfs_gen/build';
@@ -119,7 +125,13 @@ const desktop_exe = (
 const base = JSON.parse(
     readFileSync('scripts/vfs-base.json', 'utf8'),
 ) as Record<string, VfsItem>;
-const built = build_portfolio(profile);
+/** Real size on disk, in KB, CEILED — `size_label` and the upload paths ceil too. */
+function asset_size_kb(url: string): number {
+    const path = join('static', url.split('?')[0] ?? url);
+    return Math.ceil(statSync(path).size / 1024);
+}
+
+const built = build_portfolio(profile, asset_size_kb);
 
 const exes: VfsItem[] = [
     desktop_exe(

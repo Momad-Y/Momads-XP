@@ -9,20 +9,42 @@ const mirror = build_mirror();
 const paths = mirror.map((e) => e.path);
 
 describe('build_mirror', () => {
-    it('names every folder and file exactly as the seed does', () => {
+    it('names every folder and entry file exactly as the seed does', () => {
         // Derived from build_portfolio, the same pure function the seed
         // generator uses, so `/c` and CMD's `ls` cannot disagree. Duplicating
         // the naming here is the drift this repo keeps paying for.
+        //
+        // ENTRY files only, and that is the mirror's contract rather than a
+        // gap: `build_mirror` skips any child without a `portfolio_ref`
+        // because it mirrors TEXT, and a certificate PDF has none to give.
+        // This assertion covered every child until the certificate PDFs
+        // arrived — it held only because every child happened to be an entry.
         const built = build_portfolio(profile);
+        let checked = 0;
         for (const folder_id of built.folder_ids) {
             const folder = built.items[folder_id];
             if (folder == null) continue;
             expect(paths).toContain(folder.name);
             for (const child_id of folder.children) {
                 const child = built.items[child_id];
-                if (child == null) continue;
+                if (child?.portfolio_ref == null) continue;
                 expect(paths).toContain(`${folder.name}/${child.name}`);
+                checked++;
             }
+        }
+        // Guards the skip above from quietly emptying the whole assertion.
+        expect(checked).toBeGreaterThan(20);
+    });
+
+    it('leaves non-text files out, rather than mirroring a lie', () => {
+        // The certificate PDFs live in the Certifications folder and are
+        // openable in the PDF viewer; Python's mirror is text, so it must not
+        // pretend to hold them.
+        const built = build_portfolio(profile);
+        const pdfs = Object.values(built.items).filter((i) => i.ext === '.pdf');
+        expect(pdfs.length).toBeGreaterThan(0);
+        for (const pdf of pdfs) {
+            expect(paths).not.toContain(`Certifications/${pdf.name}`);
         }
     });
 

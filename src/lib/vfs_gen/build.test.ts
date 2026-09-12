@@ -147,3 +147,99 @@ describe('file_name_from_url', () => {
         );
     });
 });
+
+describe('certificate PDFs', () => {
+    /*
+     * A certificate nobody can read is not a credential. LinkedIn only ever
+     * serves uploaded documents as per-page images — the original PDFs came
+     * from the Drive links behind "Show credential" — so these are the real
+     * files, seeded beside each certification's `.txt` and openable in the PDF
+     * viewer exactly as the CV is.
+     */
+    const built = build_portfolio(profile, () => 42);
+    const items = Object.values(built.items);
+    const certs = profile.certifications.filter(
+        (c) => c.pdf != null && c.pdf !== '',
+    );
+
+    it('seeds one .pdf per certification that has one', () => {
+        expect(certs.length).toBeGreaterThan(0);
+        const pdfs = items.filter(
+            (i) => i.ext === '.pdf' && i.parent === 'p2FolderCertifications',
+        );
+        expect(pdfs).toHaveLength(certs.length);
+    });
+
+    it('names each PDF after its certification, so the two sit together', () => {
+        for (const cert of certs) {
+            const pdf = items.find((i) => i.name === `${cert.title}.pdf`);
+            expect(pdf, `no seeded PDF for ${cert.title}`).toBeDefined();
+            expect(pdf?.url).toBe(cert.pdf);
+            expect(pdf?.storage_type).toBe('remote');
+        }
+    });
+
+    it('lists them in the Certifications folder', () => {
+        const folder = built.items['p2FolderCertifications'];
+        const pdfs = items.filter(
+            (i) => i.ext === '.pdf' && i.parent === 'p2FolderCertifications',
+        );
+        for (const pdf of pdfs) {
+            expect(folder?.children).toContain(pdf.id);
+        }
+        // entries AND credentials, not one or the other
+        expect(folder?.children).toHaveLength(
+            profile.certifications.length + pdfs.length,
+        );
+    });
+
+    /*
+     * They are NOT portfolio entries: `entry_ids` becomes
+     * `PORTFOLIO_ENTRY_IDS`, which makes an item undeletable and is what
+     * `portfolio_ref` lookups walk. A PDF carries no ref.
+     */
+    it('does not count them as portfolio entries', () => {
+        const pdfIds = items.filter((i) => i.ext === '.pdf').map((i) => i.id);
+        for (const id of pdfIds) {
+            expect(built.entry_ids).not.toContain(id);
+        }
+    });
+
+    it('reports the size it was given rather than a guess', () => {
+        const pdf = items.find(
+            (i) => i.ext === '.pdf' && i.parent === 'p2FolderCertifications',
+        );
+        expect(pdf?.size).toBe(42);
+    });
+});
+
+describe('the certificate files actually exist', () => {
+    /*
+     * The seed points at `static/`, so a typo'd path ships a certification
+     * whose double-click opens the PDF viewer on a 404 — which `pdf_viewer`
+     * renders as a connection error, blaming the network for a missing file.
+     */
+    it('has a real PDF on disk behind every reference', () => {
+        for (const cert of profile.certifications) {
+            if (cert.pdf == null || cert.pdf === '') continue;
+            const path = 'static' + cert.pdf;
+            const size = statSync(path).size;
+            expect(size, `${path} is empty`).toBeGreaterThan(10_000);
+        }
+    });
+
+    it('seeds the size the file really is, ceiled', () => {
+        const real = build_portfolio(profile, (url) =>
+            Math.ceil(statSync('static' + url).size / 1024),
+        );
+        for (const cert of profile.certifications) {
+            if (cert.pdf == null || cert.pdf === '') continue;
+            const pdf = Object.values(real.items).find(
+                (i) => i.name === `${cert.title}.pdf`,
+            );
+            expect(pdf?.size).toBe(
+                Math.ceil(statSync('static' + cert.pdf).size / 1024),
+            );
+        }
+    });
+});

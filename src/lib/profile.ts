@@ -72,6 +72,15 @@ export interface Award {
 export interface Certification {
     title: string;
     images: ProfileImage[];
+    /**
+     * The credential itself, as a PDF under `static/`.
+     *
+     * Seeded as a REAL FILE beside the entry's `.txt` in the Certifications
+     * folder (see `vfs_gen/build.ts`), so double-clicking it opens the PDF
+     * viewer exactly as the CV does — a certificate nobody can read is not a
+     * credential. Optional: a certification may have no document.
+     */
+    pdf?: string;
 }
 
 export interface Project {

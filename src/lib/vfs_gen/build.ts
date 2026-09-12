@@ -108,7 +108,15 @@ export function file_name_from_url(url: string): string {
     return decoded;
 }
 
-export function build_portfolio(profile: Profile): PortfolioBuild {
+export function build_portfolio(
+    profile: Profile,
+    /**
+     * Size in KB of an asset under `static/`, injected so this module stays
+     * pure and node-free. The CV hardcodes 136 and has been free to drift
+     * since; a certificate reports what it actually weighs.
+     */
+    asset_size_kb: (url: string) => number = () => 1,
+): PortfolioBuild {
     const items: Record<string, VfsItem> = {};
     const entry_ids: string[] = [];
 
@@ -158,8 +166,43 @@ export function build_portfolio(profile: Profile): PortfolioBuild {
         ),
     };
 
+    /*
+     * Files a section ships that are NOT portfolio entries — today, the
+     * certificate PDFs, one per certification that has one, named from the
+     * same title so each lands beside its own `.txt`: the text is the summary,
+     * the PDF is the credential. `.pdf` picks up the PDF viewer through
+     * `doctypes`, so a double-click reads it.
+     *
+     * Kept out of `entry_ids` deliberately. That list becomes
+     * `PORTFOLIO_ENTRY_IDS`, which `protected_items` uses to make the entries
+     * undeletable, and it is also what `portfolio_ref` lookups walk — a PDF
+     * carries no ref and, like `CV.pdf`, is the visitor's to delete.
+     */
+    const extras: Partial<Record<PortfolioSection, VfsItem[]>> = {
+        certifications: profile.certifications.flatMap((cert, i) => {
+            const url = cert.pdf;
+            if (url == null || url === '') return [];
+            return [
+                {
+                    ...base_item(
+                        `${entry_id('certifications', cert.title) + String(i)}Pdf`,
+                        'p2FolderCertifications',
+                    ),
+                    type: 'file' as const,
+                    basename: cert.title,
+                    name: `${cert.title}.pdf`,
+                    ext: '.pdf',
+                    storage_type: 'remote' as const,
+                    url,
+                    size: asset_size_kb(url),
+                },
+            ];
+        }),
+    };
+
     for (const folder of FOLDERS) {
         const children = per_section[folder.section];
+        const extra = extras[folder.section] ?? [];
         add({
             // parent stamped by the generator script (C: drive id)
             ...base_item(folder.id, ''),
@@ -169,12 +212,13 @@ export function build_portfolio(profile: Profile): PortfolioBuild {
             ext: '',
             icon: '/images/xp/icons/FolderClosed.png',
             starting_point: true,
-            children: children.map((c) => c.id),
+            children: [...children, ...extra].map((c) => c.id),
         });
         for (const child of children) {
             add(child);
             entry_ids.push(child.id);
         }
+        for (const child of extra) add(child);
     }
 
     const resume_file_id = 'p2FileResumePdf';

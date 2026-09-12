@@ -211,19 +211,23 @@
     "certifications": [
         {
             "title": "Certificate of Excellence – Graduation Honors (AAST, 2025)",
-            "images": []
+            "images": [],
+            "pdf": "/assets/certificates/graduation-honors-2025.pdf"
         },
         {
             "title": "Certificate of Excellence (AAST, 2022)",
-            "images": []
+            "images": [],
+            "pdf": "/assets/certificates/certificate-of-excellence-2022.pdf"
         },
         {
             "title": "IELTS Academic – Band 7.5 (IELTS Official, 2025)",
-            "images": []
+            "images": [],
+            "pdf": "/assets/certificates/ielts-academic-2025.pdf"
         },
         {
             "title": "Certificate of Achievement – Mentorness ML Internship (2024)",
-            "images": []
+            "images": [],
+            "pdf": "/assets/certificates/mentorness-ml-internship-2024.pdf"
         }
     ],
     "projects": [
