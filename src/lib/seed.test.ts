@@ -930,6 +930,38 @@ describe('merge_on_reseed reaps retired ids with no snapshot at all', () => {
         expect(merged[C]?.children).toContain('mine');
     });
 
+    it('defers to the snapshot when it disagrees with the blunt rule', () => {
+        /*
+         * A retired id whose `storage_type` is NOT 'local' but differs from
+         * what the seed shipped: the visitor made it theirs somehow, and a
+         * snapshot can say so precisely where the no-snapshot rule cannot.
+         * The sharper question wins whenever it can be asked, so the two
+         * paths can never disagree about the same item.
+         */
+        const old_seed = drive(
+            item({ id: C, type: 'folder', children: [GHOST_ENTRY] }),
+            item({ id: GHOST_ENTRY, parent: C, storage_type: 'fake' }),
+        );
+        const cached = drive(
+            item({ id: C, type: 'folder', children: [GHOST_ENTRY] }),
+            item({ id: GHOST_ENTRY, parent: C, storage_type: 'remote' }),
+        );
+        const merged = merge_on_reseed(
+            cached,
+            new_seed,
+            snapshot_seed_fields(old_seed),
+        );
+        expect(merged[GHOST_ENTRY]).toBeDefined();
+
+        // and with the snapshot AGREEING, the same id is reaped
+        const untouched = merge_on_reseed(
+            old_seed,
+            new_seed,
+            snapshot_seed_fields(old_seed),
+        );
+        expect(untouched[GHOST_ENTRY]).toBeUndefined();
+    });
+
     it('still reaps by snapshot for an id the ledger never heard of', () => {
         // the two sources of evidence, not one replacing the other
         const old_seed = drive(
