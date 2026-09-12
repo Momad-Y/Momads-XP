@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { resolve_portfolio_ref } from './portfolio';
 import { profile } from './profile';
-import { to_hard_drive } from './types';
+import { entry_text } from './python/mirror';
+import { required, to_hard_drive } from './types';
 
 describe('resolve_portfolio_ref', () => {
     it('maps an experience entry to a full detail', () => {
@@ -117,6 +118,57 @@ describe('resolve_portfolio_ref', () => {
                 `${printed[0] ?? ''} is not in the drive`,
             ).toBe(true);
         }
+    });
+
+    /*
+     * The descriptions the owner writes on LinkedIn — for credentials and for
+     * the degree — had nowhere to live: `CertificateOrAward` was
+     * `{title, year, images, pdf?}` and `EducationEntry` had no prose field at
+     * all, so five awards and a four-year degree rendered as a heading, a date
+     * and a gallery. Nothing needed to change in any renderer:
+     * `PortfolioDetail.bullets` was already the section-agnostic channel that
+     * the viewer prints as a `<ul>` and `entry_text` prints as `- ` lines —
+     * these two resolvers were simply passing `[]` into it.
+     */
+    it('passes every credential description through as bullets', () => {
+        expect(profile.certificatesAndAwards.length).toBeGreaterThan(0);
+        let with_prose = 0;
+        profile.certificatesAndAwards.forEach((credential, i) => {
+            const d = resolve_portfolio_ref({
+                section: 'certificatesAndAwards',
+                key: i,
+            });
+            expect(d?.bullets, credential.title).toEqual(
+                credential.description,
+            );
+            if (credential.description.length > 0) with_prose += 1;
+        });
+        // guards the loop from passing on an all-empty profile
+        expect(with_prose).toBeGreaterThan(2);
+    });
+
+    it('passes the degree description through as bullets', () => {
+        expect(profile.education.length).toBeGreaterThan(0);
+        profile.education.forEach((entry, i) => {
+            const d = resolve_portfolio_ref({ section: 'education', key: i });
+            expect(d?.bullets, entry.institution).toEqual(entry.description);
+        });
+        expect(profile.education[0]?.description.length).toBeGreaterThan(3);
+    });
+
+    it('reaches CMD and the Python mirror, not just the window', () => {
+        // `entry_text` is what `cat` prints and what the /c mirror carries, and
+        // it renders `bullets` — so a description that never reached `bullets`
+        // would be invisible in two of the three places it should appear
+        const detail = resolve_portfolio_ref({
+            section: 'certificatesAndAwards',
+            key: profile.certificatesAndAwards.findIndex(
+                (c) => c.description.length > 0,
+            ),
+        });
+        const first = detail?.bullets[0] ?? '';
+        expect(first).not.toBe('');
+        expect(entry_text(required(detail, 'detail'))).toContain(`- ${first}`);
     });
 
     it('returns null on out-of-range or unknown keys', () => {

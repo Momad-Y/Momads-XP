@@ -1067,6 +1067,12 @@ All personal content lives in a single `src/lib/data/profile.json`. Components r
             "degree": "Bachelor's degree, Artificial Intelligence (Intelligent Systems)",
             "period": "October 2021 – July 2025",
             "honors": "Excellent with Honours",
+            // one bullet per line, rendered through `PortfolioDetail.bullets`
+            // — the same channel as an experience entry's, so it reaches the
+            // detail window, CMD `cat` and the Python mirror at once
+            "description": [
+                "Specialized in Intelligent Systems with a focus on ML, NLP, and CV.",
+            ],
             "images": [
                 {
                     "src": "/assets/images/aast-diploma.jpg",
@@ -1130,12 +1136,21 @@ All personal content lives in a single `src/lib/data/profile.json`. Components r
         {
             "title": "1st Place – RoboCup @Home Education Competition (Egypt)",
             "year": "2024",
+            // empty for a credential with no story beyond its own existence
+            // (a language certificate is a score) — LinkedIn holds no prose
+            // for those either
+            "description": [
+                "Led Team 3arfeen Hollanda to 1st place in the national RoboCup @Home Education Competition.",
+            ],
             "images": [],
         },
         {
             "title": "Honorary Award – Smart White Cane (AISC), White Cane Conference",
             // empty, not absent: every entry states whether it has a date
-            "year": "",
+            "year": "2022",
+            "description": [
+                "Presented the Smart White Cane (AISC) at the White Cane Conference …",
+            ],
             "images": [],
         },
         {

@@ -191,6 +191,13 @@
                                             ? ` · ${entry.honors}`
                                             : ''}
                                     </p>
+                                    <ul
+                                        class="list-disc ml-4 mt-1 text-[11px] text-slate-700"
+                                    >
+                                        {#each entry.description as bullet (bullet)}
+                                            <li class="mb-0.5">{bullet}</li>
+                                        {/each}
+                                    </ul>
                                 </div>
                             {/each}
                         {:else}
@@ -205,6 +212,15 @@
                                         <p class="text-[11px] text-slate-500">
                                             {credential.year}
                                         </p>
+                                    {/if}
+                                    {#if credential.description.length > 0}
+                                        <ul
+                                            class="list-disc ml-4 mt-1 text-[11px] text-slate-700"
+                                        >
+                                            {#each credential.description as bullet (bullet)}
+                                                <li class="mb-0.5">{bullet}</li>
+                                            {/each}
+                                        </ul>
                                     {/if}
                                 </div>
                             {/each}
