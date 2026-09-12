@@ -11,6 +11,10 @@
         hardDrive,
     } from '../../../lib/store';
     import * as utils from '../../../lib/utils';
+    import {
+        MPC_AUDIO_EXTENSIONS,
+        VIDEO_EXTENSIONS,
+    } from '../../../lib/media_types';
     import * as fs from '../../../lib/fs';
     import { tooltip } from '$lib/components/xp/tooltip';
     import { get } from 'idb-keyval';
@@ -32,12 +36,33 @@
     export let fs_item: VfsItem | undefined = undefined;
     export let exec_path: string;
 
-    const supported_audio_types = ['.mp3', '.wav', '.ogg'];
-    const supported_video_types = ['.mp4', '.wmv', '.webm', '.ogg'];
+    /*
+     * FROM `media_types.ts`, not written here. These two literals were a third
+     * and fourth copy of "what is audio, what is video", and they had already
+     * drifted from the other two: `.ogg` was declared video here while the
+     * music library listed it as audio. Sharing the definition also makes
+     * "every associated video type is one this player handles" true by
+     * construction instead of by test.
+     */
+    const supported_audio_types = MPC_AUDIO_EXTENSIONS;
+    const supported_video_types = VIDEO_EXTENSIONS;
 
     let slider: RangeSlider | undefined;
 
     let file_type: string | undefined; //'audio' or 'video';
+    /**
+     * The media element could not decode what it was given.
+     *
+     * `.mkv`, `.avi` and `.mov` are associated with this player because a
+     * video file should open the video player — but no browser decodes them.
+     * Without this the window painted the idle grey logo and said nothing,
+     * which is worse than the "cannot open this file" dialog an UNASSOCIATED
+     * extension already gets. It also catches a corrupt or truncated `.mp4`,
+     * which nothing handled before.
+     */
+    let load_error = false;
+    /** Errors before a real src is assigned are the empty `src=""`, not a file. */
+    let src_assigned = false;
     let player_node: HTMLAudioElement | HTMLVideoElement | undefined;
     let currentTime = 0;
     let duration = NaN;
@@ -64,11 +89,22 @@
 
     async function load_media(item: VfsItem | undefined) {
         if (item == null) return;
-        if (supported_audio_types.includes(item.ext)) {
+        load_error = false;
+        src_assigned = false;
+        // Lowercased: every other doctypes/icon lookup in the app does, and an
+        // uppercase ".MP4" reaching here silently fell through to the early
+        // return below.
+        const ext = item.ext.toLowerCase();
+        if (supported_audio_types.includes(ext)) {
             file_type = 'audio';
-        } else if (supported_video_types.includes(item.ext)) {
+        } else if (supported_video_types.includes(ext)) {
             file_type = 'video';
         } else {
+            // Not ours at all. Say so rather than sitting there idle.
+            file_type = 'video';
+            await tick();
+            load_error = true;
+            window?.update_title(item.name);
             return;
         }
         await tick();
@@ -82,7 +118,13 @@
         }
 
         subtitle_src = await find_subtitle(item);
-        player().src = url ?? '';
+        if (url == null || url === '') {
+            load_error = true;
+            window?.update_title(item.name);
+            return;
+        }
+        player().src = url;
+        src_assigned = true;
         void player().play();
         window?.update_title(item.name);
     }
@@ -309,6 +351,9 @@
                     bind:duration
                     bind:paused
                     bind:volume={audio_volume}
+                    on:error={() => {
+                        if (src_assigned) load_error = true;
+                    }}
                 >
                     <track kind="subtitles" src={subtitle_src} default />
                 </video>
@@ -316,7 +361,32 @@
             </div>
         {/if}
 
-        {#if player_node == null}
+        {#if load_error}
+            <div
+                data-testid="mpc-load-error"
+                class="grow bg-black w-full flex flex-col items-center justify-center px-6 text-center"
+            >
+                <img
+                    src="/images/xp/icons/MPC.png"
+                    class="invert opacity-20"
+                    width="90px"
+                    height="auto"
+                    alt=""
+                />
+                <p class="mt-6 text-sm text-slate-200">
+                    Media Player Classic cannot play this file.
+                </p>
+                <p class="mt-1 text-xs text-slate-400">
+                    The format is not supported.
+                </p>
+                <button
+                    on:click={open_file}
+                    class=" outline-none bg-slate-900 hover:bg-slate-800 border-2 border-slate-800 rounded mt-6 text-slate-100 text-sm py-2 px-4"
+                >
+                    Open files...
+                </button>
+            </div>
+        {:else if player_node == null}
             <div
                 class="grow bg-black w-full flex flex-col items-center justify-center"
             >

@@ -89,11 +89,36 @@
      */
     const META = metadata_index(TRACKS);
 
+    /**
+     * A file this window was asked to play, which may live anywhere.
+     *
+     * INITIALISED AT COMPONENT INIT, not in `onMount`: `$: library` is a
+     * pre-effect and runs before mount, so an id assigned later would not be
+     * in `flat` when `onMount` picks the opening track.
+     *
+     * An ID, never the item: `build_library` re-resolves it against the drive
+     * on every rebuild, so deleting the file removes it from the library and
+     * stops playback, exactly like any other track.
+     */
+    /*
+     * Read through a function, not inline. At the top level of the instance
+     * script TypeScript narrows `fs_item` to its initialiser — `undefined` —
+     * because nothing in the file statically assigns it; Svelte does, at
+     * runtime, from the prop. Inside a function the declared type survives.
+     * `initial_id` below reads it the same way for the same reason.
+     */
+    function launched_id(): string | null {
+        return fs_item == null ? null : fs_item.id;
+    }
+
+    let extra_id: string | null = launched_id();
+
     $: library = build_library(
         $hardDrive ?? {},
         my_music_id,
         META,
         profile.music.unsorted_label,
+        extra_id,
     );
     $: flat = library.flat;
 
@@ -108,6 +133,14 @@
     let duration = Number.NaN;
     let app_volume = 0.8;
     let src: string | undefined;
+    /**
+     * The element could not decode the current track.
+     *
+     * Reachable now that any audio extension opens this player: a `.flac` a
+     * browser refuses, a truncated upload, a seeded url that 404s. Without it
+     * the row simply sat there selected and silent.
+     */
+    let play_error = false;
 
     $: track = flat.find((t) => t.id === current_id);
     $: index = track == null ? -1 : flat.indexOf(track);
@@ -130,8 +163,37 @@
      * launched.
      */
     onMount(() => {
+        // `open_fs_item` can land between registration and mount — the
+        // launcher adds this instance to `runningPrograms` before Svelte has
+        // flushed `onMount` — so a selection that already happened wins.
+        if (current_id != null) return;
         if (flat.length > 0) void select(initial_id(), false);
+        if (fs_item != null) window?.update_title(fs_item.name);
     });
+
+    /**
+     * Play a file handed over after this window was already open.
+     *
+     * The player is a registry SINGLETON, so a second double-click focuses
+     * this instance instead of launching another — and until this existed the
+     * launcher dropped the file on the floor, raising a window that went on
+     * playing whatever it had.
+     *
+     * NOT called `open_file`: Media Player Classic already exports a zero-arg
+     * `open_file` that mounts a file picker, and a launcher calling whichever
+     * one it found would open a dialog instead of playing the song.
+     *
+     * `await tick()` is load-bearing. `extra_id` feeds `$: library`, a
+     * pre-effect, so selecting in the same tick reads a stale `flat`, `select`
+     * finds nothing and returns, and the deleted-track guard then stops
+     * playback — the feature would fail closed and silently.
+     */
+    export async function open_fs_item(item: VfsItem): Promise<void> {
+        extra_id = item.id;
+        await tick();
+        window?.update_title(item.name);
+        await select(item.id);
+    }
 
     function initial_id(): string | null {
         const wanted =
@@ -352,6 +414,7 @@
         const token = ++selection_token;
         current_id = next;
         current_time = 0;
+        play_error = false;
         if (next == null) {
             src = undefined;
             return;
@@ -492,7 +555,14 @@
                 <div class="truncate text-[12px] font-bold">
                     {track?.title ?? 'No track'}
                 </div>
-                {#if track?.artist != null}
+                {#if play_error}
+                    <div
+                        data-testid="play-error"
+                        class="truncate text-[11px] text-[#ffd27f]"
+                    >
+                        Cannot play this file.
+                    </div>
+                {:else if track?.artist != null}
                     <div class="truncate text-[11px] opacity-80">
                         {track.artist}
                     </div>
@@ -639,6 +709,9 @@
             {src}
             preload="metadata"
             on:durationchange={remember_duration}
+            on:error={() => {
+                if (src != null) play_error = true;
+            }}
             on:ended={() => {
                 step(1, true);
             }}
