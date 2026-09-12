@@ -51,12 +51,26 @@ function node(id: string, parent: string): VfsItem {
 
 const DESKTOP = 'nt1QdU9Sws26H26UNQZcQU';
 const live = node('live', DESKTOP);
+/** Recycled BEFORE breadcrumbs shipped: nothing says where it came from. */
 const binned = node('binned', recycle_bin_id);
+/** Recycled by `recycle_fs`, so it knows its way home. */
+const binned_known: VfsItem = {
+    ...node('binned_known', recycle_bin_id),
+    restore_id: 'was-live',
+    restore_parent: DESKTOP,
+    restore_name: 'binned_known.txt',
+};
 
 const drive: HardDrive = {
     live,
     binned,
+    binned_known,
     [DESKTOP]: { ...node(DESKTOP, 'root'), type: 'folder', children: ['live'] },
+    [recycle_bin_id]: {
+        ...node(recycle_bin_id, 'root'),
+        type: 'folder',
+        children: ['binned', 'binned_known'],
+    },
 };
 
 // finder.ts snapshots the drive at MODULE level, so the store must be seeded
@@ -249,13 +263,55 @@ describe('right-click Restore', () => {
         expect(entry_for(live, ['live'])).toBeUndefined();
     });
 
-    it('restores every selected bin item', () => {
+    it('restores straight away when the origin is known', async () => {
+        selectingItems.set(['binned_known']);
+        const restore = vi
+            .spyOn(fs, 'restore_fs')
+            .mockImplementation(() => undefined);
+        void entry_for(binned_known, ['binned_known'])?.action?.();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(restore.mock.calls.map((c) => c[0])).toEqual(['binned_known']);
+        // No dialog: it goes back where it belongs, so there is nothing to ask.
+        expect(mounted.calls).toHaveLength(0);
+    });
+
+    /*
+     * The reported bug. An entry recycled before breadcrumbs shipped has no
+     * recoverable origin, so it can only land on the Desktop — and doing that
+     * silently is what made Restore look broken: a file deleted from a folder
+     * reappeared somewhere else with no explanation.
+     */
+    it('asks first when it cannot tell where the entry came from', async () => {
         selectingItems.set(['binned']);
         const restore = vi
             .spyOn(fs, 'restore_fs')
             .mockImplementation(() => undefined);
         void entry_for(binned, ['binned'])?.action?.();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        const props = mounted.calls.at(-1)?.props;
+        expect(props?.message).toContain(
+            'cannot determine the original location',
+        );
+        expect(props?.message).toContain('binned.txt');
+        // Nothing has moved yet.
+        expect(restore).not.toHaveBeenCalled();
+
+        ok_of(props)?.action();
         expect(restore.mock.calls.map((c) => c[0])).toEqual(['binned']);
+    });
+
+    it('Cancel leaves it in the bin', async () => {
+        selectingItems.set(['binned']);
+        const restore = vi
+            .spyOn(fs, 'restore_fs')
+            .mockImplementation(() => undefined);
+        void entry_for(binned, ['binned'])?.action?.();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        cancel_of(mounted.calls.at(-1)?.props)?.action();
+        expect(restore).not.toHaveBeenCalled();
     });
 
     /*
@@ -263,12 +319,14 @@ describe('right-click Restore', () => {
      * so an id that is not actually in the bin must not be "restored", which
      * would clone a live item to wherever its breadcrumbs pointed.
      */
-    it('ignores selected ids that are not in the bin', () => {
-        selectingItems.set(['binned', 'live']);
+    it('ignores selected ids that are not in the bin', async () => {
+        selectingItems.set(['binned_known', 'live']);
         const restore = vi
             .spyOn(fs, 'restore_fs')
             .mockImplementation(() => undefined);
-        void entry_for(binned, ['binned', 'live'])?.action?.();
-        expect(restore.mock.calls.map((c) => c[0])).toEqual(['binned']);
+        void entry_for(binned_known, ['binned_known', 'live'])?.action?.();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(restore.mock.calls.map((c) => c[0])).toEqual(['binned_known']);
     });
 });

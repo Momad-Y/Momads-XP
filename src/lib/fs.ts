@@ -357,23 +357,59 @@ const MAX_RESTORE_DEPTH = 32;
  *      by a legacy bin entry written before breadcrumbs shipped, or by
  *      permanently deleting the folder from inside the bin.
  */
-function restore_target(item: VfsItem, depth: number): string {
+type RestorePlan =
+    /** The folder it came from is still there. */
+    | { kind: 'folder'; id: string }
+    /** That folder is in the bin too, and has to come out first. */
+    | { kind: 'via_bin'; clone_id: string }
+    /** Nothing on the item says where it belongs. */
+    | { kind: 'unknown' };
+
+/**
+ * WORKS OUT the destination without touching anything, so the same three steps
+ * can answer "where would this go?" and "put it there" — see
+ * `restore_origin_known`, which the menu calls to decide whether it has to ask
+ * the visitor first. Two hand-written copies of this would drift, and the
+ * drifted copy would be the one that silently moved a file somewhere else.
+ */
+function plan_restore(item: VfsItem, depth: number): RestorePlan {
     const parent = item.restore_parent;
-    if (parent == null) return desktop_folder;
-    if (drive_snapshot()[parent] != null) return parent;
-    if (depth >= MAX_RESTORE_DEPTH) return desktop_folder;
+    if (parent == null) return { kind: 'unknown' };
+    if (drive_snapshot()[parent] != null) return { kind: 'folder', id: parent };
+    if (depth >= MAX_RESTORE_DEPTH) return { kind: 'unknown' };
 
     const data = drive_snapshot();
     const bin = data[recycle_bin_id];
     const clone_of_parent = bin?.children
         .map((child_id) => data[child_id])
         .find((child) => child != null && child.restore_id === parent);
-    if (clone_of_parent == null) return desktop_folder;
+    if (clone_of_parent == null) return { kind: 'unknown' };
+    return { kind: 'via_bin', clone_id: clone_of_parent.id };
+}
 
+/**
+ * Can this bin entry be put back where it came from?
+ *
+ * False for an entry recycled BEFORE restore breadcrumbs shipped — the origin
+ * of those is genuinely unrecoverable, nothing on the item records it — and
+ * for one whose folder was destroyed outright from inside the bin. Restoring
+ * either still works, but it lands on the Desktop, and the menu asks first
+ * rather than quietly putting the file somewhere the visitor did not choose.
+ */
+export function restore_origin_known(id: string): boolean {
+    const item = drive_snapshot()[id];
+    if (item == null) return false;
+    return plan_restore(item, 0).kind !== 'unknown';
+}
+
+function restore_target(item: VfsItem, depth: number): string {
+    const plan = plan_restore(item, depth);
+    if (plan.kind === 'folder') return plan.id;
+    if (plan.kind === 'unknown') return desktop_folder;
     // The folder comes back under a FRESH id (restoring is a re-clone), so the
     // child cannot be reunited with it by `restore_parent` — it has to be told
     // the new id directly.
-    return restore_fs(clone_of_parent.id, depth + 1) ?? desktop_folder;
+    return restore_fs(plan.clone_id, depth + 1) ?? desktop_folder;
 }
 
 /**
