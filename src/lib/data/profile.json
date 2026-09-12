@@ -166,8 +166,8 @@
             ],
             "images": [
                 {
-                    "src": "/assets/images/experience/mentorness-certificate.jpg",
-                    "alt": "Machine Learning internship certificate, Mentorness"
+                    "src": "/assets/images/certifications/mentorness-ml-internship-2024.jpg",
+                    "alt": "Certificate of achievement, Mentorness Machine Learning internship"
                 }
             ]
         }
@@ -286,7 +286,7 @@
             "year": "2025",
             "images": [
                 {
-                    "src": "/assets/images/awards/graduation-honors-certificate.jpg",
+                    "src": "/assets/images/certifications/graduation-honors-2025.jpg",
                     "alt": "Certificate of excellence for graduation honours, AAST 2025"
                 },
                 {
@@ -304,7 +304,7 @@
             "year": "2022",
             "images": [
                 {
-                    "src": "/assets/images/awards/excellence-2022-certificate.jpg",
+                    "src": "/assets/images/certifications/certificate-of-excellence-2022.jpg",
                     "alt": "College of Artificial Intelligence award for academic excellence, 2022"
                 }
             ]
@@ -315,7 +315,7 @@
             "title": "Certificate of Excellence – Graduation Honors (AAST, 2025)",
             "images": [
                 {
-                    "src": "/assets/images/awards/graduation-honors-certificate.jpg",
+                    "src": "/assets/images/certifications/graduation-honors-2025.jpg",
                     "alt": "Certificate of excellence for graduation honours, AAST 2025"
                 }
             ],
@@ -325,7 +325,7 @@
             "title": "Certificate of Excellence (AAST, 2022)",
             "images": [
                 {
-                    "src": "/assets/images/awards/excellence-2022-certificate.jpg",
+                    "src": "/assets/images/certifications/certificate-of-excellence-2022.jpg",
                     "alt": "College of Artificial Intelligence award for academic excellence, 2022"
                 }
             ],
@@ -333,15 +333,20 @@
         },
         {
             "title": "IELTS Academic – Band 7.5 (IELTS Official, 2025)",
-            "images": [],
+            "images": [
+                {
+                    "src": "/assets/images/certifications/ielts-academic-2025.jpg",
+                    "alt": "IELTS Academic test report form, overall band 7.5"
+                }
+            ],
             "pdf": "/assets/certificates/ielts-academic-2025.pdf"
         },
         {
             "title": "Certificate of Achievement – Mentorness ML Internship (2024)",
             "images": [
                 {
-                    "src": "/assets/images/experience/mentorness-certificate.jpg",
-                    "alt": "Machine Learning internship certificate, Mentorness"
+                    "src": "/assets/images/certifications/mentorness-ml-internship-2024.jpg",
+                    "alt": "Certificate of achievement, Mentorness Machine Learning internship"
                 }
             ],
             "pdf": "/assets/certificates/mentorness-ml-internship-2024.pdf"

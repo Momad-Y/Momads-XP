@@ -341,3 +341,86 @@ describe('the certificate files actually exist', () => {
         }
     });
 });
+
+describe('a document has a PDF and a picture, and they agree', () => {
+    /*
+     * THE RULE, owner-stated: anything that is a PDF gets a PDF under
+     * My Documents AND a picture under My Pictures, and that picture is what
+     * the entry's `.txt` gallery shows.
+     *
+     * It exists because the two drifted. Certifications carried PDFs while
+     * three of four had a picture and the fourth (IELTS) had none, and two of
+     * them were ALSO awards whose galleries led with a LinkedIn page-image of
+     * the same document — the same credential wearing two different faces
+     * depending on which folder you opened. The pictures are now rendered
+     * from page 1 of the PDFs themselves, so there is one picture per document
+     * by construction.
+     */
+    const built = build_portfolio(profile, (url) =>
+        Math.ceil(statSync('static' + url).size / 1024),
+    );
+    const items = Object.values(built.items);
+    const with_pdf = profile.certifications.filter(
+        (c) => c.pdf != null && c.pdf !== '',
+    );
+
+    it('gives every PDF at least one picture', () => {
+        expect(with_pdf.length).toBeGreaterThan(0);
+        for (const cert of with_pdf) {
+            expect(
+                cert.images.length,
+                `${cert.title} has a PDF but no picture`,
+            ).toBeGreaterThan(0);
+        }
+    });
+
+    it('has both the document and the picture on disk', () => {
+        for (const cert of with_pdf) {
+            expect(
+                statSync('static' + String(cert.pdf)).size,
+                `${String(cert.pdf)} is empty`,
+            ).toBeGreaterThan(10_000);
+            for (const img of cert.images) {
+                expect(
+                    statSync('static' + img.src).size,
+                    `${img.src} is empty`,
+                ).toBeGreaterThan(5_000);
+            }
+        }
+    });
+
+    it('seeds the PDF under My Documents and the picture under My Pictures', () => {
+        for (const cert of with_pdf) {
+            const pdf = items.find((i) => i.name === `${cert.title}.pdf`);
+            expect(pdf?.parent).toBe('docCertifications');
+
+            const folder = items.find(
+                (i) => i.type === 'folder' && i.name === cert.title,
+            );
+            expect(
+                folder,
+                `no My Pictures folder for ${cert.title}`,
+            ).toBeDefined();
+            expect(folder?.children).toHaveLength(cert.images.length);
+        }
+    });
+
+    /*
+     * An award that IS one of those documents must show the SAME picture file,
+     * or the drive contradicts itself about what the certificate looks like.
+     */
+    it('shows one picture per document, however many entries cite it', () => {
+        const cert_srcs = new Set(
+            with_pdf.flatMap((c) => c.images.map((i) => i.src)),
+        );
+        const shared = profile.awards
+            .flatMap((a) => a.images.map((i) => i.src))
+            .filter((src) => cert_srcs.has(src));
+        // the graduation-honours and 2022 excellence awards are the same two
+        // documents as their certifications
+        expect(shared.length).toBeGreaterThan(0);
+        for (const src of shared) {
+            expect(statSync('static' + src).size).toBeGreaterThan(5_000);
+        }
+    });
+});
