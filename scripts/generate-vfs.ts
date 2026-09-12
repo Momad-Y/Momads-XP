@@ -84,6 +84,7 @@ const MY_COMPUTER_EXE = 'sWTYkZhdpSYCmXP7z6459v';
  * cannot see a literal that is wrong in both).
  */
 const MY_DOCUMENTS = 'xpFolderMyDocuments0001';
+const MY_PICTURES = 'neRHxqN8SPnG1xrivxXxRq';
 const PYTHON_FOLDER = 'xpFolderPythonScripts01';
 const IE_EXE = '2jpDfV5KSoYMArQnHgux5S';
 
@@ -131,7 +132,10 @@ function asset_size_kb(url: string): number {
     return Math.ceil(statSync(path).size / 1024);
 }
 
-const built = build_portfolio(profile, asset_size_kb);
+const built = build_portfolio(profile, asset_size_kb, {
+    pictures: MY_PICTURES,
+    documents: MY_DOCUMENTS,
+});
 
 const exes: VfsItem[] = [
     desktop_exe(
@@ -176,6 +180,18 @@ seed[C_DRIVE] = {
         ...built.folder_ids,
         built.resume_file_id,
     ],
+};
+
+// ---- My Pictures / My Documents: the portfolio's own assets --------------
+// Organised type / item / file (`My Pictures/Projects/EUC RAG Agent/…`) and
+// pointing at the same static URLs profile.json already renders from, so these
+// add metadata and duplicate no bytes — exactly as the music tree does.
+const my_pictures = seed[MY_PICTURES];
+if (my_pictures == null)
+    throw new Error('My Pictures folder missing from base');
+seed[MY_PICTURES] = {
+    ...my_pictures,
+    children: [...my_pictures.children, ...built.picture_section_ids],
 };
 
 // ---- My Music: discovered from static/audio/music/<genre>/*.mp3 ---------
@@ -248,7 +264,9 @@ seed[MY_DOCUMENTS] = {
     icon: '/images/xp/icons/MyDocuments.png',
     starting_point: true,
     parent: C_DRIVE,
-    children: [PYTHON_FOLDER],
+    // Python's save folder FIRST — it is protected and must never be dropped —
+    // then the credentials tree (`My Documents/Certifications/…`).
+    children: [PYTHON_FOLDER, ...built.document_section_ids],
     date_created: SEED_EPOCH,
     date_modified: SEED_EPOCH,
     sort_option: 0,

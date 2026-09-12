@@ -18,6 +18,16 @@ export interface PortfolioBuild {
     entry_ids: string[];
     projects_folder_id: string;
     resume_file_id: string;
+    /** Section folders to hang under `My Pictures`, in display order. */
+    picture_section_ids: string[];
+    /** Section folders to hang under `My Documents`, in display order. */
+    document_section_ids: string[];
+}
+
+/** Where the asset trees are rooted. Injected so this module names no ids. */
+export interface AssetRoots {
+    pictures: string;
+    documents: string;
 }
 
 const FOLDERS: { id: string; name: string; section: PortfolioSection }[] = [
@@ -108,6 +118,20 @@ export function file_name_from_url(url: string): string {
     return decoded;
 }
 
+/**
+ * The extension of an asset URL, lowercased.
+ *
+ * Query and fragment stripped for the reason `file_name_from_url` documents:
+ * `ext` picks the icon, prints the Type cell and selects the double-click
+ * handler, so `.pdf?v=2` would silently unbind the PDF viewer.
+ */
+function extname_of(url: string): string {
+    const clean = (url.split('?')[0] ?? url).split('#')[0] ?? url;
+    const dot = clean.lastIndexOf('.');
+    const slash = clean.lastIndexOf('/');
+    return dot > slash && dot >= 0 ? clean.slice(dot).toLowerCase() : '';
+}
+
 export function build_portfolio(
     profile: Profile,
     /**
@@ -116,6 +140,7 @@ export function build_portfolio(
      * since; a certificate reports what it actually weighs.
      */
     asset_size_kb: (url: string) => number = () => 1,
+    roots: AssetRoots = { pictures: 'MyPictures', documents: 'MyDocuments' },
 ): PortfolioBuild {
     const items: Record<string, VfsItem> = {};
     const entry_ids: string[] = [];
@@ -166,43 +191,8 @@ export function build_portfolio(
         ),
     };
 
-    /*
-     * Files a section ships that are NOT portfolio entries — today, the
-     * certificate PDFs, one per certification that has one, named from the
-     * same title so each lands beside its own `.txt`: the text is the summary,
-     * the PDF is the credential. `.pdf` picks up the PDF viewer through
-     * `doctypes`, so a double-click reads it.
-     *
-     * Kept out of `entry_ids` deliberately. That list becomes
-     * `PORTFOLIO_ENTRY_IDS`, which `protected_items` uses to make the entries
-     * undeletable, and it is also what `portfolio_ref` lookups walk — a PDF
-     * carries no ref and, like `CV.pdf`, is the visitor's to delete.
-     */
-    const extras: Partial<Record<PortfolioSection, VfsItem[]>> = {
-        certifications: profile.certifications.flatMap((cert, i) => {
-            const url = cert.pdf;
-            if (url == null || url === '') return [];
-            return [
-                {
-                    ...base_item(
-                        `${entry_id('certifications', cert.title) + String(i)}Pdf`,
-                        'p2FolderCertifications',
-                    ),
-                    type: 'file' as const,
-                    basename: cert.title,
-                    name: `${cert.title}.pdf`,
-                    ext: '.pdf',
-                    storage_type: 'remote' as const,
-                    url,
-                    size: asset_size_kb(url),
-                },
-            ];
-        }),
-    };
-
     for (const folder of FOLDERS) {
         const children = per_section[folder.section];
-        const extra = extras[folder.section] ?? [];
         add({
             // parent stamped by the generator script (C: drive id)
             ...base_item(folder.id, ''),
@@ -212,13 +202,164 @@ export function build_portfolio(
             ext: '',
             icon: '/images/xp/icons/FolderClosed.png',
             starting_point: true,
-            children: [...children, ...extra].map((c) => c.id),
+            children: children.map((c) => c.id),
         });
         for (const child of children) {
             add(child);
             entry_ids.push(child.id);
         }
-        for (const child of extra) add(child);
+    }
+
+    /*
+     * MY PICTURES and MY DOCUMENTS — the galleries and credentials as real
+     * files, organised type / item / file, the way anyone would expect to find
+     * them: `My Pictures/Projects/EUC RAG Agent/…`.
+     *
+     * NO BYTES ARE DUPLICATED. Like the music tree, these entries point at the
+     * SAME `static/` URLs the portfolio viewer already renders from
+     * `profile.json` — only metadata is added, and `profile.json` stays the
+     * source of truth for what exists.
+     *
+     * Only items that HAVE assets get a folder: an empty "Printerpix" folder
+     * under My Pictures would be a promise the drive cannot keep (its work is
+     * proprietary and there are no pictures of it).
+     */
+    const gallery: {
+        section: PortfolioSection;
+        basename: string;
+        images: readonly { src: string; alt: string }[];
+    }[] = [
+        ...profile.experience.map((e) => ({
+            section: 'experience' as const,
+            basename: `${e.company} — ${e.role}`,
+            images: e.images,
+        })),
+        ...profile.projects.map((p) => ({
+            section: 'projects' as const,
+            basename: p.name,
+            images: p.images,
+        })),
+        ...profile.education.map((e) => ({
+            section: 'education' as const,
+            basename: e.institution,
+            images: e.images,
+        })),
+        ...profile.certifications.map((c) => ({
+            section: 'certifications' as const,
+            basename: c.title,
+            images: c.images,
+        })),
+        ...profile.awards.map((a) => ({
+            section: 'awards' as const,
+            basename: a.title,
+            images: a.images,
+        })),
+    ];
+
+    const picture_section_ids: string[] = [];
+    for (const folder of FOLDERS) {
+        const owners = gallery.filter(
+            (g) => g.section === folder.section && g.images.length > 0,
+        );
+        if (owners.length === 0) continue;
+
+        const section_id = `pic${slug(folder.name)}`;
+        const item_ids: string[] = [];
+        for (const [i, owner] of owners.entries()) {
+            const item_id = `${section_id}${slug(owner.basename)}${String(i)}`;
+            const file_ids: string[] = [];
+            /*
+             * Names come from the ALT TEXT, which is the owner's own caption —
+             * "BeMo at the 2025 project discussion.jpg" reads in Explorer where
+             * "bemo-discussion-2.jpg" does not. Captions repeat, though, so
+             * duplicates are numbered rather than allowed to collide: two files
+             * of one name in one folder breaks the unique-sibling assumption
+             * `clone_fs` and `create_shortcut` both rely on.
+             */
+            const used = new Map<string, number>();
+            for (const [j, image] of owner.images.entries()) {
+                const ext = extname_of(image.src);
+                const wanted =
+                    image.alt === '' ? `Image ${String(j + 1)}` : image.alt;
+                const seen = used.get(wanted) ?? 0;
+                used.set(wanted, seen + 1);
+                const basename =
+                    seen === 0 ? wanted : `${wanted} (${String(seen + 1)})`;
+                const file_id = `${item_id}F${String(j)}`;
+                add({
+                    ...base_item(file_id, item_id),
+                    type: 'file',
+                    basename,
+                    name: `${basename}${ext}`,
+                    ext,
+                    storage_type: 'remote',
+                    url: image.src,
+                    size: asset_size_kb(image.src),
+                });
+                file_ids.push(file_id);
+            }
+            add({
+                ...base_item(item_id, section_id),
+                type: 'folder',
+                basename: owner.basename,
+                name: owner.basename,
+                ext: '',
+                icon: '/images/xp/icons/MyPictures.png',
+                children: file_ids,
+            });
+            item_ids.push(item_id);
+        }
+        add({
+            ...base_item(section_id, roots.pictures),
+            type: 'folder',
+            basename: folder.name,
+            name: folder.name,
+            ext: '',
+            icon: '/images/xp/icons/MyPictures.png',
+            children: item_ids,
+        });
+        picture_section_ids.push(section_id);
+    }
+
+    /*
+     * The credentials, under `My Documents/Certifications/`. One folder per
+     * SECTION but not per item: a certification holds exactly one document, so
+     * a per-item folder would contain a single file of the same name. The
+     * per-item level exists for pictures because galleries hold many.
+     */
+    const document_section_ids: string[] = [];
+    const with_pdf = profile.certifications.filter(
+        (c) => c.pdf != null && c.pdf !== '',
+    );
+    if (with_pdf.length > 0) {
+        const section_id = 'docCertifications';
+        const file_ids: string[] = [];
+        for (const [i, cert] of with_pdf.entries()) {
+            const url = cert.pdf ?? '';
+            const ext = extname_of(url);
+            const file_id = `${section_id}${slug(cert.title)}${String(i)}`;
+            add({
+                ...base_item(file_id, section_id),
+                type: 'file',
+                basename: cert.title,
+                name: `${cert.title}${ext}`,
+                ext,
+                storage_type: 'remote',
+                url,
+                size: asset_size_kb(url),
+            });
+            file_ids.push(file_id);
+        }
+        add({
+            ...base_item(section_id, roots.documents),
+            type: 'folder',
+            basename: 'Certifications',
+            name: 'Certifications',
+            ext: '',
+            icon: '/images/xp/icons/FolderClosed.png',
+            children: file_ids,
+        });
+        document_section_ids.push(section_id);
     }
 
     const resume_file_id = 'p2FileResumePdf';
@@ -246,5 +387,7 @@ export function build_portfolio(
         entry_ids,
         projects_folder_id: 'p2FolderProjects',
         resume_file_id,
+        picture_section_ids,
+        document_section_ids,
     };
 }
