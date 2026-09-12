@@ -142,7 +142,11 @@ describe('right-click Delete', () => {
         expect(props?.message).toContain('Recycle Bin');
         expect(props?.message).not.toContain('permanently');
 
-        const clone = vi.spyOn(fs, 'clone_fs').mockImplementation(() => {
+        // Recycling is `recycle_fs` now, not a raw clone-then-delete: it is
+        // the one place the restore breadcrumbs get written, so a delete
+        // surface that still cloned by hand would fill the bin with items
+        // Restore could not put back.
+        const recycle = vi.spyOn(fs, 'recycle_fs').mockImplementation(() => {
             /* no-op */
         });
         const del = vi.spyOn(fs, 'del_fs').mockImplementation(() => {
@@ -151,23 +155,22 @@ describe('right-click Delete', () => {
         ok_of(props)?.action();
 
         // the live one is recycled; the binned one is destroyed outright
-        expect(clone).toHaveBeenCalledTimes(1);
-        expect(clone.mock.calls[0]?.[0]).toBe('live');
-        expect(del).toHaveBeenCalledTimes(2);
+        expect(recycle.mock.calls.map((c) => c[0])).toEqual(['live']);
+        expect(del.mock.calls.map((c) => c[0])).toEqual(['binned']);
     });
 
     it('skips ids that are not in the drive', async () => {
         selectingItems.set(['live', 'ghost']);
         const props = await run_delete(live);
-        const clone = vi.spyOn(fs, 'clone_fs').mockImplementation(() => {
+        const recycle = vi.spyOn(fs, 'recycle_fs').mockImplementation(() => {
             /* no-op */
         });
         const del = vi.spyOn(fs, 'del_fs').mockImplementation(() => {
             /* no-op */
         });
         ok_of(props)?.action();
-        expect(del).toHaveBeenCalledTimes(1);
-        expect(clone).toHaveBeenCalledTimes(1);
+        expect(recycle.mock.calls.map((c) => c[0])).toEqual(['live']);
+        expect(del).not.toHaveBeenCalled();
     });
 
     it('Cancel deletes nothing', async () => {
@@ -176,8 +179,12 @@ describe('right-click Delete', () => {
         const del = vi.spyOn(fs, 'del_fs').mockImplementation(() => {
             /* no-op */
         });
+        const recycle = vi.spyOn(fs, 'recycle_fs').mockImplementation(() => {
+            /* no-op */
+        });
         cancel_of(props)?.action();
         expect(del).not.toHaveBeenCalled();
+        expect(recycle).not.toHaveBeenCalled();
     });
 });
 
@@ -193,7 +200,7 @@ describe('right-click Delete is scoped to the surface that opened it', () => {
         expect(props?.message).toContain('permanently');
         expect(props?.message).toContain('binned.txt');
 
-        const clone = vi.spyOn(fs, 'clone_fs').mockImplementation(() => {
+        const recycle = vi.spyOn(fs, 'recycle_fs').mockImplementation(() => {
             /* no-op */
         });
         const del = vi.spyOn(fs, 'del_fs').mockImplementation(() => {
@@ -201,8 +208,8 @@ describe('right-click Delete is scoped to the surface that opened it', () => {
         });
         ok_of(props)?.action();
         expect(del.mock.calls.map((c) => c[0])).toEqual(['binned']);
-        expect(del.mock.calls.map((c) => c[0])).not.toContain('live');
-        clone.mockRestore();
+        expect(recycle).not.toHaveBeenCalled();
+        recycle.mockRestore();
         del.mockRestore();
     });
 
@@ -211,15 +218,57 @@ describe('right-click Delete is scoped to the surface that opened it', () => {
         const props = await run_delete_scoped(live, undefined);
         expect(props?.message).toContain('live.txt');
 
-        const clone = vi.spyOn(fs, 'clone_fs').mockImplementation(() => {
+        const recycle = vi.spyOn(fs, 'recycle_fs').mockImplementation(() => {
             /* no-op */
         });
         const del = vi.spyOn(fs, 'del_fs').mockImplementation(() => {
             /* no-op */
         });
         ok_of(props)?.action();
-        expect(del.mock.calls.map((c) => c[0])).toEqual(['live']);
-        clone.mockRestore();
+        expect(recycle.mock.calls.map((c) => c[0])).toEqual(['live']);
+        expect(del).not.toHaveBeenCalled();
+        recycle.mockRestore();
         del.mockRestore();
+    });
+});
+
+describe('right-click Restore', () => {
+    const entry_for = (item: VfsItem, visible_ids: string[] | undefined) =>
+        make({
+            type: 'FSItem',
+            originator: originator_for(item, visible_ids),
+        })
+            .menu.flat()
+            .find((m) => m.name === 'Restore');
+
+    it('is offered for an item in the bin', () => {
+        expect(entry_for(binned, ['binned'])).toBeDefined();
+    });
+
+    it('is NOT offered for a live item', () => {
+        expect(entry_for(live, ['live'])).toBeUndefined();
+    });
+
+    it('restores every selected bin item', () => {
+        selectingItems.set(['binned']);
+        const restore = vi
+            .spyOn(fs, 'restore_fs')
+            .mockImplementation(() => undefined);
+        void entry_for(binned, ['binned'])?.action?.();
+        expect(restore.mock.calls.map((c) => c[0])).toEqual(['binned']);
+    });
+
+    /*
+     * A selection can span surfaces — `selectingItems` is one global store —
+     * so an id that is not actually in the bin must not be "restored", which
+     * would clone a live item to wherever its breadcrumbs pointed.
+     */
+    it('ignores selected ids that are not in the bin', () => {
+        selectingItems.set(['binned', 'live']);
+        const restore = vi
+            .spyOn(fs, 'restore_fs')
+            .mockImplementation(() => undefined);
+        void entry_for(binned, ['binned', 'live'])?.action?.();
+        expect(restore.mock.calls.map((c) => c[0])).toEqual(['binned']);
     });
 });

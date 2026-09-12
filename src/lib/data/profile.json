@@ -556,7 +556,8 @@
             "english-pop/03 - Far Away.mp3": "Demis Roussos",
             "hip-hop/01 - i (Single Version).mp3": "Kendrick Lamar"
         },
-        "notice": "All music legally acquired™ · personal listening only, not for distribution."
+        "notice": "All music legally acquired™ · personal listening only, not for distribution.",
+        "unsorted_label": "Unsorted"
     },
     "copy": {
         "loginStatus": "1337 programs running.",

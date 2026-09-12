@@ -193,6 +193,14 @@ export interface MusicGenre {
 }
 
 export interface ProfileMusic {
+    /**
+     * GENERATOR INPUT ONLY — nothing reads this at runtime any more.
+     *
+     * It names the folders `npm run generate:vfs` creates under My Music and
+     * the order it creates them in. The player itself groups by what is
+     * actually on the drive, so that a folder the visitor makes is a category
+     * too; a genre's display name comes from its folder, not from here.
+     */
     genres: MusicGenre[];
     /**
      * Corrections for artists the ID3 tag gets wrong, keyed `<genre>/<file>`.
@@ -207,6 +215,14 @@ export interface ProfileMusic {
     artists: Record<string, string>;
     /** Shown in the player. Content, so it lives here and not in the component. */
     notice: string;
+    /**
+     * Header for songs sitting loose in My Music with no genre folder.
+     *
+     * The player groups by FOLDER now, so this is the one group name it has to
+     * invent rather than read off the drive — which makes it copy, and copy
+     * lives here.
+     */
+    unsorted_label: string;
 }
 
 /**

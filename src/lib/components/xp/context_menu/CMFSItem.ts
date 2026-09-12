@@ -56,9 +56,32 @@ export const make = ({
 
     return {
         required_width: 180 + 20,
-        required_height: 27 * 11 + 20,
+        required_height: 27 * 12 + 20,
         menu: [
             [
+                /*
+                 * Restore is offered ONLY on a direct child of the bin. Items
+                 * nested inside a binned folder come back with that folder, so
+                 * offering it on them would mean restoring half a tree and
+                 * leaving the rest behind — and they carry no breadcrumbs of
+                 * their own to place it with.
+                 */
+                ...(originator.item.parent == recycle_bin_id
+                    ? [
+                          {
+                              name: 'Restore',
+                              action: () => {
+                                  const data = get(hardDrive) ?? {};
+                                  for (const id of in_scope()) {
+                                      if (data[id]?.parent === recycle_bin_id) {
+                                          fs.restore_fs(id);
+                                      }
+                                  }
+                              },
+                              font: 'bold',
+                          },
+                      ]
+                    : []),
                 ...(originator.item.parent != recycle_bin_id
                     ? [
                           {
@@ -289,14 +312,11 @@ export const make = ({
                                           // confirmation stuck on screen.
                                           if (get(hardDrive)?.[id] == null)
                                               continue;
-                                          if (!plan.permanent_ids.has(id)) {
-                                              fs.clone_fs(
-                                                  id,
-                                                  recycle_bin_id,
-                                                  null,
-                                              );
+                                          if (plan.permanent_ids.has(id)) {
+                                              fs.del_fs(id);
+                                          } else {
+                                              fs.recycle_fs(id);
                                           }
-                                          fs.del_fs(id);
                                       }
                                   };
 
