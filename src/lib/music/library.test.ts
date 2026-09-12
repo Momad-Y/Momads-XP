@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
     AUDIO_EXTENSIONS,
+    EXTRA_GROUP_KEY,
     UNSORTED_GROUP_KEY,
     build_library,
     is_audio,
@@ -333,5 +334,80 @@ describe('is_audio', () => {
         expect(is_audio(dir('f', []))).toBe(false);
         expect(is_audio(node('p', { storage_type: 'fake' }))).toBe(false);
         expect(is_audio(node('t', { ext: '.txt' }))).toBe(false);
+    });
+});
+
+describe('a file opened from outside My Music', () => {
+    /** `Desktop > stray.mp3`, alongside the usual library. */
+    function with_stray(): HardDrive {
+        const drive = seed();
+        drive.desktop = dir('desktop', ['stray'], { name: 'Desktop' });
+        drive.stray = node('stray', {
+            parent: 'desktop',
+            storage_type: 'local',
+            url: 'blob-1',
+        });
+        return drive;
+    }
+
+    const build_with = (drive: HardDrive, extra: string | null) =>
+        build_library(drive, MY_MUSIC, NO_META, 'Unsorted', extra);
+
+    it('is listed in its own group, named after the folder it came from', () => {
+        const library = build_with(with_stray(), 'stray');
+
+        expect(library.groups.map((g) => g.name)).toEqual(['Rock', 'Desktop']);
+        expect(library.groups[1]?.key).toBe(EXTRA_GROUP_KEY);
+        expect(library.flat.map((t) => t.title)).toEqual(['riff', 'stray']);
+    });
+
+    /*
+     * THE CASE THAT SHIPS. Every bundled track lives inside My Music, so the
+     * launched file is usually already in the library — and appending a group
+     * for it would put a duplicate id in `flat`, sending prev/next to the
+     * wrong place, or collide with an existing group key and throw
+     * `each_key_duplicate`, which stops the whole list rendering.
+     */
+    it('is NOT duplicated when it is already in the library', () => {
+        const library = build_with(with_stray(), 'riff');
+
+        expect(library.groups.map((g) => g.name)).toEqual(['Rock']);
+        expect(library.flat.map((t) => t.id)).toEqual(['riff']);
+    });
+
+    /*
+     * The id is re-resolved on every rebuild rather than snapshotted, so
+     * deleting the file removes it from the library — the player then stops,
+     * exactly as it does for a library track (defect 1).
+     */
+    it('disappears when the file is deleted', () => {
+        const drive = with_stray();
+        delete drive.stray;
+
+        expect(build_with(drive, 'stray').flat.map((t) => t.title)).toEqual([
+            'riff',
+        ]);
+    });
+
+    it('is ignored when it is not audio', () => {
+        const drive = with_stray();
+        drive.stray = node('stray', {
+            parent: 'desktop',
+            name: 'notes.txt',
+            ext: '.txt',
+        });
+
+        expect(build_with(drive, 'stray').groups).toHaveLength(1);
+    });
+
+    it('falls back to the unsorted label when its folder is unresolvable', () => {
+        const drive = with_stray();
+        delete drive.desktop;
+
+        expect(build_with(drive, 'stray').groups[1]?.name).toBe('Unsorted');
+    });
+
+    it('changes nothing when no file was handed over', () => {
+        expect(build_with(with_stray(), null).groups).toHaveLength(1);
     });
 });

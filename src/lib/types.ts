@@ -200,6 +200,19 @@ export type ProgramInstance = {
     /** Undefined until Window.svelte's `bind:this` resolves after mount. */
     window: WindowController | undefined;
     options: WindowOptions;
+    /**
+     * Play/show a file in an ALREADY-OPEN window, for singletons.
+     *
+     * Optional because almost no program needs it: a non-singleton simply
+     * gets another window with the file as a prop. The Music Player is a
+     * singleton, so without this the launcher raised its window and dropped
+     * the file — a second double-click appeared to do nothing.
+     *
+     * Deliberately not named `open_file`: Media Player Classic already has a
+     * zero-arg `open_file` that mounts a file picker, and a launcher calling
+     * whichever it found would pop a dialog instead of playing the song.
+     */
+    open_fs_item?: (item: VfsItem) => void | Promise<void>;
 };
 
 /**

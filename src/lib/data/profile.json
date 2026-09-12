@@ -470,6 +470,18 @@
                 {
                     "ext": ".mp3",
                     "desc": "MP3 Audio — Media Player, or the fancy one"
+                },
+                {
+                    "ext": ".ogg",
+                    "desc": "OGG Audio — the format nobody agreed on"
+                },
+                {
+                    "ext": ".mp4",
+                    "desc": "MPEG-4 Video — Media Player Classic’s department"
+                },
+                {
+                    "ext": ".mkv",
+                    "desc": "Matroska Video — good luck, codec permitting"
                 }
             ],
             "note": "Change and Advanced are disabled. These associations are perfect as-is."
