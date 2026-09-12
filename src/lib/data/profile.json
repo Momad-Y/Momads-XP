@@ -50,12 +50,7 @@
                 "Developed an ML pricing engine: Elastic Net regression and Monte Carlo simulation (10,000+ scenarios, 95% confidence) across 900+ products, with Playwright + Gemini vision competitor monitoring over 82+ URLs feeding BigQuery back into the models.",
                 "Ship across AWS, GCP and Azure with Docker and CI/CD on GitHub Actions and GitLab CI; integration work spans n8n, webhooks, ETL pipelines and marketing APIs (Meta, Pinterest, Google Ads)."
             ],
-            "images": [
-                {
-                    "src": "/assets/images/avatar.png",
-                    "alt": "Mohamed at Printerpix (test image)"
-                }
-            ]
+            "images": []
         },
         {
             "company": "Udacity",
@@ -67,7 +62,12 @@
                 "Covered Python, HTML, CSS, fundamentals of AI, and data science, along with introductions to networks, cybersecurity, multimedia, and encoding/decoding.",
                 "Mentored students through hands-on projects and activities, achieving an 80%+ graduation rate."
             ],
-            "images": []
+            "images": [
+                {
+                    "src": "/assets/images/experience/udacity-connect-mentorship-certificate.jpg",
+                    "alt": "Certificate of completion, Udacity Connect Mentorship"
+                }
+            ]
         },
         {
             "company": "Robotics Club - AASTMT",
@@ -79,7 +79,24 @@
                 "Conducted sessions teaching Python, C/C++, Competitive Programming, and Arduino to over 300 students.",
                 "Attended the 2023 Maker Faire in Cairo representing the Robotics Club."
             ],
-            "images": []
+            "images": [
+                {
+                    "src": "/assets/images/experience/robotics-club-board.jpg",
+                    "alt": "The AASTMT Robotics Club board"
+                },
+                {
+                    "src": "/assets/images/experience/robotics-club-sessions-1.jpg",
+                    "alt": "Robotics Club teaching sessions, 2023"
+                },
+                {
+                    "src": "/assets/images/experience/robotics-club-sessions-2.jpg",
+                    "alt": "Robotics Club teaching sessions, 2023"
+                },
+                {
+                    "src": "/assets/images/experience/robotics-club-maker-faire-2023.jpg",
+                    "alt": "Representing the Robotics Club at Maker Faire Cairo, 2023"
+                }
+            ]
         },
         {
             "company": "Corporatica",
@@ -102,7 +119,40 @@
                 "Developed real-time computer vision and NLP systems with OpenCV, PyTorch and Hugging Face Transformers on embedded hardware, reaching 30 FPS object detection and about 0.3s speech response latency.",
                 "Led the team's AI software architecture to 1st place nationally in Egypt and 3rd place internationally in the Netherlands at RoboCup@Home."
             ],
-            "images": []
+            "images": [
+                {
+                    "src": "/assets/images/experience/robocup-first-place-certificate.jpg",
+                    "alt": "First place certificate, RoboCup@Home Education 2024"
+                },
+                {
+                    "src": "/assets/images/experience/robocup-egypt-trophy.jpg",
+                    "alt": "RoboCup@Home Egypt 2024 trophy"
+                },
+                {
+                    "src": "/assets/images/experience/robocup-egypt-team.jpg",
+                    "alt": "The AAST team at RoboCup@Home Egypt 2024"
+                },
+                {
+                    "src": "/assets/images/experience/robocup-participation-certificate.jpg",
+                    "alt": "Certificate of participation, RoboCup@Home Education Netherlands 2024"
+                },
+                {
+                    "src": "/assets/images/experience/robocup-netherlands-ranking.jpg",
+                    "alt": "Major team ranking, RoboCup@Home Netherlands 2024"
+                },
+                {
+                    "src": "/assets/images/experience/robocup-netherlands-team.jpg",
+                    "alt": "The AAST team at RoboCup@Home Netherlands 2024"
+                },
+                {
+                    "src": "/assets/images/experience/robocup-netherlands-robot.jpg",
+                    "alt": "The team robot at RoboCup@Home Netherlands 2024"
+                },
+                {
+                    "src": "/assets/images/experience/robocup-netherlands-arena.jpg",
+                    "alt": "The RoboCup@Home arena, Netherlands 2024"
+                }
+            ]
         },
         {
             "company": "Mentorness",
@@ -114,7 +164,12 @@
                 "Developed classifiers (Naive Bayes, Random Forest, Logistic Regression) and sequence models (LSTM, GRU).",
                 "Compared multiple models and selected top performers (90%+ accuracy) for deployment."
             ],
-            "images": []
+            "images": [
+                {
+                    "src": "/assets/images/experience/mentorness-certificate.jpg",
+                    "alt": "Machine Learning internship certificate, Mentorness"
+                }
+            ]
         }
     ],
     "education": [
@@ -198,21 +253,64 @@
                 "Flutter"
             ],
             "url": "",
-            "images": []
+            "images": [
+                {
+                    "src": "/assets/images/projects/bemo-robot.jpg",
+                    "alt": "BeMo, the conversational robot"
+                },
+                {
+                    "src": "/assets/images/projects/bemo-discussion-1.jpg",
+                    "alt": "BeMo at the 2025 project discussion"
+                },
+                {
+                    "src": "/assets/images/projects/bemo-discussion-2.jpg",
+                    "alt": "BeMo at the 2025 project discussion"
+                },
+                {
+                    "src": "/assets/images/projects/bemo-discussion-3.jpg",
+                    "alt": "BeMo at the 2025 project discussion"
+                },
+                {
+                    "src": "/assets/images/projects/bemo-demo-1.jpg",
+                    "alt": "BeMo demo"
+                },
+                {
+                    "src": "/assets/images/projects/bemo-demo-2.jpg",
+                    "alt": "BeMo demo"
+                }
+            ]
         },
         {
             "name": "EUC RAG Agent",
             "description": "A complete RAG system for a fictional university: TXT/CSV/PDF/DOCX preprocessing with cleaning, lemmatization and chunk caching feeding a Chroma vector store, three swappable embedding backends and three generation models selectable at runtime. Live demo: euc-rag.streamlit.app",
             "tech": ["Python", "LangChain", "Chroma", "Gemini", "Streamlit"],
             "url": "https://github.com/Momad-Y/EUC-RAG-Agent",
-            "images": []
+            "images": [
+                {
+                    "src": "/assets/images/projects/euc-rag-webapp.jpg",
+                    "alt": "EUC RAG Agent web app"
+                }
+            ]
         },
         {
             "name": "NexChat",
             "description": "A multimodal AI chatbot: document Q&A over LangChain + FAISS, long-context summarization, image captioning via a vision LLM, and speech in and out — running entirely on free-tier hosted models with a full test suite. Live demo: nexchat.streamlit.app",
             "tech": ["Python", "LangChain", "FAISS", "Streamlit"],
             "url": "https://github.com/Momad-Y/NexChat",
-            "images": []
+            "images": [
+                {
+                    "src": "/assets/images/projects/nexchat-summarization.jpg",
+                    "alt": "NexChat long-context summarization"
+                },
+                {
+                    "src": "/assets/images/projects/nexchat-question-answering.jpg",
+                    "alt": "NexChat document question answering"
+                },
+                {
+                    "src": "/assets/images/projects/nexchat-image-captioning.jpg",
+                    "alt": "NexChat image captioning"
+                }
+            ]
         },
         {
             "name": "Lyric Logic",
@@ -226,7 +324,59 @@
                 "PostgreSQL"
             ],
             "url": "https://github.com/Momad-Y/Lyric-Logic",
-            "images": []
+            "images": [
+                {
+                    "src": "/assets/images/projects/lyric-logic-web-app.jpg",
+                    "alt": "Lyric Logic web app"
+                }
+            ]
+        },
+        {
+            "name": "LM Box 5",
+            "description": "A retro gaming system played with computer vision instead of controllers — Popping Balloons, Pong and Dinosaur Runner driven by Mediapipe hand tracking and pose detection. Shipped as a full PyGame executable with title screens, animations, sound and settings, an SQLite store for user and gameplay records, and cross-platform releases for Windows, macOS and Linux published free on itch.io.",
+            "tech": [
+                "Python",
+                "PyGame",
+                "Mediapipe",
+                "Computer Vision",
+                "SQLite"
+            ],
+            "url": "https://github.com/Momad-Y/LM-Box-5",
+            "images": [
+                {
+                    "src": "/assets/images/projects/lmbox5-main-menu.jpg",
+                    "alt": "LM Box 5 main menu"
+                },
+                {
+                    "src": "/assets/images/projects/lmbox5-pong.jpg",
+                    "alt": "LM Box 5 Pong, played with hand tracking"
+                },
+                {
+                    "src": "/assets/images/projects/lmbox5-balloons.jpg",
+                    "alt": "LM Box 5 Popping Balloons"
+                },
+                {
+                    "src": "/assets/images/projects/lmbox5-runner.jpg",
+                    "alt": "LM Box 5 Dinosaur Runner"
+                }
+            ]
+        },
+        {
+            "name": "ACO Simulation",
+            "description": "An Ant Colony Optimization simulation written from scratch with no swarm-algorithm libraries: ant movement (Monte Carlo), pheromone placement and evaporation, and dynamic food and weather algorithms all implemented by hand, visualised live in Pygame with configurable parameters.",
+            "tech": [
+                "Python",
+                "Pygame",
+                "Monte Carlo Simulation",
+                "Swarm Intelligence"
+            ],
+            "url": "https://github.com/Momad-Y/ACO-Simulation",
+            "images": [
+                {
+                    "src": "/assets/images/projects/aco-simulation.jpg",
+                    "alt": "ACO Simulation running in Pygame"
+                }
+            ]
         },
         {
             "name": "Magnus & Hikaru Chess Robots",
@@ -252,7 +402,36 @@
             "description": "A convolutional neural network that matches a face to its closest celebrity look-alike.",
             "tech": ["Python", "TensorFlow", "OpenCV", "Computer Vision"],
             "url": "https://github.com/Momad-Y/Celebrity-look-a-like-CNN",
-            "images": []
+            "images": [
+                {
+                    "src": "/assets/images/projects/celebrity-real-time.jpg",
+                    "alt": "Celebrity Look-a-Like running in real time"
+                },
+                {
+                    "src": "/assets/images/projects/celebrity-celeb-vs-celeb.jpg",
+                    "alt": "Celebrity input compared with the matched celebrity"
+                },
+                {
+                    "src": "/assets/images/projects/celebrity-test-vs-celeb.jpg",
+                    "alt": "Test photo compared with the matched celebrity"
+                }
+            ]
+        },
+        {
+            "name": "NFLX Stock Price Prediction",
+            "description": "Built and compared several ML models — Linear Regression, Random Forest and AdaBoost — to predict NFLX stock prices, with data collection, preprocessing and feature engineering, and model performance analysed through visualisations and evaluation metrics.",
+            "tech": ["Python", "Scikit-Learn", "Pandas", "Matplotlib"],
+            "url": "https://github.com/Momad-Y/NFLX-Stock-Price-Prediction",
+            "images": [
+                {
+                    "src": "/assets/images/projects/nflx-final-output.jpg",
+                    "alt": "NFLX prediction against actual close prices"
+                },
+                {
+                    "src": "/assets/images/projects/nflx-close-prices.jpg",
+                    "alt": "Distribution of NFLX close prices"
+                }
+            ]
         },
         {
             "name": "Smart White Cane (AISC)",
