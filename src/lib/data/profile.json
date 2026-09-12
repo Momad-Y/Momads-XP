@@ -178,45 +178,157 @@
             "degree": "B.Sc. in Artificial Intelligence (Intelligent Systems)",
             "period": "October 2021 – August 2025",
             "honors": "GPA 3.94/4.0 — Excellent with Honours (Summa Cum Laude), ranked 2nd in class",
-            "images": []
+            "images": [
+                {
+                    "src": "/assets/images/education/aast-bachelor-degree.jpg",
+                    "alt": "Bachelor's degree in Artificial Intelligence from the AAST College of Artificial Intelligence"
+                },
+                {
+                    "src": "/assets/images/education/cai-graduation-2025.jpg",
+                    "alt": "Receiving the graduation award on stage at the 2025 AAST ceremony"
+                },
+                {
+                    "src": "/assets/images/education/project-1-discussion-2025.jpg",
+                    "alt": "Presenting BeMo's communication-handler module at the 2025 project defence"
+                },
+                {
+                    "src": "/assets/images/education/project-2-discussion-2025.jpg",
+                    "alt": "With the faculty panel after the 2025 graduation project defence"
+                },
+                {
+                    "src": "/assets/images/education/robotics-show-alamein-2023.jpg",
+                    "alt": "The College of AI robotics show at the Alamein campus, 2023"
+                },
+                {
+                    "src": "/assets/images/education/robotics-show-alamein-2022.jpg",
+                    "alt": "At the AAST fifty-years robotics show, Alamein campus, 2022"
+                },
+                {
+                    "src": "/assets/images/education/dobot-show-alamein-2022.jpg",
+                    "alt": "Demonstrating a Dobot robotic arm at the Alamein campus, 2022"
+                },
+                {
+                    "src": "/assets/images/education/vr-show-abu-qir-2022.jpg",
+                    "alt": "Presenting at the VR and robotics show, Abu Qir campus, 2022"
+                },
+                {
+                    "src": "/assets/images/education/cai-college.jpg",
+                    "alt": "With the team and the college's humanoid robots"
+                }
+            ]
         }
     ],
     "awards": [
         {
             "title": "1st Place – RoboCup @Home Education Competition (Egypt)",
             "year": "2024",
-            "images": []
+            "images": [
+                {
+                    "src": "/assets/images/experience/robocup-first-place-certificate.jpg",
+                    "alt": "First place certificate, RoboCup@Home Education Egypt 2024"
+                },
+                {
+                    "src": "/assets/images/experience/robocup-egypt-trophy.jpg",
+                    "alt": "The RoboCup@Home Egypt 2024 trophy"
+                },
+                {
+                    "src": "/assets/images/experience/robocup-egypt-team.jpg",
+                    "alt": "The AAST team at RoboCup@Home Egypt 2024"
+                }
+            ]
         },
         {
             "title": "3rd Place – RoboCup @Home Education Major Competition (Netherlands)",
             "year": "2024",
-            "images": []
+            "images": [
+                {
+                    "src": "/assets/images/experience/robocup-participation-certificate.jpg",
+                    "alt": "Certificate of participation, RoboCup@Home Education Netherlands 2024"
+                },
+                {
+                    "src": "/assets/images/experience/robocup-netherlands-ranking.jpg",
+                    "alt": "The major team ranking board, Netherlands 2024"
+                },
+                {
+                    "src": "/assets/images/experience/robocup-netherlands-team.jpg",
+                    "alt": "The AAST team at RoboCup@Home Netherlands 2024"
+                },
+                {
+                    "src": "/assets/images/experience/robocup-netherlands-robot.jpg",
+                    "alt": "The team robot at RoboCup@Home Netherlands 2024"
+                },
+                {
+                    "src": "/assets/images/experience/robocup-netherlands-arena.jpg",
+                    "alt": "The RoboCup@Home arena, Netherlands 2024"
+                }
+            ]
         },
         {
             "title": "Honorary Award – Smart White Cane (AISC), White Cane Conference",
             "year": "",
-            "images": []
+            "images": [
+                {
+                    "src": "/assets/images/awards/smart-white-cane-3.jpg",
+                    "alt": "Presenting the Smart White Cane at the Bibliotheca Alexandrina"
+                },
+                {
+                    "src": "/assets/images/awards/smart-white-cane-2.jpg",
+                    "alt": "The Smart White Cane team with the finished cane"
+                },
+                {
+                    "src": "/assets/images/awards/smart-white-cane-1.jpg",
+                    "alt": "On stage with the team at the White Cane Conference"
+                }
+            ]
         },
         {
             "title": "Certificate of Excellence – Graduation Honors",
             "year": "2025",
-            "images": []
+            "images": [
+                {
+                    "src": "/assets/images/awards/graduation-honors-certificate.jpg",
+                    "alt": "Certificate of excellence for graduation honours, AAST 2025"
+                },
+                {
+                    "src": "/assets/images/awards/graduation-2025-ceremony-1.jpg",
+                    "alt": "Receiving the graduation honours award from the faculty"
+                },
+                {
+                    "src": "/assets/images/awards/graduation-2025-ceremony-2.jpg",
+                    "alt": "In cap and gown with the graduation certificate"
+                }
+            ]
         },
         {
             "title": "Certificate of Excellence",
             "year": "2022",
-            "images": []
+            "images": [
+                {
+                    "src": "/assets/images/awards/excellence-2022-certificate.jpg",
+                    "alt": "College of Artificial Intelligence award for academic excellence, 2022"
+                }
+            ]
         }
     ],
     "certifications": [
         {
             "title": "Certificate of Excellence – Graduation Honors (AAST, 2025)",
-            "images": [],
+            "images": [
+                {
+                    "src": "/assets/images/awards/graduation-honors-certificate.jpg",
+                    "alt": "Certificate of excellence for graduation honours, AAST 2025"
+                }
+            ],
             "pdf": "/assets/certificates/graduation-honors-2025.pdf"
         },
         {
             "title": "Certificate of Excellence (AAST, 2022)",
-            "images": [],
+            "images": [
+                {
+                    "src": "/assets/images/awards/excellence-2022-certificate.jpg",
+                    "alt": "College of Artificial Intelligence award for academic excellence, 2022"
+                }
+            ],
             "pdf": "/assets/certificates/certificate-of-excellence-2022.pdf"
         },
         {
@@ -226,7 +338,12 @@
         },
         {
             "title": "Certificate of Achievement – Mentorness ML Internship (2024)",
-            "images": [],
+            "images": [
+                {
+                    "src": "/assets/images/experience/mentorness-certificate.jpg",
+                    "alt": "Machine Learning internship certificate, Mentorness"
+                }
+            ],
             "pdf": "/assets/certificates/mentorness-ml-internship-2024.pdf"
         }
     ],
@@ -243,7 +360,20 @@
                 "Playwright"
             ],
             "url": "https://github.com/Momad-Y/Momads-XP",
-            "images": []
+            "images": [
+                {
+                    "src": "/assets/images/projects/momads-xp-desktop.jpg",
+                    "alt": "The XP desktop as it boots, with the curated icons and taskbar"
+                },
+                {
+                    "src": "/assets/images/projects/momads-xp-explorer.jpg",
+                    "alt": "Explorer showing the music library, with the XP sidebar, address bar and status bar"
+                },
+                {
+                    "src": "/assets/images/projects/momads-xp-music-player.jpg",
+                    "alt": "The Music Player with its live spectrum visualiser and collapsible genre list"
+                }
+            ]
         },
         {
             "name": "BeMo (Be Modern) — Graduation Project",
@@ -291,8 +421,8 @@
             "url": "https://github.com/Momad-Y/EUC-RAG-Agent",
             "images": [
                 {
-                    "src": "/assets/images/projects/euc-rag-webapp.jpg",
-                    "alt": "EUC RAG Agent web app"
+                    "src": "/assets/images/projects/euc-rag-chatbot.png",
+                    "alt": "The EUC Chatbot answering a tuition question, with the model and embedding pickers"
                 }
             ]
         },
@@ -304,15 +434,15 @@
             "images": [
                 {
                     "src": "/assets/images/projects/nexchat-summarization.jpg",
-                    "alt": "NexChat long-context summarization"
+                    "alt": "NexChat summarising a long document"
                 },
                 {
                     "src": "/assets/images/projects/nexchat-question-answering.jpg",
-                    "alt": "NexChat document question answering"
+                    "alt": "NexChat answering questions over an uploaded document"
                 },
                 {
                     "src": "/assets/images/projects/nexchat-image-captioning.jpg",
-                    "alt": "NexChat image captioning"
+                    "alt": "NexChat captioning an uploaded photo"
                 }
             ]
         },
@@ -330,8 +460,12 @@
             "url": "https://github.com/Momad-Y/Lyric-Logic",
             "images": [
                 {
-                    "src": "/assets/images/projects/lyric-logic-web-app.jpg",
-                    "alt": "Lyric Logic web app"
+                    "src": "/assets/images/projects/lyric-logic-app.jpg",
+                    "alt": "Lyric Logic predicting the artist from pasted lyrics, with a confidence score"
+                },
+                {
+                    "src": "/assets/images/projects/lyric-logic-dataset.jpg",
+                    "alt": "The artist dataset the classifier was trained on"
                 }
             ]
         },
@@ -348,20 +482,32 @@
             "url": "https://github.com/Momad-Y/LM-Box-5",
             "images": [
                 {
-                    "src": "/assets/images/projects/lmbox5-main-menu.jpg",
-                    "alt": "LM Box 5 main menu"
+                    "src": "/assets/images/projects/lmbox5-game-menu.png",
+                    "alt": "LM Box 5's game carousel — Balloons, Pong and Runner"
                 },
                 {
-                    "src": "/assets/images/projects/lmbox5-pong.jpg",
-                    "alt": "LM Box 5 Pong, played with hand tracking"
+                    "src": "/assets/images/projects/lmbox5-balloons-game.jpg",
+                    "alt": "Popping Balloons, played with hand tracking over the webcam feed"
                 },
                 {
-                    "src": "/assets/images/projects/lmbox5-balloons.jpg",
-                    "alt": "LM Box 5 Popping Balloons"
+                    "src": "/assets/images/projects/lmbox5-pong-game.jpg",
+                    "alt": "Two-player Pong controlled by hand position"
                 },
                 {
-                    "src": "/assets/images/projects/lmbox5-runner.jpg",
-                    "alt": "LM Box 5 Dinosaur Runner"
+                    "src": "/assets/images/projects/lmbox5-runner-game.png",
+                    "alt": "Dinosaur Runner, controlled by body movement"
+                },
+                {
+                    "src": "/assets/images/projects/lmbox5-users.png",
+                    "alt": "The user profiles screen"
+                },
+                {
+                    "src": "/assets/images/projects/lmbox5-leaderboards.png",
+                    "alt": "Per-game leaderboards"
+                },
+                {
+                    "src": "/assets/images/projects/lmbox5-settings.png",
+                    "alt": "Audio, camera and gameplay settings"
                 }
             ]
         },
@@ -377,8 +523,8 @@
             "url": "https://github.com/Momad-Y/ACO-Simulation",
             "images": [
                 {
-                    "src": "/assets/images/projects/aco-simulation.jpg",
-                    "alt": "ACO Simulation running in Pygame"
+                    "src": "/assets/images/projects/aco-simulation-window.png",
+                    "alt": "The Ant Colony Optimization simulation running, with pheromone trails and a legend"
                 }
             ]
         },
@@ -392,14 +538,68 @@
                 "Robotics"
             ],
             "url": "https://github.com/Momad-Y/Magnus-Hikaru-Chess-Robots",
-            "images": []
+            "images": [
+                {
+                    "src": "/assets/images/projects/chess-magnus-playing.jpg",
+                    "alt": "Magnus Armsen playing the move the Stockfish engine chose"
+                },
+                {
+                    "src": "/assets/images/projects/chess-magnus-player-move.jpg",
+                    "alt": "A player making their move on the board the arm reads by camera"
+                },
+                {
+                    "src": "/assets/images/projects/chess-magnus-web-app.jpg",
+                    "alt": "Magnus Armsen's web app"
+                },
+                {
+                    "src": "/assets/images/projects/chess-magnus-calibration.jpg",
+                    "alt": "Calibrating the chessboard from the camera feed"
+                },
+                {
+                    "src": "/assets/images/projects/chess-hikaru-rig.jpg",
+                    "alt": "The Hikaru Nakarmsen rig — a Dobot Magician, board, camera and laptop"
+                },
+                {
+                    "src": "/assets/images/projects/chess-hikaru-menu.png",
+                    "alt": "Hikaru Nakarmsen's main menu"
+                },
+                {
+                    "src": "/assets/images/projects/chess-hikaru-play.png",
+                    "alt": "The play screen: virtual board beside the camera before and after views"
+                },
+                {
+                    "src": "/assets/images/projects/chess-presentation-audience.jpg",
+                    "alt": "Presenting the chess robots to visitors"
+                },
+                {
+                    "src": "/assets/images/projects/chess-presentation-arm.jpg",
+                    "alt": "Demonstrating the robotic arm to an audience"
+                }
+            ]
         },
         {
             "name": "OptiCompanion",
             "description": "An application designed to help blind and visually impaired individuals using AI, delivered as a Flutter mobile app.",
             "tech": ["Flutter", "Dart"],
             "url": "https://github.com/Momad-Y/OptiCompanion",
-            "images": []
+            "images": [
+                {
+                    "src": "/assets/images/projects/opticompanion-feature-graphic.jpg",
+                    "alt": "OptiCompanion — an app to help blind and visually impaired people, using AI"
+                },
+                {
+                    "src": "/assets/images/projects/opticompanion-home-screen.jpg",
+                    "alt": "The app's home screen: OCR, object recognition, document reader, feedback and settings"
+                },
+                {
+                    "src": "/assets/images/projects/opticompanion-splash-mockup.jpg",
+                    "alt": "The app's splash screen on a phone"
+                },
+                {
+                    "src": "/assets/images/projects/opticompanion-home-mockup.jpg",
+                    "alt": "The home screen on a phone"
+                }
+            ]
         },
         {
             "name": "Celebrity Look-a-Like CNN",
@@ -408,16 +608,24 @@
             "url": "https://github.com/Momad-Y/Celebrity-look-a-like-CNN",
             "images": [
                 {
-                    "src": "/assets/images/projects/celebrity-real-time.jpg",
-                    "alt": "Celebrity Look-a-Like running in real time"
+                    "src": "/assets/images/projects/celebrity-real-time-detection.jpg",
+                    "alt": "Real-time celebrity matching from a webcam, with the match and confidence overlaid"
                 },
                 {
-                    "src": "/assets/images/projects/celebrity-celeb-vs-celeb.jpg",
-                    "alt": "Celebrity input compared with the matched celebrity"
+                    "src": "/assets/images/projects/celebrity-test-vs-celeb-grid.jpg",
+                    "alt": "A grid of test photos beside their closest celebrity match and score"
                 },
                 {
-                    "src": "/assets/images/projects/celebrity-test-vs-celeb.jpg",
-                    "alt": "Test photo compared with the matched celebrity"
+                    "src": "/assets/images/projects/celebrity-celeb-vs-celeb-grid.jpg",
+                    "alt": "Celebrity photos matched against other celebrity photos"
+                },
+                {
+                    "src": "/assets/images/projects/celebrity-imdb-dataset.jpg",
+                    "alt": "A sample of the IMDB celebrity face dataset"
+                },
+                {
+                    "src": "/assets/images/projects/celebrity-preprocessing.jpg",
+                    "alt": "Faces after cropping and normalisation"
                 }
             ]
         },
@@ -428,12 +636,24 @@
             "url": "https://github.com/Momad-Y/NFLX-Stock-Price-Prediction",
             "images": [
                 {
-                    "src": "/assets/images/projects/nflx-final-output.jpg",
-                    "alt": "NFLX prediction against actual close prices"
+                    "src": "/assets/images/projects/nflx-all-predictions.png",
+                    "alt": "All model predictions against Netflix's actual closing prices"
                 },
                 {
-                    "src": "/assets/images/projects/nflx-close-prices.jpg",
-                    "alt": "Distribution of NFLX close prices"
+                    "src": "/assets/images/projects/nflx-correlation-heatmap.png",
+                    "alt": "Correlation heat map of the open, high, low and close attributes"
+                },
+                {
+                    "src": "/assets/images/projects/nflx-five-year-prices.png",
+                    "alt": "Netflix closing prices across five years"
+                },
+                {
+                    "src": "/assets/images/projects/nflx-close-price-histogram.png",
+                    "alt": "Distribution of Netflix closing prices"
+                },
+                {
+                    "src": "/assets/images/projects/nflx-random-forest.png",
+                    "alt": "Random Forest predictions against actual closing prices"
                 }
             ]
         },
@@ -442,7 +662,20 @@
             "description": "An AI-assisted white cane for blind and visually impaired users, recognised with an Honorary Award at the White Cane Conference.",
             "tech": ["Python", "Computer Vision", "Embedded Software", "IoT"],
             "url": "https://github.com/YasserSalem1/Smart-Cane",
-            "images": []
+            "images": [
+                {
+                    "src": "/assets/images/awards/smart-white-cane-2.jpg",
+                    "alt": "The Smart White Cane team with the finished cane"
+                },
+                {
+                    "src": "/assets/images/awards/smart-white-cane-3.jpg",
+                    "alt": "Presenting the Smart White Cane at the Bibliotheca Alexandrina"
+                },
+                {
+                    "src": "/assets/images/awards/smart-white-cane-1.jpg",
+                    "alt": "On stage with the team at the White Cane Conference"
+                }
+            ]
         }
     ],
     "skills": {

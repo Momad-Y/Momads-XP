@@ -250,12 +250,31 @@ describe('My Pictures — the galleries as real files', () => {
         expect(names.some((n) => n?.startsWith('Printerpix'))).toBe(false);
     });
 
-    it('skips sections that have no pictures at all', () => {
-        // education/awards/certifications carry no images today
-        expect(built.picture_section_ids).toEqual([
-            'picExperience',
-            'picProjects',
-        ]);
+    /*
+     * The INVARIANT, not today's list: this asserted
+     * `['picExperience', 'picProjects']` and went red the moment education,
+     * awards and certifications gained pictures — a test that fails when
+     * content is ADDED is testing the content, not the rule.
+     */
+    it('includes a section exactly when that section has pictures', () => {
+        const sections: [string, boolean][] = [
+            ['Experience', profile.experience.some((e) => e.images.length > 0)],
+            ['Projects', profile.projects.some((p) => p.images.length > 0)],
+            ['Education', profile.education.some((e) => e.images.length > 0)],
+            [
+                'Certifications',
+                profile.certifications.some((c) => c.images.length > 0),
+            ],
+            ['Awards', profile.awards.some((a) => a.images.length > 0)],
+        ];
+        const names = built.picture_section_ids.map(
+            (id) => built.items[id]?.name,
+        );
+        for (const [name, present] of sections) {
+            expect(names.includes(name), `${name} section presence`).toBe(
+                present,
+            );
+        }
     });
 
     it('names files from the alt text, numbering repeats', () => {
