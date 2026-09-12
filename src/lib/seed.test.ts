@@ -782,3 +782,197 @@ describe('merge_on_reseed re-homes orphans instead of deleting them', () => {
         expect(() => merge_on_reseed(cached, new_seed, previous)).not.toThrow();
     });
 });
+
+/*
+ * REAPING ON A DRIVE WITH NO SNAPSHOT.
+ *
+ * `hard_drive_seed_fields` shipped on 2026-08-23. Before that, provenance was
+ * unknowable, so `merge_on_reseed` reaped nothing at all for those visitors and
+ * every item a later seed dropped was carried forever: music tracks pointing at
+ * 404 URLs after the library rewrite, and a ghost `C:\Awards` folder after the
+ * Certificates & Awards merge whose `.txt` files rendered "This file cannot be
+ * displayed." Permanently, because the snapshot persisted after that boot
+ * describes the NEW seed, so the ghosts never appear in a `previous` again.
+ *
+ * The retired-id ledger answers it from the build instead. These tests run the
+ * legacy path — `previous` undefined — which had no reaping behaviour to test
+ * before.
+ */
+describe('merge_on_reseed reaps retired ids with no snapshot at all', () => {
+    const C = 'c_drive';
+    // REAL ids out of the shipped ledger, not invented ones: a test that
+    // passes against a made-up id would pass against an empty ledger too.
+    const GHOST_FOLDER = 'p2FolderAwards';
+    const GHOST_ENTRY = 'p2Award1stPlaceRoboCupHomeEducationCompetitionEgypt0';
+    const GHOST_TRACK = 'p3MusicAscentTrack00001';
+
+    const new_seed = drive(item({ id: C, type: 'folder', children: [] }));
+
+    /** A pre-2026-08-23 drive: the ghosts, and a file of the visitor's own. */
+    const legacy = (): HardDrive =>
+        drive(
+            item({ id: C, type: 'folder', children: [GHOST_FOLDER, 'mine'] }),
+            item({
+                id: GHOST_FOLDER,
+                name: 'Awards',
+                type: 'folder',
+                parent: C,
+                children: [GHOST_ENTRY],
+            }),
+            item({
+                id: GHOST_ENTRY,
+                parent: GHOST_FOLDER,
+                storage_type: 'remote',
+                url: '/gone.txt',
+            }),
+            item({
+                id: 'mine',
+                name: 'holiday.jpg',
+                parent: C,
+                storage_type: 'local',
+            }),
+        );
+
+    it('reaps a retired folder and the retired entries inside it', () => {
+        const merged = merge_on_reseed(legacy(), new_seed, undefined);
+        expect(merged[GHOST_FOLDER]).toBeUndefined();
+        expect(merged[GHOST_ENTRY]).toBeUndefined();
+        expect(merged[C]?.children).not.toContain(GHOST_FOLDER);
+    });
+
+    it('reaps a stale track from the music rewrite', () => {
+        const cached = drive(
+            item({ id: C, type: 'folder', children: [GHOST_TRACK] }),
+            item({
+                id: GHOST_TRACK,
+                parent: C,
+                storage_type: 'remote',
+                url: '/audio/music/demo/ascent.mp3',
+            }),
+        );
+        expect(merge_on_reseed(cached, new_seed, undefined)[GHOST_TRACK]).toBe(
+            undefined,
+        );
+    });
+
+    it("leaves the visitor's own file alone", () => {
+        const merged = merge_on_reseed(legacy(), new_seed, undefined);
+        expect(merged['mine']).toBeDefined();
+        expect(merged[C]?.children).toContain('mine');
+    });
+
+    it('KEEPS a retired item the visitor has their own bytes in', () => {
+        /*
+         * `save_file` flips `storage_type` to 'local' and `url` to an idb key
+         * on the SAME id when Paint saves over a seeded wallpaper or
+         * `my drawing.png`. With no snapshot there is nothing to compare
+         * against, so the rule is blunt on purpose: never reap an item holding
+         * local bytes. A stale icon is cosmetic; a deleted drawing is not.
+         */
+        const cached = drive(
+            item({ id: C, type: 'folder', children: [GHOST_ENTRY] }),
+            item({
+                id: GHOST_ENTRY,
+                parent: C,
+                storage_type: 'local',
+                url: 'their-idb-blob-key',
+            }),
+        );
+        const merged = merge_on_reseed(cached, new_seed, undefined);
+        expect(merged[GHOST_ENTRY]).toBeDefined();
+        expect(merged[GHOST_ENTRY]?.url).toBe('their-idb-blob-key');
+    });
+
+    it('KEEPS a bin clone of a retired item — the visitor put it there', () => {
+        // `recycle_fs` clones through `clone_fs`, which stamps `authored`, so
+        // the guard covers it whatever its storage_type says
+        const cached = drive(
+            item({ id: C, type: 'folder', children: ['bin_clone'] }),
+            item({
+                id: 'bin_clone',
+                parent: C,
+                authored: true,
+                storage_type: 'remote',
+                restore_id: GHOST_ENTRY,
+            }),
+        );
+        expect(
+            merge_on_reseed(cached, new_seed, undefined)['bin_clone'],
+        ).toBeDefined();
+    });
+
+    it('touches nothing whose id we never shipped', () => {
+        const cached = drive(
+            item({ id: C, type: 'folder', children: ['theirs'] }),
+            item({ id: 'theirs', parent: C, storage_type: 'remote' }),
+        );
+        // a .url internet shortcut is `remote` and carries no `authored`, so
+        // this is the guard that protects it: the ledger has never heard of it
+        expect(
+            merge_on_reseed(cached, new_seed, undefined)['theirs'],
+        ).toBeDefined();
+    });
+
+    it('re-homes the visitor file out of a retired folder rather than dropping it', () => {
+        const cached = drive(
+            item({ id: C, type: 'folder', children: [GHOST_FOLDER] }),
+            item({
+                id: GHOST_FOLDER,
+                type: 'folder',
+                parent: C,
+                children: ['mine'],
+            }),
+            item({ id: 'mine', parent: GHOST_FOLDER, storage_type: 'local' }),
+        );
+        const merged = merge_on_reseed(cached, new_seed, undefined);
+        expect(merged[GHOST_FOLDER]).toBeUndefined();
+        expect(merged['mine']?.parent).toBe(C);
+        expect(merged[C]?.children).toContain('mine');
+    });
+
+    it('defers to the snapshot when it disagrees with the blunt rule', () => {
+        /*
+         * A retired id whose `storage_type` is NOT 'local' but differs from
+         * what the seed shipped: the visitor made it theirs somehow, and a
+         * snapshot can say so precisely where the no-snapshot rule cannot.
+         * The sharper question wins whenever it can be asked, so the two
+         * paths can never disagree about the same item.
+         */
+        const old_seed = drive(
+            item({ id: C, type: 'folder', children: [GHOST_ENTRY] }),
+            item({ id: GHOST_ENTRY, parent: C, storage_type: 'fake' }),
+        );
+        const cached = drive(
+            item({ id: C, type: 'folder', children: [GHOST_ENTRY] }),
+            item({ id: GHOST_ENTRY, parent: C, storage_type: 'remote' }),
+        );
+        const merged = merge_on_reseed(
+            cached,
+            new_seed,
+            snapshot_seed_fields(old_seed),
+        );
+        expect(merged[GHOST_ENTRY]).toBeDefined();
+
+        // and with the snapshot AGREEING, the same id is reaped
+        const untouched = merge_on_reseed(
+            old_seed,
+            new_seed,
+            snapshot_seed_fields(old_seed),
+        );
+        expect(untouched[GHOST_ENTRY]).toBeUndefined();
+    });
+
+    it('still reaps by snapshot for an id the ledger never heard of', () => {
+        // the two sources of evidence, not one replacing the other
+        const old_seed = drive(
+            item({ id: C, type: 'folder', children: ['unlisted'] }),
+            item({ id: 'unlisted', parent: C, storage_type: 'remote' }),
+        );
+        const merged = merge_on_reseed(
+            old_seed,
+            new_seed,
+            snapshot_seed_fields(old_seed),
+        );
+        expect(merged['unlisted']).toBeUndefined();
+    });
+});
