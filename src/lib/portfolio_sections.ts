@@ -12,7 +12,7 @@
  * Keyed by `PortfolioSection`, so adding a section without naming it is a type
  * error rather than an empty label.
  */
-import type { PortfolioSection } from './types';
+import type { HardDrive, PortfolioSection } from './types';
 
 /*
  * `as const satisfies`, not a type annotation: the annotation widens every
@@ -39,6 +39,38 @@ export const SECTION_LABELS = {
 const MY_DOCUMENTS = 'My Documents';
 
 /**
+ * The My Documents folder the credential PDFs live in.
+ *
+ * An ID, deliberately, and owned HERE rather than in `vfs_gen/build.ts` where
+ * it used to be a bare literal: identity and display name belong together and
+ * neither belongs to the generator. `build.ts` imports both from this module,
+ * so a folder rename cannot mint a new id (the whole lesson of the
+ * Certifications → Certificates & Awards merge) and a lookup cannot go
+ * looking for a folder by a name the visitor may have changed.
+ */
+export const DOCUMENTS_FOLDER_ID = 'docCertifications';
+
+/**
+ * The live id of a credential's seeded PDF, or null if it is not there.
+ *
+ * By FOLDER ID and file name, not by path string: a visitor can rename that
+ * folder (it is not protected), and asking the drive means the answer follows
+ * them. Returns null once the file is gone — which is the point, see
+ * `portfolio.ts`.
+ */
+export function find_document(
+    drive: HardDrive,
+    file_name: string,
+): string | null {
+    const folder = drive[DOCUMENTS_FOLDER_ID];
+    if (folder == null) return null;
+    for (const id of folder.children) {
+        if (drive[id]?.name === file_name) return id;
+    }
+    return null;
+}
+
+/**
  * Where a credential's PDF actually sits, in the drive's own terms.
  *
  * The detail view had no way to say that the document exists: `profile.ts`
@@ -51,3 +83,15 @@ const MY_DOCUMENTS = 'My Documents';
 export function document_path(file_name: string): string {
     return `${MY_DOCUMENTS}\\${SECTION_LABELS.certificatesAndAwards}\\${file_name}`;
 }
+
+/**
+ * Where a credential's PDF is RIGHT NOW, in the idiom of the surface asking —
+ * or null if the visitor has deleted it.
+ *
+ * `resolve_portfolio_ref` takes one of these instead of composing the path
+ * itself, because it is pure over `profile.json` and cannot see the drive.
+ * Explorer passes `finder.to_url` (`C:\…`), CMD passes `display_path`
+ * (`~/…`), and the Python mirror passes nothing at all — it describes the
+ * pristine seed, where the file is always present.
+ */
+export type DocumentLocator = (file_name: string) => string | null;

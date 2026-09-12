@@ -2,7 +2,7 @@
 import type { Profile } from '../profile';
 import type { PortfolioRef, PortfolioSection, VfsItem } from '../types';
 import { entry_id, slug } from './ids';
-import { SECTION_LABELS } from '../portfolio_sections';
+import { DOCUMENTS_FOLDER_ID, SECTION_LABELS } from '../portfolio_sections';
 
 export { slug };
 
@@ -360,14 +360,17 @@ export function build_portfolio(
      * many. Entries with no document — four of the seven, and any award that
      * never came with paper — simply contribute nothing here.
      *
-     * The id stays `docCertifications` across the rename; see `FOLDERS`.
+     * The id is `DOCUMENTS_FOLDER_ID`, which lives beside the section's label
+     * in `portfolio_sections.ts` — it stayed the same across the rename (see
+     * `FOLDERS`), and the runtime lookup that finds a credential's PDF reads
+     * the same constant.
      */
     const document_section_ids: string[] = [];
     const with_pdf = profile.certificatesAndAwards.filter(
         (c) => c.pdf != null && c.pdf !== '',
     );
     if (with_pdf.length > 0) {
-        const section_id = 'docCertifications';
+        const section_id = DOCUMENTS_FOLDER_ID;
         const file_ids: string[] = [];
         for (const [i, cert] of with_pdf.entries()) {
             const url = cert.pdf ?? '';

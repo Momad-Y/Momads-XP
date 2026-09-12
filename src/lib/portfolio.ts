@@ -6,6 +6,7 @@
 import { profile } from './profile';
 import type { ProfileImage } from './profile';
 import { document_path } from './portfolio_sections';
+import type { DocumentLocator } from './portfolio_sections';
 import type { PortfolioRef } from './types';
 
 export interface PortfolioDetail {
@@ -35,8 +36,23 @@ const extname_of = (url: string): string => {
     return dot > slash ? url.slice(dot) : '';
 };
 
+/**
+ * `locate_document` answers where a credential's PDF is right now.
+ *
+ * It is a parameter rather than a composed string because this module is pure
+ * over `profile.json` and the answer lives in the visitor's drive — they can
+ * delete that PDF (it is not protected, by design) and rename the folder it
+ * sits in. The line used to be `document_path(...)` unconditionally, so a
+ * visitor who binned the certificate still read "My Documents\Certificates &
+ * Awards\…" in the entry that described it, and CMD printed a Windows path
+ * inside a shell whose own prompt is `momad@xp:~$`.
+ *
+ * Default: the seed's own path, for callers with no drive to ask — the Python
+ * mirror, which describes the pristine seed rather than anyone's drive.
+ */
 export function resolve_portfolio_ref(
     ref: PortfolioRef,
+    locate_document: DocumentLocator = document_path,
 ): PortfolioDetail | null {
     switch (ref.section) {
         case 'experience': {
@@ -113,7 +129,8 @@ export function resolve_portfolio_ref(
                     c.year,
                     c.pdf == null || c.pdf === ''
                         ? undefined
-                        : document_path(`${c.title}${extname_of(c.pdf)}`),
+                        : (locate_document(`${c.title}${extname_of(c.pdf)}`) ??
+                          undefined),
                 ]),
                 bullets: c.description,
                 chips: [],

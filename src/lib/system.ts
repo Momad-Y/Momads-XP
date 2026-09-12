@@ -9,6 +9,7 @@ import {
     PORTFOLIO_ENTRY_IDS,
     PORTFOLIO_FOLDER_IDS,
     PYTHON_FOLDER_ID,
+    RESUME_FILE_ID,
 } from './generated/vfs_ids';
 
 export interface DefaultWallpaper {
@@ -129,6 +130,9 @@ export const desktop_folder = 'nt1QdU9Sws26H26UNQZcQU';
 
 export const wallpapers_folder = 'uZ7fBbvbzFvQgAmJZpVbEb';
 
+/** `My CV.exe` on the desktop — an inherited-shell id, like the ones above. */
+export const my_cv_desktop_exe = 'p1MyCvDesktopExe0000001';
+
 export const bliss_wallpaper = 'w38WCkdn67K6JsvjdGug6y';
 
 export const protected_items: string[] = [
@@ -151,6 +155,24 @@ export const protected_items: string[] = [
      * it stay fully deletable.
      */
     PYTHON_FOLDER_ID,
+    /*
+     * THE CV, both of its doors.
+     *
+     * `RESUME_FILE_ID` is `C:\CV.pdf` and `my_cv_desktop_exe` is the desktop
+     * icon that opens it. Neither was protected, so the one document the whole
+     * site exists to hand over could be dragged to the bin — and the tombstone
+     * pass would then keep it deleted through every future re-seed. Owner's
+     * call, on the same principle as the entry files: the portfolio IS the
+     * product, and a visitor's freedom is over their own files.
+     *
+     * Note this protects the FILE, not the reader: launched with no file at
+     * all, `pdf_viewer` falls back to `profile.meta.resumePdf`, so My CV in
+     * All Programs keeps working regardless. The other desktop icons — About
+     * Me, Contact Me, Internet Explorer — stay deletable, as XP's shortcuts
+     * are: each is a launcher with a Start-menu twin, not a document.
+     */
+    RESUME_FILE_ID,
+    my_cv_desktop_exe,
 ];
 
 export const hidden_items: string[] = [

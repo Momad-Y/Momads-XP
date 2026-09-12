@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { resolve_portfolio_ref } from './portfolio';
 import { profile } from './profile';
 import { entry_text } from './python/mirror';
+import { DOCUMENTS_FOLDER_ID, find_document } from './portfolio_sections';
 import { required, to_hard_drive } from './types';
 
 describe('resolve_portfolio_ref', () => {
@@ -169,6 +170,91 @@ describe('resolve_portfolio_ref', () => {
         const first = detail?.bullets[0] ?? '';
         expect(first).not.toBe('');
         expect(entry_text(required(detail, 'detail'))).toContain(`- ${first}`);
+    });
+
+    /*
+     * The line naming a credential's PDF must never outlive the PDF. Those
+     * files are deletable on purpose — only the entry `.txt`s and the CV are
+     * protected — so an entry that keeps printing
+     * "My Documents\\Certificates & Awards\\…" after the visitor binned it is
+     * telling them to look somewhere empty.
+     */
+    describe('the document line follows the drive, not a constant', () => {
+        const with_pdf = profile.certificatesAndAwards.findIndex(
+            (c) => c.pdf != null && c.pdf !== '',
+        );
+        const ref = {
+            section: 'certificatesAndAwards',
+            key: with_pdf,
+        } as const;
+
+        it('names the document where the locator says it is', () => {
+            const d = resolve_portfolio_ref(ref, () => '~/somewhere/else.pdf');
+            expect(d?.meta_lines).toContain('~/somewhere/else.pdf');
+        });
+
+        it('says nothing at all once the document is gone', () => {
+            const d = resolve_portfolio_ref(ref, () => null);
+            expect(d?.meta_lines.some((l) => l.endsWith('.pdf'))).toBe(false);
+            // the year is still there — losing the file must not lose the rest
+            const credential = profile.certificatesAndAwards[with_pdf];
+            expect(d?.meta_lines).toEqual(
+                credential?.year === '' ? [] : [credential?.year],
+            );
+        });
+
+        it('asks for the file name the generator actually seeds', () => {
+            const asked: string[] = [];
+            resolve_portfolio_ref(ref, (name) => {
+                asked.push(name);
+                return null;
+            });
+            const credential = required(
+                profile.certificatesAndAwards[with_pdf],
+                'credential with a pdf',
+            );
+            // `vfs_gen/build.ts` names the seeded PDF after the TITLE, not
+            // after its URL — a locator handed the wrong name finds nothing
+            // and the line silently disappears for everyone
+            expect(asked).toEqual([`${credential.title}.pdf`]);
+        });
+
+        it('finds the real one in the shipped drive', () => {
+            const drive = to_hard_drive(
+                JSON.parse(
+                    readFileSync('static/json/hard_drive.json', 'utf-8'),
+                ),
+            );
+            const credential = required(
+                profile.certificatesAndAwards[with_pdf],
+                'credential with a pdf',
+            );
+            const found = find_document(drive, `${credential.title}.pdf`);
+            expect(found, 'no seeded PDF under the documents folder').not.toBe(
+                null,
+            );
+            expect(drive[found ?? '']?.ext).toBe('.pdf');
+        });
+
+        it('finds nothing once that folder is gone from the drive', () => {
+            const drive = to_hard_drive(
+                JSON.parse(
+                    readFileSync('static/json/hard_drive.json', 'utf-8'),
+                ),
+            );
+            const credential = required(
+                profile.certificatesAndAwards[with_pdf],
+                'credential with a pdf',
+            );
+            const without = Object.fromEntries(
+                Object.entries(drive).filter(
+                    ([id]) => id !== DOCUMENTS_FOLDER_ID,
+                ),
+            );
+            expect(
+                find_document(without, `${credential.title}.pdf`),
+            ).toBeNull();
+        });
     });
 
     it('returns null on out-of-range or unknown keys', () => {

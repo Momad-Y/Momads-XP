@@ -5,6 +5,7 @@ import { ROOT } from './path';
 import { strip_ansi } from '../term/ansi';
 import { required, to_hard_drive } from '../types';
 import { profile } from '../profile';
+import { DOCUMENTS_FOLDER_ID } from '../portfolio_sections';
 import type { HardDrive } from '../types';
 
 /** The SHIPPED seed, narrowed rather than asserted into shape. */
@@ -193,9 +194,36 @@ describe('cat', () => {
             C,
         );
         expect(text).toContain('Certificate of Excellence');
-        // the entry says where its own document is
-        expect(text).toContain('Certificates & Awards');
-        expect(text).toContain('.pdf');
+        // the entry says where its own document is — in THIS shell's idiom,
+        // a path that can be pasted straight back into it, rather than the
+        // `My Documents\…` the Explorer window shows
+        expect(text).toContain(
+            '~/My Documents/Certificates & Awards/Certificate of Excellence (AAST).pdf',
+        );
+    });
+
+    it('stops naming the document once the visitor deletes it', () => {
+        /*
+         * Those PDFs are deletable by design — only the entry `.txt`s and the
+         * CV are protected — so the line has to follow the drive. It used to
+         * be composed from a constant, which meant an entry kept pointing at
+         * a folder the visitor had emptied.
+         */
+        const without: HardDrive = Object.fromEntries(
+            Object.entries(drive).filter(
+                ([, item]) => item.parent !== DOCUMENTS_FOLDER_ID,
+            ),
+        );
+        const text = run_fs(
+            'cat',
+            'Certificates & Awards/Certificate of Excellence (AAST).txt',
+            { drive: without, cwd: C },
+        )
+            .lines.map(strip_ansi)
+            .join('\n');
+        expect(text).toContain('Certificate of Excellence');
+        expect(text).toContain('2022'); // the year survives
+        expect(text).not.toContain('.pdf');
     });
 
     it('describes a file it has no text for, with its size', () => {
