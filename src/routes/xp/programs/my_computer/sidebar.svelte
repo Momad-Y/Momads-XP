@@ -25,7 +25,8 @@
     /**
      * XP shows System Tasks on a DRIVE (and at My Computer), and File and
      * Folder Tasks FIRST inside a folder. Every folder here got the drive's
-     * pane instead — "Hide the contents of this drive" in `C:\Awards` — and
+     * pane instead — "Hide the contents of this drive" in a portfolio folder
+     * — and
      * because File and Folder Tasks was third, at the default window height
      * its caption was sliced by the status bar and all of its links were off
      * screen.

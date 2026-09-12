@@ -5,6 +5,7 @@
  */
 import { profile } from './profile';
 import type { ProfileImage } from './profile';
+import { document_path } from './portfolio_sections';
 import type { PortfolioRef } from './types';
 
 export interface PortfolioDetail {
@@ -19,6 +20,20 @@ export interface PortfolioDetail {
 
 const non_empty = (lines: (string | undefined)[]): string[] =>
     lines.filter((l): l is string => l != null && l !== '');
+
+/**
+ * An asset URL's extension, `.pdf` included.
+ *
+ * The seeded document is named after the entry TITLE, not after its URL
+ * (`vfs_gen/build.ts`), so the file name is title + this — the same two pieces
+ * the generator puts together. `portfolio.test.ts` resolves the composed path
+ * against the generated drive, so the two cannot drift apart in silence.
+ */
+const extname_of = (url: string): string => {
+    const dot = url.lastIndexOf('.');
+    const slash = url.lastIndexOf('/');
+    return dot > slash ? url.slice(dot) : '';
+};
 
 export function resolve_portfolio_ref(
     ref: PortfolioRef,
@@ -78,25 +93,28 @@ export function resolve_portfolio_ref(
                 images: [],
             };
         }
-        case 'awards': {
+        case 'certificatesAndAwards': {
             if (typeof ref.key !== 'number') return null;
-            const a = profile.awards[ref.key];
-            if (a == null) return null;
-            return {
-                heading: a.title,
-                meta_lines: non_empty([a.year]),
-                bullets: [],
-                chips: [],
-                images: a.images,
-            };
-        }
-        case 'certifications': {
-            if (typeof ref.key !== 'number') return null;
-            const c = profile.certifications[ref.key];
+            const c = profile.certificatesAndAwards[ref.key];
             if (c == null) return null;
             return {
                 heading: c.title,
-                meta_lines: [],
+                /*
+                 * The year, then where the document is — in the drive's own
+                 * terms, not as a link. The four certificates that merged in
+                 * here had NO meta lines before (their year was baked into the
+                 * title) and no way to mention their PDF at all, so a visitor
+                 * reading the text had no idea the certificate itself was
+                 * sitting two folders away. `document_path` is shared with the
+                 * generator's folder name so the printed path cannot drift
+                 * from where the file actually lands.
+                 */
+                meta_lines: non_empty([
+                    c.year,
+                    c.pdf == null || c.pdf === ''
+                        ? undefined
+                        : document_path(`${c.title}${extname_of(c.pdf)}`),
+                ]),
                 bullets: [],
                 chips: [],
                 images: c.images,

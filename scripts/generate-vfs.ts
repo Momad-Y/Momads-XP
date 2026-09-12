@@ -265,7 +265,7 @@ seed[MY_DOCUMENTS] = {
     starting_point: true,
     parent: C_DRIVE,
     // Python's save folder FIRST — it is protected and must never be dropped —
-    // then the credentials tree (`My Documents/Certifications/…`).
+    // then the credentials tree (`My Documents/Certificates & Awards/…`).
     children: [PYTHON_FOLDER, ...built.document_section_ids],
     date_created: SEED_EPOCH,
     date_modified: SEED_EPOCH,

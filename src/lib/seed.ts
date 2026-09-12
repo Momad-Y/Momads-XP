@@ -87,7 +87,7 @@ const USER_FIELDS = [
 /**
  * Project a seed into the field snapshot persisted alongside it.
  *
- * Storing this (~6 KB for the 59-item seed, vs 24 KB for the seed itself) is
+ * Storing this (a few KB against the seed's own tens of KB) is
  * what makes the carry UNAMBIGUOUS. Without it we cannot tell "the visitor
  * renamed this" from "a later seed renamed it" — and guessing wrong either
  * discards the visitor's edit or freezes the item against future content
@@ -196,6 +196,12 @@ function is_dropped_seed_item(
 }
 
 /**
+ * Ancestry-walk bound. A drive is a tree a few levels deep; anything past this
+ * is a cycle in corrupt cached data, and boot must not spin on it.
+ */
+const MAX_TREE_DEPTH = 64;
+
+/**
  * Re-seed merge (Phase 2 spec D3): the new seed owns every id it contains; the
  * visitor's OWN items are carried when their parent resolves in seed ∪ carried
  * (transitively), then relinked into their seed parent's `children` (folders
@@ -221,18 +227,83 @@ export function merge_on_reseed(
             !is_dropped_seed_item(i, previous),
     );
     const carried = new Set<string>();
-    let grew = true;
-    while (grew) {
-        grew = false;
-        for (const c of candidates) {
-            if (carried.has(c.id)) continue;
-            const p = c.parent;
-            if (p != null && (seed[p] != null || carried.has(p))) {
-                carried.add(c.id);
-                grew = true;
+    /** Carry every candidate whose parent resolves, transitively. */
+    const carry_transitively = (): void => {
+        let grew = true;
+        while (grew) {
+            grew = false;
+            for (const c of candidates) {
+                if (carried.has(c.id)) continue;
+                const p = c.parent;
+                if (p != null && (seed[p] != null || carried.has(p))) {
+                    carried.add(c.id);
+                    grew = true;
+                }
             }
         }
+    };
+    carry_transitively();
+
+    /*
+     * ── ORPHANS: the visitor's own items whose FOLDER the new seed dropped ──
+     *
+     * The pass above carries an item only when its parent survives, so a file
+     * the visitor put inside a seed folder that we later removed matched
+     * nothing and was deleted — silently, on boot, with no bin copy. That
+     * directly contradicts the contract `is_dropped_seed_item` states in its
+     * own header ("it protects an mp3 they upload into a genre folder"): the
+     * protection was real for the item and absent for its container.
+     *
+     * Found by the red team on the Certifications+Awards merge, which drops
+     * `C:\\Awards` — but it was reachable the day the music library started
+     * discovering genres from disk, and `help.html` invites visitors to drop
+     * files into any folder.
+     *
+     * Re-home instead of dropping: put the orphan in the nearest folder of its
+     * own ancestry that still exists, the same rule Recycle Bin restore uses.
+     * Only CANDIDATES are re-homed, and candidates exclude everything
+     * `previous` proves came from a seed — so seed content still dies with its
+     * folder (a renamed genre takes its seeded tracks with it, as before) and
+     * only the visitor's own work is rescued.
+     *
+     * SHALLOWEST FIRST, then carry again: a visitor's folder-inside-a-dropped-
+     * folder must be re-homed before the files inside it are considered, or
+     * whichever the arbitrary object order reached first would win and their
+     * own folder structure would flatten. Re-homing the folder and re-running
+     * the carry pass keeps the children where the visitor put them.
+     */
+    const depth_in_cache = (item: VfsItem): number => {
+        let depth = 0;
+        let cur: VfsItem | undefined = item;
+        // bounded: a corrupt drive must not spin here
+        while (cur?.parent != null && depth <= MAX_TREE_DEPTH) {
+            cur = cached[cur.parent];
+            depth += 1;
+        }
+        return depth;
+    };
+    const rehomed = new Map<string, string>();
+    const by_depth = [...candidates].sort(
+        (a, b) => depth_in_cache(a) - depth_in_cache(b),
+    );
+    for (const c of by_depth) {
+        if (carried.has(c.id)) continue;
+        // its own parent is gone by construction (the carry pass would have
+        // taken it otherwise), so start the search one level up
+        let ancestor = c.parent == null ? undefined : cached[c.parent];
+        let hops = 0;
+        while (ancestor != null && hops <= MAX_TREE_DEPTH) {
+            if (seed[ancestor.id] != null || carried.has(ancestor.id)) {
+                rehomed.set(c.id, ancestor.id);
+                carried.add(c.id);
+                break;
+            }
+            ancestor =
+                ancestor.parent == null ? undefined : cached[ancestor.parent];
+            hops += 1;
+        }
     }
+    carry_transitively();
 
     const result: HardDrive = { ...seed };
 
@@ -292,13 +363,19 @@ export function merge_on_reseed(
         if (c == null) continue;
         result[id] = {
             ...c,
+            // a re-homed orphan's own `parent` pointed at a folder that is
+            // gone; folders render from `children`, but a stale `parent`
+            // breaks every path walk (CMD `cd ..`, the Python mirror, restore)
+            parent: rehomed.get(id) ?? c.parent,
             children: c.children.filter((child) => carried.has(child)),
         };
     }
     for (const id of carried) {
-        const c = cached[id];
+        const c = result[id];
         const p = c?.parent;
-        if (c == null || p == null || seed[p] == null) continue;
+        if (c == null || p == null) continue;
+        // `result[p]`, not `seed[p]`: a carried item's parent may itself be a
+        // carried folder, and a re-homed orphan's new parent is a seed folder
         const parent = result[p];
         if (parent != null && !parent.children.includes(id)) {
             result[p] = { ...parent, children: [...parent.children, id] };

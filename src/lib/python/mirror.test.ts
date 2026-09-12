@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { build_mirror, entry_text, OUTBOX_PATH } from './mirror';
 import { PYTHON_WORKER_SOURCE } from './worker_source';
 import { profile } from '../profile';
+import { SECTION_LABELS, document_path } from '../portfolio_sections';
 import { build_portfolio } from '../vfs_gen/build';
 
 const mirror = build_mirror();
@@ -37,14 +38,16 @@ describe('build_mirror', () => {
     });
 
     it('leaves non-text files out, rather than mirroring a lie', () => {
-        // The certificate PDFs live in the Certifications folder and are
-        // openable in the PDF viewer; Python's mirror is text, so it must not
-        // pretend to hold them.
+        // The certificate PDFs live under My Documents and are openable in
+        // the PDF viewer; Python's mirror is text, so it must not pretend to
+        // hold them.
         const built = build_portfolio(profile);
         const pdfs = Object.values(built.items).filter((i) => i.ext === '.pdf');
         expect(pdfs.length).toBeGreaterThan(0);
         for (const pdf of pdfs) {
-            expect(paths).not.toContain(`Certifications/${pdf.name}`);
+            expect(paths).not.toContain(
+                `${SECTION_LABELS.certificatesAndAwards}/${pdf.name}`,
+            );
         }
     });
 
@@ -56,10 +59,25 @@ describe('build_mirror', () => {
         expect(entry?.text).toContain('Printerpix');
     });
 
+    it('exposes the section whose name contains an ampersand', () => {
+        /*
+         * `Certificates & Awards` crosses into Python as a dict key and then
+         * into `os.makedirs`. Nothing interpolates it (see the path-safety
+         * test below), but the folder is the first seeded name with an `&` in
+         * it, so the crossing is asserted rather than assumed.
+         */
+        const label = SECTION_LABELS.certificatesAndAwards;
+        expect(label).toContain('&');
+        expect(paths).toContain(label);
+        expect(
+            paths.filter((p) => p.startsWith(`${label}/`)).length,
+        ).toBeGreaterThan(0);
+    });
+
     it('handles both dashes the seed ships', () => {
-        // 7 em (U+2014) in Experience, 8 en (U+2013) in Awards and
-        // Certifications. A fixture written from one proves nothing about the
-        // other.
+        // 7 em (U+2014) in Experience, en dashes (U+2013) throughout
+        // Certificates & Awards. A fixture written from one proves nothing
+        // about the other.
         expect(paths.some((p) => p.includes('—'))).toBe(true);
         expect(paths.some((p) => p.includes('–'))).toBe(true);
     });
@@ -70,7 +88,7 @@ describe('build_mirror', () => {
         // so shipping the visitor's own files in would make a pasted script an
         // exfiltration tool.
         const all_text = mirror.map((e) => e.text ?? '').join('\n');
-        for (const forbidden of [
+        const visitor_areas = [
             'Wallpapers',
             'My Music',
             'My Pictures',
@@ -78,13 +96,45 @@ describe('build_mirror', () => {
             'Recycle Bin',
             '.jpg',
             '.mp3',
-            '.pdf',
             '.exe',
-        ]) {
+        ];
+        for (const forbidden of [...visitor_areas, '.pdf']) {
             expect(paths.join('\n'), forbidden).not.toContain(forbidden);
+        }
+        for (const forbidden of visitor_areas) {
             // The claim is about CONTENT as much as names — checking paths
             // alone would pass on a mirror that embedded a visitor's file.
             expect(all_text, forbidden).not.toContain(forbidden);
+        }
+    });
+
+    /*
+     * `.pdf` is checked against the mirror's PATHS above but not against its
+     * text, because a credential's `.txt` now names where its own PDF sits —
+     * otherwise the certificate is undiscoverable from the text describing it.
+     * That is seed content the owner published, not the visitor's, so it costs
+     * nothing the assertion above protects. (`My Documents` is not on either
+     * list: the mirror's own writable outbox lives there.)
+     *
+     * Kept precise rather than dropped: every `.pdf` mention must be one of
+     * those known seeded paths, so a change that started mirroring documents
+     * for real would still fail here.
+     */
+    it("mentions a document only to say where the owner's own one lives", () => {
+        const allowed = profile.certificatesAndAwards
+            .filter((c) => c.pdf != null && c.pdf !== '')
+            .map((c) => document_path(`${c.title}.pdf`));
+        expect(allowed.length).toBeGreaterThan(0);
+
+        const mentions = mirror
+            .flatMap((e) => (e.text ?? '').split('\n'))
+            .filter((line) => line.includes('.pdf'));
+        expect(mentions.length).toBe(allowed.length);
+        for (const line of mentions) {
+            expect(
+                allowed.some((path) => line.includes(path)),
+                `unexpected document mention: ${line}`,
+            ).toBe(true);
         }
     });
 

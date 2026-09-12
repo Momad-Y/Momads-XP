@@ -5,7 +5,6 @@ export const PORTFOLIO_FOLDER_IDS: string[] = [
     'p2FolderEducation',
     'p2FolderSkills',
     'p2FolderCertifications',
-    'p2FolderAwards',
 ];
 export const PORTFOLIO_ENTRY_IDS: string[] = [
     'p2ExpPrinterpixAgenticAIEngineer0',
@@ -33,15 +32,13 @@ export const PORTFOLIO_ENTRY_IDS: string[] = [
     'p2SkillBackendFullStack',
     'p2SkillCloudDevOps',
     'p2SkillAIFirstDevelopment',
-    'p2CertCertificateOfExcellenceGraduationHonorsAAST20250',
-    'p2CertCertificateOfExcellenceAAST20221',
-    'p2CertIELTSAcademicBand75IELTSOfficial20252',
-    'p2CertCertificateOfAchievementMentornessMLInternship20243',
-    'p2Award1stPlaceRoboCupHomeEducationCompetitionEgypt0',
-    'p2Award3rdPlaceRoboCupHomeEducationMajorCompetitionNetherlands1',
-    'p2AwardHonoraryAwardSmartWhiteCaneAISCWhiteCaneConference2',
-    'p2AwardCertificateOfExcellenceGraduationHonors3',
-    'p2AwardCertificateOfExcellence4',
+    'p2CertAward1stPlaceRoboCupHomeEducationCompetitionEgypt0',
+    'p2CertAward3rdPlaceRoboCupHomeEducationMajorCompetitionNetherlands1',
+    'p2CertAwardHonoraryAwardSmartWhiteCaneAISCWhiteCaneConference2',
+    'p2CertAwardCertificateOfExcellenceGraduationHonorsAAST3',
+    'p2CertAwardIELTSAcademicBand75IELTSOfficial4',
+    'p2CertAwardCertificateOfAchievementMentornessMLInternship5',
+    'p2CertAwardCertificateOfExcellenceAAST6',
 ];
 export const PROJECTS_FOLDER_ID = 'p2FolderProjects';
 export const RESUME_FILE_ID = 'p2FileResumePdf';

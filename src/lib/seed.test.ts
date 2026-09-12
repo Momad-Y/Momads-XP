@@ -667,3 +667,118 @@ describe('merge_on_reseed reaps items the new seed dropped', () => {
         expect(merged['old_track']).toBeDefined();
     });
 });
+
+/*
+ * A DROPPED FOLDER MUST NOT TAKE THE VISITOR'S OWN FILES WITH IT.
+ *
+ * `is_dropped_seed_item`'s header promises "it protects an mp3 they upload into
+ * a genre folder". That promise held for the file and not for its container:
+ * the carry pass required a surviving parent, so an upload inside a folder the
+ * new seed removed matched nothing and was deleted on boot, with no bin copy
+ * and no way to get it back.
+ *
+ * Found red-teaming the Certifications+Awards merge, which drops `C:\Awards` —
+ * but it has been reachable since the music library started discovering genres
+ * from disk, and `help.html` tells visitors to drop files into any folder.
+ */
+describe('merge_on_reseed re-homes orphans instead of deleting them', () => {
+    const C = 'c_drive';
+    const old_seed = drive(
+        item({ id: C, type: 'folder', children: ['awards'] }),
+        item({ id: 'awards', type: 'folder', parent: C, children: ['entry'] }),
+        item({ id: 'entry', parent: 'awards', storage_type: 'remote' }),
+    );
+    const new_seed = drive(
+        item({ id: C, type: 'folder', children: ['merged'] }),
+        item({ id: 'merged', type: 'folder', parent: C, children: [] }),
+    );
+    const previous = snapshot_seed_fields(old_seed);
+
+    /** The visitor's drive: they dropped a file into `C:\Awards`. */
+    const with_upload = (): HardDrive =>
+        drive(
+            item({ id: C, type: 'folder', children: ['awards'] }),
+            item({
+                id: 'awards',
+                type: 'folder',
+                parent: C,
+                children: ['entry', 'mine'],
+            }),
+            item({ id: 'entry', parent: 'awards', storage_type: 'remote' }),
+            item({
+                id: 'mine',
+                name: 'holiday.jpg',
+                parent: 'awards',
+                storage_type: 'local',
+            }),
+        );
+
+    it('keeps a file the visitor put in a folder the new seed removed', () => {
+        const merged = merge_on_reseed(with_upload(), new_seed, previous);
+        expect(merged['mine']).toBeDefined();
+        expect(merged['mine']?.name).toBe('holiday.jpg');
+    });
+
+    it('puts it in the nearest folder that still exists, and links it there', () => {
+        const merged = merge_on_reseed(with_upload(), new_seed, previous);
+        expect(merged['mine']?.parent).toBe(C);
+        expect(merged[C]?.children).toContain('mine');
+        // and the folder it used to live in is still gone
+        expect(merged['awards']).toBeUndefined();
+        expect(merged[C]?.children).not.toContain('awards');
+    });
+
+    it('still drops the SEED items that lived in that folder', () => {
+        // the whole point of reaping: `entry` came from a seed, so it dies
+        // with its folder exactly as before
+        const merged = merge_on_reseed(with_upload(), new_seed, previous);
+        expect(merged['entry']).toBeUndefined();
+    });
+
+    it("keeps the visitor's own folder structure, however deep", () => {
+        const cached = drive(
+            item({ id: C, type: 'folder', children: ['awards'] }),
+            item({
+                id: 'awards',
+                type: 'folder',
+                parent: C,
+                children: ['their_folder'],
+            }),
+            item({
+                id: 'their_folder',
+                name: 'Trophies',
+                type: 'folder',
+                parent: 'awards',
+                children: ['deep'],
+            }),
+            item({ id: 'deep', parent: 'their_folder', storage_type: 'local' }),
+        );
+        const merged = merge_on_reseed(cached, new_seed, previous);
+        // the folder is re-homed; the file inside it stays inside it rather
+        // than being flattened into C: alongside its own folder
+        expect(merged['their_folder']?.parent).toBe(C);
+        expect(merged['deep']?.parent).toBe('their_folder');
+        expect(merged['their_folder']?.children).toContain('deep');
+        expect(merged[C]?.children).toContain('their_folder');
+        expect(merged[C]?.children).not.toContain('deep');
+    });
+
+    it('drops an orphan with no surviving ancestor at all', () => {
+        // nothing to re-home it to is not an excuse to invent a parent
+        const cached = drive(
+            item({ id: 'gone', type: 'folder', children: ['mine'] }),
+            item({ id: 'mine', parent: 'gone', storage_type: 'local' }),
+        );
+        const merged = merge_on_reseed(cached, new_seed, previous);
+        expect(merged['mine']).toBeUndefined();
+    });
+
+    it('does not spin on a cycle in a corrupt cached drive', () => {
+        const cached = drive(
+            item({ id: 'a', type: 'folder', parent: 'b', children: ['mine'] }),
+            item({ id: 'b', type: 'folder', parent: 'a', children: ['a'] }),
+            item({ id: 'mine', parent: 'a', storage_type: 'local' }),
+        );
+        expect(() => merge_on_reseed(cached, new_seed, previous)).not.toThrow();
+    });
+});

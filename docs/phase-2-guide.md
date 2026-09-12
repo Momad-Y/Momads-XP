@@ -1,10 +1,20 @@
 # Phase 2 Guide — Portfolio Content Apps
 
 > Handoff per `SPECIFICATION.md` §11. Spec: `docs/superpowers/specs/2026-07-18-phase-2-content-apps-design.md`. Plan: `docs/superpowers/plans/2026-07-18-phase-2-content-apps.md`. Shipped via PRs #28–#33 + gate-6 fixes.
+>
+> **SUPERSEDED in part.** This phase shipped SIX portfolio folders; there are
+> now five. `Certifications` and `Awards` were merged into one
+> **Certificates & Awards** (`profile.json` key `certificatesAndAwards`,
+> `PortfolioSection` value of the same name) because the two arrays described
+> the same two credentials twice. The surviving folder kept its ids
+> (`p2FolderCertifications`, `picCertifications`, `docCertifications`) so the
+> rename stayed a rename rather than a migration. Wherever this guide says
+> "six folders" or names either old folder, read
+> `docs/certificates-and-awards-plan.md`.
 
 ## 1. Phase summary
 
-**Implemented:** `profile.json → VFS` generator (`scripts/generate-vfs.ts` + pure builders in `src/lib/vfs_gen/`; deterministic ids/timestamps; **auto SEED_VERSION** written to generated `src/lib/generated/seed_version.ts` — hand-stamping retired; CI freshness step regenerates and `git diff --exit-code`s); **re-seed merge** (`merge_on_reseed` in `src/lib/seed.ts` — visitors' `storage_type:'local'` files survive content updates, relinked into surviving parents; verified live in a browser); six portfolio folders (Experience/Projects/Education/Skills/Certifications/Awards) at the Explorer root via the `my_computer` list, entries are protected `.txt` files with generator-stamped `portfolio_ref` opened by the new **portfolio_viewer** (section-aware details, tech chips, external links, conditional gallery); **pdf_viewer** (pdfjs-dist v6, bundled worker, zoom with render-token guard, Download; `.pdf` doctype + desktop `My CV.exe` fallback to `meta.resumePdf`); **About Me** (Explorer chrome, XP sidebar panels from profile.json, My Projects deep-link into the Explorer, My Resume); **Contact Me** (Outlook-style, XP dialogs) posting to **`/api/email`** (Netlify Function via `prerender=false`; Resend over plain fetch; §6.8 hardening: Origin *with Referer fallback*, 32KB cap, per-IP token bucket, global 50/day cap consumed **only by real sends**, honeypot answered with fake 202, 3s min-fill-time with a friendly 422 dialog). E2E grew 12 → 20 specs.
+**Implemented:** `profile.json → VFS` generator (`scripts/generate-vfs.ts` + pure builders in `src/lib/vfs_gen/`; deterministic ids/timestamps; **auto SEED_VERSION** written to generated `src/lib/generated/seed_version.ts` — hand-stamping retired; CI freshness step regenerates and `git diff --exit-code`s); **re-seed merge** (`merge_on_reseed` in `src/lib/seed.ts` — visitors' `storage_type:'local'` files survive content updates, relinked into surviving parents; verified live in a browser); six portfolio folders (Experience/Projects/Education/Skills/Certifications/Awards — five since the merge, see the note above) at the Explorer root via the `my_computer` list, entries are protected `.txt` files with generator-stamped `portfolio_ref` opened by the new **portfolio_viewer** (section-aware details, tech chips, external links, conditional gallery); **pdf_viewer** (pdfjs-dist v6, bundled worker, zoom with render-token guard, Download; `.pdf` doctype + desktop `My CV.exe` fallback to `meta.resumePdf`); **About Me** (Explorer chrome, XP sidebar panels from profile.json, My Projects deep-link into the Explorer, My Resume); **Contact Me** (Outlook-style, XP dialogs) posting to **`/api/email`** (Netlify Function via `prerender=false`; Resend over plain fetch; §6.8 hardening: Origin *with Referer fallback*, 32KB cap, per-IP token bucket, global 50/day cap consumed **only by real sends**, honeypot answered with fake 202, 3s min-fill-time with a friendly 422 dialog). E2E grew 12 → 20 specs.
 
 **Deferred:** CMD/Python/Paint-custom/Music (Phase 3), games (Phase 4), IE chatbot (Phase 5), sound manager (Phase 6). Placeholders remain only for those.
 

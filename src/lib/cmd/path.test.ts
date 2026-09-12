@@ -25,9 +25,10 @@ function load_seed(): HardDrive {
 }
 
 // The SHIPPED drive, not a hand-made stand-in. Every name this module has to
-// cope with — spaces, apostrophes, ampersands, and both an em dash (U+2014, in
-// Experience) and an en dash (U+2013, in Awards and Certifications) — is in
-// here, and a fixture written by hand would quietly get the dashes wrong.
+// cope with — spaces, apostrophes, ampersands (in a FOLDER name now, not only
+// inside a file name), and both an em dash (U+2014, in Experience) and an en
+// dash (U+2013, throughout Certificates & Awards) — is in here, and a fixture
+// written by hand would quietly get the dashes wrong.
 const drive = load_seed();
 
 const C = 'cTbkbrM4qjwF3UfmCoFkEK';
@@ -179,17 +180,41 @@ describe('resolve', () => {
         );
     });
 
-    it('handles the en dash in Awards, not just the em dash in Experience', () => {
+    it('handles the en dash in the credentials, not just the em dash in Experience', () => {
         // Both ship. A test written from one of them proves nothing about the
         // other, and the en-dash names are the majority.
         const award = resolve(
-            '/c/Awards/1st Place – RoboCup @Home Education Competition (Egypt).txt',
+            '/c/Certificates & Awards/1st Place – RoboCup @Home Education Competition (Egypt).txt',
             C,
             drive,
         );
         expect(got(award)).toBe(
-            'p2Award1stPlaceRoboCupHomeEducationCompetitionEgypt0',
+            'p2CertAward1stPlaceRoboCupHomeEducationCompetitionEgypt0',
         );
+    });
+
+    it('walks a FOLDER whose name contains an ampersand', () => {
+        /*
+         * `&` separates commands in a real cmd.exe, so a folder called
+         * "Certificates & Awards" is the one name on this drive that a shell
+         * habit could break. It does not break here — `run_cd`/`run_cat` take
+         * the raw remainder of the line rather than whitespace-split tokens,
+         * and `resolve` splits on `/` alone — but that is a property worth a
+         * test rather than an assumption, since it is what the whole section
+         * is reachable through.
+         */
+        const folder = 'p2FolderCertifications';
+        expect(got(resolve('/c/Certificates & Awards', ROOT, drive))).toBe(
+            folder,
+        );
+        expect(got(resolve('Certificates & Awards', C, drive))).toBe(folder);
+        expect(got(resolve('~/Certificates & Awards/', ROOT, drive))).toBe(
+            folder,
+        );
+        // quoted, the way a visitor reaching for shell habits would type it
+        expect(got(resolve('"Certificates & Awards"', C, drive))).toBe(folder);
+        // and back out again
+        expect(got(resolve('..', folder, drive))).toBe(C);
     });
 
     it('walks absolute paths, `~`, `.`, `..` and trailing slashes', () => {

@@ -2,6 +2,7 @@
 import type { Profile } from '../profile';
 import type { PortfolioRef, PortfolioSection, VfsItem } from '../types';
 import { entry_id, slug } from './ids';
+import { SECTION_LABELS } from '../portfolio_sections';
 
 export { slug };
 
@@ -30,18 +31,55 @@ export interface AssetRoots {
     documents: string;
 }
 
-const FOLDERS: { id: string; name: string; section: PortfolioSection }[] = [
-    { id: 'p2FolderExperience', name: 'Experience', section: 'experience' },
-    { id: 'p2FolderProjects', name: 'Projects', section: 'projects' },
-    { id: 'p2FolderEducation', name: 'Education', section: 'education' },
-    { id: 'p2FolderSkills', name: 'Skills', section: 'skills' },
+/**
+ * The portfolio folders, in `C:\` order.
+ *
+ * `id` and `picture_id` are EXPLICIT and never derived from `name`. The My
+ * Pictures section id used to be `pic${slug(folder.name)}`, which made a
+ * display rename mint a new id — and a new id is not a rename, it is a
+ * migration: `merge_on_reseed` reaps the old container, and a visitor's own
+ * files inside it go with it. `profile.ts`'s `MusicGenre` already argues this
+ * exact point for `dir` vs `name`. So when Certifications and Awards became
+ * one "Certificates & Awards", the surviving folder kept all three of its ids
+ * (`p2FolderCertifications`, `picCertifications`, `docCertifications`) and
+ * only its NAME changed — which is also what lets `user_edits` do the right
+ * thing in both directions: a visitor who never renamed it gets the new name,
+ * one who did keeps theirs.
+ *
+ * Names come from `SECTION_LABELS`, the single place a section is named.
+ */
+const FOLDERS: {
+    id: string;
+    picture_id: string;
+    section: PortfolioSection;
+}[] = [
     {
-        id: 'p2FolderCertifications',
-        name: 'Certifications',
-        section: 'certifications',
+        id: 'p2FolderExperience',
+        picture_id: 'picExperience',
+        section: 'experience',
     },
-    { id: 'p2FolderAwards', name: 'Awards', section: 'awards' },
+    {
+        id: 'p2FolderProjects',
+        picture_id: 'picProjects',
+        section: 'projects',
+    },
+    {
+        id: 'p2FolderEducation',
+        picture_id: 'picEducation',
+        section: 'education',
+    },
+    { id: 'p2FolderSkills', picture_id: 'picSkills', section: 'skills' },
+    {
+        // was `Certifications`; `Awards` (`p2FolderAwards`) merged into it
+        id: 'p2FolderCertifications',
+        picture_id: 'picCertifications',
+        section: 'certificatesAndAwards',
+    },
 ];
+
+/** A folder's display name — never an id input. */
+const folder_name = (folder: { section: PortfolioSection }): string =>
+    SECTION_LABELS[folder.section];
 
 function base_item(
     id: string,
@@ -177,28 +215,26 @@ export function build_portfolio(
         skills: Object.keys(profile.skills).map((category) =>
             entry_file('skills', category, category, 'p2FolderSkills'),
         ),
-        certifications: profile.certifications.map((c, i) =>
+        certificatesAndAwards: profile.certificatesAndAwards.map((c, i) =>
             entry_file(
-                'certifications',
+                'certificatesAndAwards',
                 c.title,
                 i,
                 'p2FolderCertifications',
                 String(i),
             ),
         ),
-        awards: profile.awards.map((a, i) =>
-            entry_file('awards', a.title, i, 'p2FolderAwards', String(i)),
-        ),
     };
 
     for (const folder of FOLDERS) {
         const children = per_section[folder.section];
+        const name = folder_name(folder);
         add({
             // parent stamped by the generator script (C: drive id)
             ...base_item(folder.id, ''),
             type: 'folder',
-            basename: folder.name,
-            name: folder.name,
+            basename: name,
+            name,
             ext: '',
             icon: '/images/xp/icons/FolderClosed.png',
             starting_point: true,
@@ -244,15 +280,10 @@ export function build_portfolio(
             basename: e.institution,
             images: e.images,
         })),
-        ...profile.certifications.map((c) => ({
-            section: 'certifications' as const,
+        ...profile.certificatesAndAwards.map((c) => ({
+            section: 'certificatesAndAwards' as const,
             basename: c.title,
             images: c.images,
-        })),
-        ...profile.awards.map((a) => ({
-            section: 'awards' as const,
-            basename: a.title,
-            images: a.images,
         })),
     ];
 
@@ -263,7 +294,7 @@ export function build_portfolio(
         );
         if (owners.length === 0) continue;
 
-        const section_id = `pic${slug(folder.name)}`;
+        const section_id = folder.picture_id;
         const item_ids: string[] = [];
         for (const [i, owner] of owners.entries()) {
             const item_id = `${section_id}${slug(owner.basename)}${String(i)}`;
@@ -312,8 +343,8 @@ export function build_portfolio(
         add({
             ...base_item(section_id, roots.pictures),
             type: 'folder',
-            basename: folder.name,
-            name: folder.name,
+            basename: folder_name(folder),
+            name: folder_name(folder),
             ext: '',
             icon: '/images/xp/icons/MyPictures.png',
             children: item_ids,
@@ -322,13 +353,17 @@ export function build_portfolio(
     }
 
     /*
-     * The credentials, under `My Documents/Certifications/`. One folder per
-     * SECTION but not per item: a certification holds exactly one document, so
-     * a per-item folder would contain a single file of the same name. The
-     * per-item level exists for pictures because galleries hold many.
+     * The credential documents, under `My Documents/Certificates & Awards/`.
+     * One folder per SECTION but not per item: an entry carries at most ONE
+     * document, so a per-item folder would hold a single file of the same
+     * name. The per-item level exists for pictures because galleries hold
+     * many. Entries with no document — four of the seven, and any award that
+     * never came with paper — simply contribute nothing here.
+     *
+     * The id stays `docCertifications` across the rename; see `FOLDERS`.
      */
     const document_section_ids: string[] = [];
-    const with_pdf = profile.certifications.filter(
+    const with_pdf = profile.certificatesAndAwards.filter(
         (c) => c.pdf != null && c.pdf !== '',
     );
     if (with_pdf.length > 0) {
@@ -353,8 +388,8 @@ export function build_portfolio(
         add({
             ...base_item(section_id, roots.documents),
             type: 'folder',
-            basename: 'Certifications',
-            name: 'Certifications',
+            basename: SECTION_LABELS.certificatesAndAwards,
+            name: SECTION_LABELS.certificatesAndAwards,
             ext: '',
             icon: '/images/xp/icons/FolderClosed.png',
             children: file_ids,

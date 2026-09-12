@@ -82,8 +82,15 @@ export type PortfolioSection =
     | 'projects'
     | 'education'
     | 'skills'
-    | 'awards'
-    | 'certifications';
+    /**
+     * ONE section, not two. `awards` and `certifications` were separate until
+     * the owner merged them: the two arrays described the same two credentials
+     * twice (the graduation honours and the 2022 excellence certificate were
+     * in both, with different titles), so one folder holding both lists would
+     * have shown that duplication rather than resolved it. See
+     * `docs/certificates-and-awards-plan.md`.
+     */
+    | 'certificatesAndAwards';
 
 /** Stamped only by scripts/generate-vfs.ts; consumed by portfolio_viewer. */
 export interface PortfolioRef {

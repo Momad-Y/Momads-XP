@@ -1,6 +1,8 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { resolve_portfolio_ref } from './portfolio';
 import { profile } from './profile';
+import { to_hard_drive } from './types';
 
 describe('resolve_portfolio_ref', () => {
     it('maps an experience entry to a full detail', () => {
@@ -43,7 +45,7 @@ describe('resolve_portfolio_ref', () => {
         expect(d?.meta_lines).toContain(profile.education[0]?.honors);
     });
 
-    it('lists an award year as a meta line, and omits an empty one', () => {
+    it('lists a credential year as a meta line, and omits an empty one', () => {
         /*
          * This used to hunt profile.awards for an entry with `year: ''` and
          * assert the empty case — so it silently stopped testing anything the
@@ -51,14 +53,70 @@ describe('resolve_portfolio_ref', () => {
          * fail rather than skip. Asserted per entry instead: whatever the data
          * holds, the rule is the same.
          */
-        expect(profile.awards.length).toBeGreaterThan(0);
-        profile.awards.forEach((award, i) => {
-            const d = resolve_portfolio_ref({ section: 'awards', key: i });
-            expect(d, award.title).not.toBeNull();
-            expect(d?.meta_lines).toEqual(
-                award.year === '' ? [] : [award.year],
-            );
+        expect(profile.certificatesAndAwards.length).toBeGreaterThan(0);
+        profile.certificatesAndAwards.forEach((credential, i) => {
+            const d = resolve_portfolio_ref({
+                section: 'certificatesAndAwards',
+                key: i,
+            });
+            expect(d, credential.title).not.toBeNull();
+            expect(d?.meta_lines[0] ?? '').toBe(credential.year);
         });
+    });
+
+    /*
+     * The `.txt` must SAY where the document is. The four certificates that
+     * merged into this section had no meta lines at all and no way to mention
+     * their PDF, so the certificate itself — sitting under My Documents — was
+     * undiscoverable from the text that described it.
+     *
+     * Resolved against the generated drive rather than compared to a string:
+     * that is the only way the printed path and the file's real location
+     * cannot drift apart, which is the failure this repo keeps paying for.
+     */
+    it('prints a path that really resolves, for every credential with a PDF', () => {
+        // `to_hard_drive` narrows rather than asserts — the same way
+        // `cmd/path.test.ts` loads the shipped seed
+        const drive = to_hard_drive(
+            JSON.parse(readFileSync('static/json/hard_drive.json', 'utf-8')),
+        );
+        const full_path = (id: string): string => {
+            const parts: string[] = [];
+            let cur = drive[id];
+            while (cur != null) {
+                parts.unshift(cur.name);
+                cur = cur.parent == null ? undefined : drive[cur.parent];
+            }
+            // `C:\` is the drive root; the printed path starts below it
+            return parts.slice(1).join('\\');
+        };
+        const paths = new Set(Object.keys(drive).map(full_path));
+
+        const with_pdf = profile.certificatesAndAwards.filter(
+            (c) => c.pdf != null && c.pdf !== '',
+        );
+        expect(with_pdf.length).toBeGreaterThan(0);
+        for (const [i, credential] of profile.certificatesAndAwards.entries()) {
+            const d = resolve_portfolio_ref({
+                section: 'certificatesAndAwards',
+                key: i,
+            });
+            const printed = (d?.meta_lines ?? []).filter((l) =>
+                l.endsWith('.pdf'),
+            );
+            if (credential.pdf == null || credential.pdf === '') {
+                expect(printed, `${credential.title} has no PDF`).toEqual([]);
+                continue;
+            }
+            expect(
+                printed,
+                `${credential.title} names no document`,
+            ).toHaveLength(1);
+            expect(
+                paths.has(printed[0] ?? ''),
+                `${printed[0] ?? ''} is not in the drive`,
+            ).toBe(true);
+        }
     });
 
     it('returns null on out-of-range or unknown keys', () => {

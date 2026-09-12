@@ -126,27 +126,34 @@ My Computer
 │   ├── Data & Programming
 │   ├── Backend & Full-Stack
 │   └── Software Development
-├── Certifications/
-│   └── [List from JSON]
-└── Awards/
+└── Certificates & Awards/
     ├── 1st Place — RoboCup @Home (Egypt)
     ├── 3rd Place — RoboCup @Home (Netherlands)
     └── ...
 ```
+
+> **Amended (post-Phase-3).** `Certifications/` and `Awards/` were two folders
+> until the owner merged them into one **Certificates & Awards**. They had to
+> merge: the two `profile.json` arrays described the same two credentials twice
+> — the graduation honours and the 2022 certificate of excellence were in both
+> with different titles, one copy carrying the PDF and the other the ceremony
+> photos. One section, one folder, everywhere it is derived (`C:\`,
+> My Pictures, My Documents, CMD, the Python mirror). See
+> `docs/certificates-and-awards-plan.md`.
 
 - Clicking a folder shows its contents as XP file/folder icons in the right panel
 - Clicking a file (experience entry, project, etc.) opens a detail view within the explorer window or in a new window
 
 **Image & media support per entry:**
 
-Each file (experience, education, award, project, certification) can have associated images and/or GIFs defined in `profile.json`. These are rendered in the detail view when a file is opened.
+Each file (experience, education, project, credential) can have associated images and/or GIFs defined in `profile.json`. These are rendered in the detail view when a file is opened.
 
 Examples:
 
 - **Education → AAST**: Diploma photo, graduation project presentation photo
-- **Awards → RoboCup 1st Place (Egypt)**: Team photo, certificate scan
+- **Certificates & Awards → RoboCup 1st Place (Egypt)**: Team photo, trophy, certificate scan
 - **Experience → Printerpix**: Office photo, system dashboard screenshot
-- **Certifications → IELTS**: Certificate scan
+- **Certificates & Awards → Graduation Honors**: Certificate scan plus the ceremony photos, and the PDF itself under My Documents
 
 Images are displayed as a thumbnail gallery or inline within the detail view. Clicking a thumbnail opens a larger preview (XP-style image viewer or lightbox within the explorer window).
 
@@ -921,7 +928,7 @@ The base repo persists a virtual filesystem in IndexedDB (`idb-keyval`): a seed 
 
 Momad's XP adapts this so all portfolio content stays data-driven:
 
-- A build-time script (`scripts/generate-vfs`) generates the VFS seed from `src/lib/data/profile.json` — the My Computer folder tree (Experience, Projects, Education, Skills, Certifications, Awards) is derived from the JSON, never hand-edited
+- A build-time script (`scripts/generate-vfs`) generates the VFS seed from `src/lib/data/profile.json` — the My Computer folder tree (Experience, Projects, Education, Skills, Certificates & Awards) is derived from the JSON, never hand-edited
 - The seed carries a `SEED_VERSION` — computed as a **content hash** of the generated seed, so it changes automatically with every content edit (no manual bump to forget); on boot, a version mismatch re-seeds IndexedDB so content updates actually reach returning visitors
 - User-created files (Paint drawings, etc.) survive re-seeds where possible; portfolio folders are always replaced by the new seed
 
@@ -1114,49 +1121,31 @@ All personal content lives in a single `src/lib/data/profile.json`. Components r
         ],
     },
 
-    "awards": [
+    // ONE array, not `awards` + `certifications`: those two held the same
+    // credentials twice. Awards first, then certificates, each
+    // reverse-chronological with undated entries last — this order IS the
+    // order Explorer, `ls` and `os.listdir` show, because generated items
+    // carry `sort_option: NONE`.
+    "certificatesAndAwards": [
         {
             "title": "1st Place – RoboCup @Home Education Competition (Egypt)",
             "year": "2024",
             "images": [],
         },
         {
-            "title": "3rd Place – RoboCup @Home Education Major Competition (Netherlands)",
-            "year": "2024",
-            "images": [],
-        },
-        {
             "title": "Honorary Award – Smart White Cane (AISC), White Cane Conference",
+            // empty, not absent: every entry states whether it has a date
             "year": "",
             "images": [],
         },
         {
-            "title": "Certificate of Excellence – Graduation Honors",
+            "title": "Certificate of Excellence – Graduation Honors (AAST)",
             "year": "2025",
             "images": [],
-        },
-    ],
-
-    "certifications": [
-        {
-            "title": "Certificate of Achievement – Mentorness Machine Learning Internship",
-            "images": [],
-        },
-        {
-            "title": "Certificate of Excellence – Graduation Honors",
-            "images": [],
-        },
-        {
-            "title": "3rd Place – RoboCup @Home Education Major Competition (Netherlands)",
-            "images": [],
-        },
-        {
-            "title": "Certificate of Participation – RoboCup Junior",
-            "images": [],
-        },
-        {
-            "title": "IELTS Academic Certificate",
-            "images": [],
+            // optional. A PDF is seeded under
+            // `My Documents/Certificates & Awards/<title>.pdf` and the entry's
+            // own `.txt` prints that path.
+            "pdf": "/assets/certificates/graduation-honors-2025.pdf",
         },
     ],
 
@@ -1353,7 +1342,7 @@ All personal content lives in a single `src/lib/data/profile.json`. Components r
 - [x] Verify/extend `profile.json` (created in Phase 1) — add projects, `images` arrays, and any fields the Phase 2 apps need
 - [x] Write `scripts/generate-vfs.ts` and wire it into the build: `profile.json` → VFS seed (`hard_drive.json`), with `SEED_VERSION` computed as a content hash of the generated seed (no manual bumping to forget) — §6.7
 - [x] My Computer: Explorer-style window with folder tree and file/folder view
-    - Folder structure: Experience, Projects, Education, Skills, Certifications, Awards
+    - Folder structure: Experience, Projects, Education, Skills, Certificates & Awards (Certifications and Awards were merged post-Phase-3)
     - Clicking items shows detail content sourced from JSON
     - Image/GIF gallery per entry (rendered from `images` array in JSON)
 - [x] About Me: Explorer window with sidebar navigation, bio content, skills tree
