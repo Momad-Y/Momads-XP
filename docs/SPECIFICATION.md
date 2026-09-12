@@ -376,6 +376,80 @@ where Pyodide takes ~10 seconds.
 - Visualization: simple waveform or spectrum analyzer (Canvas API + Web Audio `AnalyserNode`)
 - Stretch alternative: an additional Spotify Embed mode with a reduced feature set (only the embed's own play/pause/seek)
 
+#### My Pictures library — photos and video (Phase 6)
+
+Owner-requested 2026-09-12: the same thing the Music Player became, for
+pictures and video. `My Pictures` is EMPTY in the seed today (0 children).
+
+**The pipeline is the music one, reused rather than re-invented.** Every piece
+below already exists and is proven; the new work is a second scanner and a
+gallery view, not a second architecture.
+
+| Music | Pictures |
+| --- | --- |
+| `static/audio/music/<genre>/*.mp3` | `static/images/gallery/<album>/*` |
+| `music.genres` in `profile.json` — names and ORDER, generator input only | `pictures.albums` — same shape, same role |
+| `music.artists` overrides, keyed `<genre>/<file>`, stale keys a hard error | `pictures.captions` — alt text and captions, same keying, same hard error |
+| `src/lib/music/scan.ts` | `src/lib/pictures/scan.ts` |
+| ids are `sha256(genre/filename)` | ids are `sha256(album/filename)` |
+| `src/lib/generated/music.ts` sidecar + the VFS seed | `src/lib/generated/pictures.ts` + the VFS seed |
+| `build_library` over the `My Music` subtree | `build_gallery` over the `My Pictures` subtree |
+| `music_player.svelte` reads the drive | the gallery reads the drive |
+
+The scanner inherits every validation `scan.ts` already enforces, because each
+one was written for a real mistake: a folder on disk that `profile.json` does
+not declare (and the reverse) fails the build with the exact line to paste; no
+loose files at the tree root; no empty albums; no byte-identical duplicates;
+stale override keys are an error, not a silent no-op.
+
+Reading the drive rather than the manifest means the gallery inherits, for
+free, all seven behaviours the music player had to be taught: deleting a photo
+in Explorer removes it, deleting an album folder removes the album, emptying
+one leaves the album at zero, a folder or file the visitor adds appears, a
+loose file groups under the unsorted header, and opening a picture from outside
+`My Pictures` still shows it.
+
+**Three places an exact mirror is impossible. These are the decisions.**
+
+1. **No generated thumbnails.** `cover_box.ts` measures crops and deliberately
+   never re-encodes: `zlib` output is not stable across Node versions, and
+   `static/assets/covers` sits on the CI freshness gate, so a re-encode would
+   redden CI on every run for reasons nobody could see. Resizing a photo IS
+   re-encoding, so the same rule forbids build-time thumbnails. The gallery
+   therefore scales originals in CSS — `Previewable.svelte` already lazy-loads
+   them through an `IntersectionObserver` — and the owner exports at sane
+   dimensions. This is in tension with the Phase 6 "optimize images (WebP)"
+   item and should be settled with it: pre-sized WebP variants committed AS
+   SOURCE would satisfy both, since committed inputs are stable by definition.
+2. **Video carries no build-time poster or duration.** Both need a decoder.
+   Reuse the pattern the music player already ships: `<video preload="metadata">`
+   supplies its own first frame, and duration renders as `--:--` until the file
+   is loaded (`format_optional_duration`, and the component-level learned-duration
+   cache beside it).
+3. **One folder, or two.** The owner asked for images AND video under
+   `My Pictures`. XP itself separates `My Pictures` from `My Videos`, and the
+   association work already sends video to Media Player Classic and images to
+   the image viewer, so a split would need no new plumbing. Defaulting to what
+   was asked — one `My Pictures` tree holding both — with the split recorded as
+   a one-line change if wanted at build time.
+
+**Metadata the sidecar carries**, all readable in pure Node from file headers,
+the way `cover_box.ts` already decodes PNG: intrinsic width and height (PNG
+`IHDR`, JPEG `SOF`, WebP `VP8X`/`VP8L`), byte size, and the caption/alt text
+from `profile.json`. Alt text from the profile is also the honest answer to
+part of the Phase 6 a11y item — a gallery of images with no `alt` would add to
+the warning count this phase exists to burn down.
+
+**Consequence for All Programs:** `image_viewer.svelte` is excluded from the
+menu today because it throws without a file (`NOT_PROGRAMS` in
+`src/lib/start_menu_programs.ts`). A gallery is launchable cold, so it belongs
+IN the menu — and the folder-coverage test will require that decision to be
+made explicitly.
+
+**What the owner provides:** the files, in one folder per album under
+`static/images/gallery/`, plus an `albums` list in `profile.json` naming and
+ordering them. Then `npm run generate:vfs`. Same three steps as the music.
+
 ### 3.3 Games
 
 #### Minesweeper
@@ -1341,6 +1415,12 @@ surprised by it:
 
 **Goal:** Sounds, animations, final UX details, performance optimization.
 
+- [ ] **`My Pictures` photo and video library** (owner-requested 2026-09-12) —
+      folder-discovered albums seeded into `My Pictures`, built on the music
+      pipeline: see §3.2 "My Pictures library" for the piece-by-piece mapping,
+      the three decisions where an exact mirror is impossible (no generated
+      thumbnails, no build-time video poster or duration, one folder vs
+      `My Videos`), and what the owner supplies
 - [ ] Sound manager: preload all XP sounds; system tray volume control
 - [ ] Wire up all sound triggers (boot, open, close, error, minimize, startup, shutdown)
 - [ ] Window animations: open, close, minimize, maximize transitions
