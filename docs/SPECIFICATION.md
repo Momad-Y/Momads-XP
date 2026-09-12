@@ -1264,9 +1264,23 @@ All personal content lives in a single `src/lib/data/profile.json`. Components r
 
 ## 9. Implementation Phases
 
-> **Status (2026-08-23).** Phases 0, 1 and 2 are complete and **live in
-> production** at <https://momad-xp.netlify.app>. Phase 3 is next. Ticked boxes
-> below mean shipped and deployed, not merely written.
+> **Status (2026-09-12).** Phases 0, 1, 2 and **3** are complete and live in
+> production at <https://momad-xp.netlify.app>. **Phase 4 (Games) is next and
+> needs the owner's explicit go.** Ticked boxes below mean shipped and
+> deployed, not merely written.
+>
+> Phase 3's own gate artefacts are `docs/phase-3-{spec,redteam-spec,plan,redteam-plan,redteam-implementation}.md`,
+> with the handoff in `docs/phase-3-guide.md`.
+>
+> A run of post-Phase-3 work has shipped on top of it, each with its own plan
+> doc: CMD filesystem navigation (`cmd-filesystem-plan.md`), the Python REPL
+> filesystem (`python-fs-plan.md`), removal of both SRI-less CDN origins
+> (`cdn-removal-plan.md`), the real music library (`music-library-plan.md`),
+> the Music Player rebuilt as a live view over `My Music` plus Recycle Bin
+> Restore (`music-library-vfs-plan.md`), audio/video file associations
+> (`media-associations-plan.md`), All Programs completeness, and the portfolio
+> content itself — the missing projects, 35 images and the certificate PDFs,
+> seeded as real files under `My Pictures` and `My Documents`.
 >
 > Everything after Phase 2 also went through a five-lens red team — code,
 > security, visual parity, test integrity and persisted state — recorded in
