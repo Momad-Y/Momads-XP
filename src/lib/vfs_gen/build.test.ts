@@ -148,49 +148,49 @@ describe('file_name_from_url', () => {
     });
 });
 
-describe('certificate PDFs', () => {
+describe('My Documents — the credentials', () => {
     /*
-     * A certificate nobody can read is not a credential. LinkedIn only ever
-     * serves uploaded documents as per-page images — the original PDFs came
-     * from the Drive links behind "Show credential" — so these are the real
-     * files, seeded beside each certification's `.txt` and openable in the PDF
-     * viewer exactly as the CV is.
+     * A certificate nobody can read is not a credential. LinkedIn only serves
+     * uploaded documents as per-page images — the PDFs came from the Drive
+     * links behind "Show credential" — and they live under My Documents, where
+     * anyone would look for a document, rather than beside the portfolio text.
      */
     const built = build_portfolio(profile, () => 42);
     const items = Object.values(built.items);
     const certs = profile.certifications.filter(
         (c) => c.pdf != null && c.pdf !== '',
     );
+    const pdfs = items.filter(
+        (i) => i.ext === '.pdf' && i.parent === 'docCertifications',
+    );
 
     it('seeds one .pdf per certification that has one', () => {
         expect(certs.length).toBeGreaterThan(0);
-        const pdfs = items.filter(
-            (i) => i.ext === '.pdf' && i.parent === 'p2FolderCertifications',
-        );
         expect(pdfs).toHaveLength(certs.length);
     });
 
-    it('names each PDF after its certification, so the two sit together', () => {
+    it('names each PDF after its certification', () => {
         for (const cert of certs) {
-            const pdf = items.find((i) => i.name === `${cert.title}.pdf`);
+            const pdf = pdfs.find((i) => i.name === `${cert.title}.pdf`);
             expect(pdf, `no seeded PDF for ${cert.title}`).toBeDefined();
             expect(pdf?.url).toBe(cert.pdf);
             expect(pdf?.storage_type).toBe('remote');
         }
     });
 
-    it('lists them in the Certifications folder', () => {
+    it('hangs the section off My Documents, not the C: root', () => {
+        expect(built.document_section_ids).toEqual(['docCertifications']);
+        const section = built.items['docCertifications'];
+        expect(section?.parent).toBe('MyDocuments'); // the injected default
+        expect(section?.children).toHaveLength(pdfs.length);
+    });
+
+    it('leaves the portfolio Certifications folder holding only its entries', () => {
         const folder = built.items['p2FolderCertifications'];
-        const pdfs = items.filter(
-            (i) => i.ext === '.pdf' && i.parent === 'p2FolderCertifications',
-        );
-        for (const pdf of pdfs) {
-            expect(folder?.children).toContain(pdf.id);
+        expect(folder?.children).toHaveLength(profile.certifications.length);
+        for (const id of folder?.children ?? []) {
+            expect(built.items[id]?.ext).toBe('.txt');
         }
-        // entries AND credentials, not one or the other
-        expect(folder?.children).toHaveLength(
-            profile.certifications.length + pdfs.length,
-        );
     });
 
     /*
@@ -199,17 +199,96 @@ describe('certificate PDFs', () => {
      * `portfolio_ref` lookups walk. A PDF carries no ref.
      */
     it('does not count them as portfolio entries', () => {
-        const pdfIds = items.filter((i) => i.ext === '.pdf').map((i) => i.id);
-        for (const id of pdfIds) {
-            expect(built.entry_ids).not.toContain(id);
+        for (const pdf of pdfs) {
+            expect(built.entry_ids).not.toContain(pdf.id);
         }
     });
 
     it('reports the size it was given rather than a guess', () => {
-        const pdf = items.find(
-            (i) => i.ext === '.pdf' && i.parent === 'p2FolderCertifications',
+        expect(pdfs[0]?.size).toBe(42);
+    });
+});
+
+describe('My Pictures — the galleries as real files', () => {
+    const built = build_portfolio(profile, () => 7);
+    const items = Object.values(built.items);
+    const section_of = (name: string) =>
+        built.picture_section_ids
+            .map((id) => built.items[id])
+            .find((f) => f?.name === name);
+
+    it('groups by section, then by item, then the files', () => {
+        const projects = section_of('Projects');
+        expect(projects).toBeDefined();
+        expect(projects?.parent).toBe('MyPictures'); // the injected default
+
+        // the example the owner asked for: My Pictures/Projects/EUC RAG Agent
+        const euc = (projects?.children ?? [])
+            .map((id) => built.items[id])
+            .find((f) => f?.name === 'EUC RAG Agent');
+        expect(euc, 'no EUC RAG Agent folder').toBeDefined();
+        expect(euc?.type).toBe('folder');
+        const files = (euc?.children ?? []).map((id) => built.items[id]);
+        expect(files.length).toBeGreaterThan(0);
+        for (const f of files) {
+            expect(f?.type).toBe('file');
+            expect(f?.storage_type).toBe('remote');
+            expect(f?.url?.startsWith('/assets/')).toBe(true);
+        }
+    });
+
+    it('gives every item with pictures a folder, and no others one', () => {
+        const withImages = profile.projects.filter((p) => p.images.length > 0);
+        const projects = section_of('Projects');
+        expect(projects?.children).toHaveLength(withImages.length);
+        // Printerpix has no media on LinkedIn; an empty folder would promise
+        // what the drive cannot deliver.
+        const experience = section_of('Experience');
+        const names = (experience?.children ?? []).map(
+            (id) => built.items[id]?.name,
         );
-        expect(pdf?.size).toBe(42);
+        expect(names.some((n) => n?.startsWith('Printerpix'))).toBe(false);
+    });
+
+    it('skips sections that have no pictures at all', () => {
+        // education/awards/certifications carry no images today
+        expect(built.picture_section_ids).toEqual([
+            'picExperience',
+            'picProjects',
+        ]);
+    });
+
+    it('names files from the alt text, numbering repeats', () => {
+        const bemo = items.find(
+            (i) => i.type === 'folder' && i.name.startsWith('BeMo'),
+        );
+        const names = (bemo?.children ?? []).map((id) => built.items[id]?.name);
+        // three images share the caption "BeMo at the 2025 project discussion"
+        expect(names).toContain('BeMo at the 2025 project discussion.jpg');
+        expect(names).toContain('BeMo at the 2025 project discussion (2).jpg');
+        // a duplicate sibling name breaks clone_fs/create_shortcut's
+        // unique-name assumption, so there must be none
+        expect(new Set(names).size).toBe(names.length);
+    });
+
+    it('points at the same static files the galleries render, duplicating no bytes', () => {
+        const urls = new Set(
+            items.filter((i) => i.parent?.startsWith('pic')).map((i) => i.url),
+        );
+        for (const p of profile.projects) {
+            for (const img of p.images) expect(urls).toContain(img.src);
+        }
+    });
+
+    it('reports the size it was given', () => {
+        const file = items.find((i) => i.ext === '.jpg');
+        expect(file?.size).toBe(7);
+    });
+
+    it('adds no picture file to the portfolio entry ids', () => {
+        for (const i of items.filter((x) => x.ext === '.jpg')) {
+            expect(built.entry_ids).not.toContain(i.id);
+        }
     });
 });
 
