@@ -976,3 +976,110 @@ describe('merge_on_reseed reaps retired ids with no snapshot at all', () => {
         expect(merged['unlisted']).toBeUndefined();
     });
 });
+
+/*
+ * AN ID THAT LEFT THE SEED AND CAME BACK.
+ *
+ * The snapshot only remembers the LAST seed the visitor received. So when an
+ * id drops out, `previous[id]` goes with it — and when a later seed brings the
+ * id back, `{ ...seed }` replaced the record wholesale with nothing to compare
+ * against. A wallpaper the visitor had painted over silently reverted, and
+ * since no `del_fs` ran, `free_blob` never freed the blob: it sat in
+ * IndexedDB referenced by nothing, forever.
+ *
+ * Found by the red team on the retired-id ledger. Ids really do leave and
+ * return — two did in `d5b2ff3` when an array reindexed.
+ */
+describe('merge_on_reseed keeps the visitor bytes on an id that returns', () => {
+    const C = 'c_drive';
+    const WALLPAPER = 'seed_wallpaper';
+
+    /** The seed they last received: the wallpaper had been dropped from it. */
+    const seed_without = drive(item({ id: C, type: 'folder', children: [] }));
+    /** The seed today: it is back, pointing at a shipped asset again. */
+    const seed_with = drive(
+        item({ id: C, type: 'folder', children: [WALLPAPER] }),
+        item({
+            id: WALLPAPER,
+            name: 'Bliss.jpg',
+            parent: C,
+            storage_type: 'remote',
+            url: '/images/xp/Bliss.jpg',
+        }),
+    );
+    /** Their drive: they painted over it while it was theirs alone. */
+    const painted = (): HardDrive =>
+        drive(
+            item({ id: C, type: 'folder', children: [WALLPAPER] }),
+            item({
+                id: WALLPAPER,
+                name: 'Bliss.jpg',
+                parent: C,
+                storage_type: 'local',
+                url: 'their-idb-blob-key',
+            }),
+        );
+
+    it('keeps their bytes instead of reverting to the shipped file', () => {
+        const merged = merge_on_reseed(
+            painted(),
+            seed_with,
+            snapshot_seed_fields(seed_without),
+        );
+        expect(merged[WALLPAPER]?.storage_type).toBe('local');
+        expect(merged[WALLPAPER]?.url).toBe('their-idb-blob-key');
+    });
+
+    it('takes the rest of the record from the new seed', () => {
+        // only the bytes are theirs: a name or a sort order cannot be told
+        // apart from a seed's own change across the gap
+        const renamed_by_seed = drive(
+            item({ id: C, type: 'folder', children: [WALLPAPER] }),
+            item({
+                id: WALLPAPER,
+                name: 'Bliss (2).jpg',
+                parent: C,
+                storage_type: 'remote',
+                url: '/images/xp/Bliss.jpg',
+            }),
+        );
+        const merged = merge_on_reseed(
+            painted(),
+            renamed_by_seed,
+            snapshot_seed_fields(seed_without),
+        );
+        expect(merged[WALLPAPER]?.name).toBe('Bliss (2).jpg');
+        expect(merged[WALLPAPER]?.url).toBe('their-idb-blob-key');
+    });
+
+    it('leaves a returning id they never touched to the seed', () => {
+        const untouched = drive(
+            item({ id: C, type: 'folder', children: [WALLPAPER] }),
+            item({
+                id: WALLPAPER,
+                name: 'Bliss.jpg',
+                parent: C,
+                storage_type: 'remote',
+                url: '/old/path.jpg',
+            }),
+        );
+        const merged = merge_on_reseed(
+            untouched,
+            seed_with,
+            snapshot_seed_fields(seed_without),
+        );
+        expect(merged[WALLPAPER]?.storage_type).toBe('remote');
+        expect(merged[WALLPAPER]?.url).toBe('/images/xp/Bliss.jpg');
+    });
+
+    it('does not invent bytes for content that is new to them', () => {
+        // the same `previous[id] == null` shape, but they have no copy at all
+        const merged = merge_on_reseed(
+            drive(item({ id: C, type: 'folder', children: [] })),
+            seed_with,
+            snapshot_seed_fields(seed_without),
+        );
+        expect(merged[WALLPAPER]?.storage_type).toBe('remote');
+        expect(merged[WALLPAPER]?.url).toBe('/images/xp/Bliss.jpg');
+    });
+});
