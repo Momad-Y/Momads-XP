@@ -93,6 +93,36 @@ test('double-clicking a song opens the Music Player on THAT song', async ({
     // And the clicked track — NOT the first track in the library, which is
     // what the old fallback played.
     await expect(now_playing(page)).toHaveText('Wailli');
+    // AND it plays. Opening a song means play it; it used to sit paused,
+    // waiting to be told again.
+    await expect
+        .poll(async () =>
+            page.locator('audio').evaluate((el: HTMLAudioElement) => el.paused),
+        )
+        .toBe(false);
+    await expect(page.getByTestId('play-pause')).toHaveText('⏸');
+});
+
+test('opening the player from the Start menu does NOT start playing', async ({
+    page,
+}) => {
+    // The other half of the rule: launching the program is "show me my
+    // music", launching a FILE is "play this". Blasting audio at someone who
+    // opened the app from the Start menu is the behaviour everyone hates.
+    await page.locator('#start-menu-btn').click();
+    await page.locator('#start-menu').getByText('All Programs').hover();
+    const flyout = page.locator('#all-programs-flyout');
+    await expect(flyout).toBeVisible();
+    await flyout.getByText('Music Player', { exact: true }).click();
+    await expect(player(page)).toBeVisible({ timeout: 15_000 });
+    await page.waitForTimeout(1200);
+
+    expect(
+        await page
+            .locator('audio')
+            .evaluate((el: HTMLAudioElement) => el.paused),
+    ).toBe(true);
+    await expect(page.getByTestId('play-pause')).toHaveText('▶');
 });
 
 test('a second double-click switches the open player to that song', async ({

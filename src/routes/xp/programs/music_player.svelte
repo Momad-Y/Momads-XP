@@ -167,7 +167,13 @@
         // launcher adds this instance to `runningPrograms` before Svelte has
         // flushed `onMount` — so a selection that already happened wins.
         if (current_id != null) return;
-        if (flat.length > 0) void select(initial_id(), false);
+        // Autoplay ONLY when a file was double-clicked. Opening the player
+        // from the Start menu is "show me my music", not "start playing at
+        // me"; opening a song is unambiguously "play this". The double-click
+        // is the user gesture that makes it allowed — and the visitor has
+        // certainly interacted with the page by then, which is what the
+        // autoplay policy actually checks before resuming an AudioContext.
+        if (flat.length > 0) void select(initial_id(), fs_item != null);
         if (fs_item != null) window?.update_title(fs_item.name);
     });
 
@@ -395,10 +401,26 @@
         if (audio == null) return;
         if (audio.paused) {
             ensure_graph();
-            void audio.play();
+            start(audio);
         } else {
             audio.pause();
         }
+    }
+
+    /**
+     * Begin playback, tolerating a refusal.
+     *
+     * `play()` REJECTS when the browser declines — an autoplay policy block,
+     * or a source it cannot decode. `void play()` does not catch that, so it
+     * surfaced as an unhandled rejection; and now that opening a file plays it
+     * straight away, that path is reachable by an ordinary double-click rather
+     * than only by a deliberate click on the transport.
+     *
+     * A refusal is not an error state: the element stays paused, the button
+     * still reads Play, and the visitor presses it.
+     */
+    function start(element: HTMLAudioElement): void {
+        element.play().catch(() => undefined);
     }
 
     /**
@@ -435,7 +457,7 @@
         await tick();
         if (autoplay && audio != null) {
             ensure_graph();
-            void audio.play();
+            start(audio);
         }
     }
 
