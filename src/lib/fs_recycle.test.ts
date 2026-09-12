@@ -251,3 +251,60 @@ describe('restoring an upload keeps its bytes', () => {
         expect(del).toHaveBeenCalledWith('blob-key-1');
     });
 });
+
+describe('restore_origin_known', () => {
+    it('is true for an entry recycled the normal way', () => {
+        fs.recycle_fs('song');
+        expect(fs.restore_origin_known(bin_children()[0] ?? '')).toBe(true);
+    });
+
+    /*
+     * The reported bug. Before `recycle_fs` existed, deleting was a plain
+     * clone into the bin, so entries from back then carry no breadcrumbs at
+     * all. They can only land on the Desktop — and the menu asks first rather
+     * than doing it silently.
+     */
+    it('is false for a legacy entry with no breadcrumbs', () => {
+        fs.recycle_fs('song');
+        const clone_id = bin_children()[0] ?? '';
+        hardDrive.update((d) => {
+            const data = d ?? {};
+            const clone = data[clone_id];
+            if (clone == null) return data;
+            const stripped = { ...clone };
+            delete stripped.restore_id;
+            delete stripped.restore_parent;
+            delete stripped.restore_name;
+            return { ...data, [clone_id]: stripped };
+        });
+
+        expect(fs.restore_origin_known(clone_id)).toBe(false);
+    });
+
+    it('is true when the folder is gone but its own clone is in the bin', () => {
+        fs.recycle_fs('song');
+        fs.recycle_fs('genre');
+        expect(fs.restore_origin_known(bin_children()[0] ?? '')).toBe(true);
+    });
+
+    it('is false when the folder was destroyed outright', () => {
+        fs.recycle_fs('song');
+        const clone_id = bin_children()[0] ?? '';
+        fs.del_fs('genre');
+        expect(fs.restore_origin_known(clone_id)).toBe(false);
+    });
+
+    it('is false for an id that is not there', () => {
+        expect(fs.restore_origin_known('nope')).toBe(false);
+    });
+
+    /* The predicate must agree with what restoring actually does. */
+    it('agrees with where the restore lands', () => {
+        fs.recycle_fs('song');
+        const clone_id = bin_children()[0] ?? '';
+        expect(fs.restore_origin_known(clone_id)).toBe(true);
+        const restored = fs.restore_fs(clone_id) ?? '';
+        expect(drive()[restored]?.parent).toBe('genre');
+        expect(drive()[restored]?.parent).not.toBe(desktop_folder);
+    });
+});

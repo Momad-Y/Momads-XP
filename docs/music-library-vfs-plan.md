@@ -323,3 +323,31 @@ were hardened at the same time: the "playing track was deleted" guard now asks
 `flat` directly instead of reading the derived `index`, because legacy blocks
 run in source order rather than dependency order, so a guard reading another
 block's result can act on a stale value. Recorded in CLAUDE.md's known traps.
+
+## Follow-up — Restore's Desktop fallback had to stop being silent
+
+Reported after the feature landed: *"Restoring a file from the recycle bin goes
+to the desktop not its original location."*
+
+Reproduced, and the cause is narrow. Restore puts an item back using the
+breadcrumbs `recycle_fs` stamps on it. **Entries recycled before this feature
+existed have none** — deleting was a plain `clone_fs` into the bin — so their
+origin is unrecoverable and they fall to step 3, the Desktop. Any bin that
+predates the feature is full of them, which is why it read as broken.
+
+Confirmed it is a CLOSED population: Paste is excluded from the Recycle Bin in
+both the item menu and the void menu (`CMFSVoid.ts:102`), and `recycle_fs` is
+now the only way in, so no new un-stamped entry can be created. It shrinks to
+nothing as bins are emptied.
+
+There is no migration to write. The seed would know where a seeded file
+belongs, but `starting.svelte` only fetches it when `SEED_VERSION` changes, so
+it is not in memory to consult — and `hard_drive_seed_fields`, which IS
+persisted, deliberately does not carry `parent`.
+
+So the fix is to stop guessing silently. `plan_restore` was split out of
+`restore_target` as a side-effect-free resolver, `restore_origin_known` asks it
+"could this go home?", and the menu confirms first when the answer is no:
+*"Windows cannot determine the original location of X. Restore to the Desktop
+instead?"* One resolver, two callers — two hand-written copies would drift, and
+the drifted one would be what silently moved a file.
