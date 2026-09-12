@@ -58,7 +58,7 @@ test('All Programs flyout lists the programs and the Games flyout', async ({
         'Command Prompt',
         'Python',
         'Paint',
-        'Music Player',
+        'Windows Media Player',
         // Missing for as long as the video player has existed. The list is now
         // derived from src/lib/start_menu_programs.ts, whose unit test walks
         // the programs folder and fails on any component that is neither

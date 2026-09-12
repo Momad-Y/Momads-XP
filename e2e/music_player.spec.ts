@@ -57,7 +57,7 @@ async function openPlayer(page: Page) {
     await page.locator('#start-menu').getByText('All Programs').hover();
     const flyout = page.locator('#all-programs-flyout');
     await expect(flyout).toBeVisible();
-    await flyout.getByText('Music Player', { exact: true }).click();
+    await flyout.getByText('Windows Media Player', { exact: true }).click();
     await expect(page.getByTestId('play-pause')).toBeVisible({
         timeout: 15_000,
     });
@@ -216,7 +216,7 @@ test('is a singleton — it owns the audio output', async ({ page }) => {
     await page.locator('#start-menu').getByText('All Programs').hover();
     await page
         .locator('#all-programs-flyout')
-        .getByText('Music Player', { exact: true })
+        .getByText('Windows Media Player', { exact: true })
         .click();
     await expect(page.locator('#work-space .window')).toHaveCount(1);
 });

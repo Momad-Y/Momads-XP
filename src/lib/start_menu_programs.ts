@@ -86,7 +86,11 @@ export const ALL_PROGRAMS: ProgramEntry[] = [
         path: './programs/paint.svelte',
     },
     {
-        name: 'Music Player',
+        // "Windows Media Player", matching its own title bar, its Open With
+        // entry and the taskbar — and XP's real Start menu. It read "Music
+        // Player" here alone, so clicking it opened a window with a different
+        // name on it.
+        name: 'Windows Media Player',
         icon: '/images/xp/icons/WindowsMediaPlayer9.png',
         path: './programs/music_player.svelte',
     },

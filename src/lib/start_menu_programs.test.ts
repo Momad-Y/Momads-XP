@@ -121,3 +121,52 @@ describe('the entries themselves', () => {
         expect(paths).toHaveLength(new Set(paths).size);
     });
 });
+
+describe('a program has ONE name', () => {
+    /*
+     * The music player read "Music Player" in this menu while its title bar,
+     * its Open With entry and its taskbar button all read "Windows Media
+     * Player" — so clicking one name opened a window wearing another.
+     *
+     * Asserted for the two media players specifically rather than for every
+     * entry, because three entries differ from their program name on purpose
+     * and a blanket rule would be a lie:
+     *   - "My CV" is a CONTENT label; it opens the résumé through the PDF
+     *     viewer, whose own name is "PDF Viewer".
+     *   - "Internet Explorer" is what XP's Start menu says; Open With uses the
+     *     full "Microsoft Internet Explorer".
+     *   - "Command Prompt" is the program; `momad@xp:~` is the shell prompt it
+     *     shows in its title bar, which is the joke.
+     */
+    const label_of = (path: string): string | undefined =>
+        ALL_PROGRAMS.find((entry) => entry.path === path)?.name;
+
+    it('names the music player the same everywhere', async () => {
+        const { doctypes } = await import('./system');
+        const { find_app } = await import('./app_registry');
+        const path = './programs/music_player.svelte';
+
+        const menu = label_of(path);
+        const open_with = (doctypes['.mp3'] ?? []).find(
+            (handler) => handler.path === path,
+        )?.name;
+        const window_title = find_app(path)?.title;
+
+        expect(menu).toBe('Windows Media Player');
+        expect(open_with).toBe(menu);
+        expect(window_title).toBe(menu);
+    });
+
+    it('names the video player the same everywhere', async () => {
+        const { doctypes } = await import('./system');
+        const path = './programs/media_player_classic.svelte';
+
+        const menu = label_of(path);
+        const open_with = (doctypes['.mp4'] ?? []).find(
+            (handler) => handler.path === path,
+        )?.name;
+
+        expect(menu).toBe('Media Player Classic');
+        expect(open_with).toBe(menu);
+    });
+});

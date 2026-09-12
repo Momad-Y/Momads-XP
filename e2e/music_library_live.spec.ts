@@ -49,7 +49,7 @@ async function openPlayer(page: Page): Promise<Locator> {
     await page.locator('#start-menu').getByText('All Programs').hover();
     const flyout = page.locator('#all-programs-flyout');
     await expect(flyout).toBeVisible();
-    await flyout.getByText('Music Player', { exact: true }).click();
+    await flyout.getByText('Windows Media Player', { exact: true }).click();
     const win = player(page);
     await expect(win).toBeVisible({ timeout: 15_000 });
     await page.waitForTimeout(400);
