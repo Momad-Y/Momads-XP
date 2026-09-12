@@ -11,6 +11,7 @@
  * `(args, profile) => string[]`, the property that whole file is built around.
  */
 import { resolve_portfolio_ref } from '../portfolio';
+import { find_document } from '../portfolio_sections';
 import type { HardDrive, VfsItem } from '../types';
 import {
     accent,
@@ -146,10 +147,15 @@ function run_pwd(drive: HardDrive, cwd: string): FsResult {
  * so `cat` and the block commands are one rendering rather than two that
  * drift.
  */
-function portfolio_lines(item: VfsItem): string[] | null {
+function portfolio_lines(item: VfsItem, drive: HardDrive): string[] | null {
     const ref = item.portfolio_ref;
     if (ref == null) return null;
-    const detail = resolve_portfolio_ref(ref);
+    // `~/My Documents/…`, not `My Documents\…`: a path the visitor can paste
+    // straight back into this shell — and nothing at all once they delete it
+    const detail = resolve_portfolio_ref(ref, (file_name) => {
+        const id = find_document(drive, file_name);
+        return id == null ? null : display_path(id, drive);
+    });
     // Null when profile.json and the generated VFS have drifted apart; fall
     // through to the generic description rather than printing a blank.
     if (detail == null) return null;
@@ -231,7 +237,7 @@ function run_cat(rest: string, drive: HardDrive, cwd: string): FsResult {
     if (target.id === ROOT || item == null || is_dir(item)) {
         return { lines: [`cat: ${path}: Is a directory`] };
     }
-    const portfolio = portfolio_lines(item);
+    const portfolio = portfolio_lines(item, drive);
     if (portfolio != null) return { lines: portfolio, blank_after: true };
 
     // A file the visitor actually owns. Its bytes are in IndexedDB, so the

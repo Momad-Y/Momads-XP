@@ -41,6 +41,35 @@ async function enterC(
     await expect(win.getByText('CV.pdf')).toBeVisible();
 }
 
+const DELETABLE_FILE = 'New Text Document.txt';
+
+/**
+ * Enter `C:\` and MAKE a file the visitor is allowed to delete.
+ *
+ * `C:\` ships none any more: every portfolio folder is protected, so are the
+ * shell folders, and `CV.pdf` joined them when the owner asked for the résumé
+ * to be undeletable — these two tests used to reach for it. They need a
+ * genuinely DELETABLE item (a protected one is dropped by `plan_delete` before
+ * the dialog it is testing ever appears, which would make them vacuous rather
+ * than red), and creating one through Explorer's own New ▸ Text Document ties
+ * them to nothing in the seed at all — so the next content change cannot
+ * quietly hollow them out the way this one did.
+ */
+async function enterCWithADeletableFile(
+    win: Locator,
+    { first_entry }: { first_entry: boolean },
+): Promise<void> {
+    await enterC(win, { first_entry });
+    // File ▸ New ▸ Text Document, the same route `file_menu_safety.spec.ts`
+    // uses to get itself a file it is allowed to touch
+    await win.locator('.toolbar-menu').getByText('File').click();
+    await win.locator('p', { hasText: /^New$/ }).first().hover();
+    await win.getByText('Text Document').click();
+    await expect(win.getByText(DELETABLE_FILE)).toBeVisible({
+        timeout: 15000,
+    });
+}
+
 async function openMenu(win: Locator, name: string): Promise<void> {
     await win.locator('.toolbar-menu').getByText(name, { exact: true }).click();
 }
@@ -131,15 +160,15 @@ test('a desktop selection is not deleted by an Explorer right-click', async ({
     // from under the file we just made
     await page.locator('#work-space p', { hasText: 'My Computer' }).dblclick();
     const win = page.locator('#work-space .window').first();
-    await enterC(win, { first_entry: true });
+    await enterCWithADeletableFile(win, { first_entry: true });
 
     // the selection has to be made AFTER the window mounts — mounting a viewer
     // clears the global selection, which is what made earlier attempts vacuous
     await desktop_file.click();
-    await win.getByText('CV.pdf').click({ modifiers: ['Control'] });
+    await win.getByText(DELETABLE_FILE).click({ modifiers: ['Control'] });
 
     // right-click Delete in Explorer must act on Explorer's item alone
-    await win.getByText('CV.pdf').click({ button: 'right' });
+    await win.getByText(DELETABLE_FILE).click({ button: 'right' });
     await page.locator('.context-menu').getByText('Delete').click();
     const prompt = win.locator('.dialog');
     await expect(prompt).toBeVisible();
@@ -149,7 +178,7 @@ test('a desktop selection is not deleted by an Explorer right-click', async ({
     await prompt.getByText('OK').click();
     await expect(prompt).toBeHidden();
     // the Explorer file went …
-    await expect(win.getByText('CV.pdf')).toHaveCount(0);
+    await expect(win.getByText(DELETABLE_FILE)).toHaveCount(0);
     // … and the desktop file, which the user never targeted, survived
     await expect(
         page.locator('#work-space p', { hasText: 'New Text Document.txt' }),
@@ -237,8 +266,8 @@ test('F5 does not refresh underneath the DELETE confirmation', async ({
     // the new guard is the DOM query that covers the dialogs which mount into
     // the window and set no flag. This is one of those.
     const win = await openMyComputer(page);
-    await enterC(win, { first_entry: true });
-    await win.getByText('CV.pdf').click();
+    await enterCWithADeletableFile(win, { first_entry: true });
+    await win.getByText(DELETABLE_FILE).click();
     await openMenu(win, 'File');
     await menuRow(win, 'Delete').click();
     const prompt = win.locator('.dialog');
@@ -252,7 +281,7 @@ test('F5 does not refresh underneath the DELETE confirmation', async ({
     // and Escape is Cancel here, as on any XP dialog
     await page.keyboard.press('Escape');
     await expect(prompt).toBeHidden();
-    await expect(win.getByText('CV.pdf')).toBeVisible();
+    await expect(win.getByText(DELETABLE_FILE)).toBeVisible();
 });
 
 test('Escape does NOT close an Explorer Bar — that was never XP', async ({

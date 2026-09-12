@@ -17,7 +17,16 @@ vi.mock('idb-keyval', () => ({
 
 import { get } from 'svelte/store';
 import { hardDrive } from './store';
-import { recycle_bin_id, desktop_folder, protected_items } from './system';
+import {
+    recycle_bin_id,
+    desktop_folder,
+    my_cv_desktop_exe,
+    protected_items,
+} from './system';
+import { readFileSync } from 'node:fs';
+import { RESUME_FILE_ID } from './generated/vfs_ids';
+import { DOCUMENTS_FOLDER_ID } from './portfolio_sections';
+import { to_hard_drive } from './types';
 import type { HardDrive, VfsItem } from './types';
 
 function node(id: string, over: Partial<VfsItem> = {}): VfsItem {
@@ -306,5 +315,59 @@ describe('restore_origin_known', () => {
         const restored = fs.restore_fs(clone_id) ?? '';
         expect(drive()[restored]?.parent).toBe('genre');
         expect(drive()[restored]?.parent).not.toBe(desktop_folder);
+    });
+});
+
+/*
+ * WHAT THE VISITOR MAY NOT DELETE.
+ *
+ * Stated as a list rather than left to whoever edits `protected_items` next.
+ * The rule the owner set: the portfolio IS the product, so the entry text and
+ * the résumé are his; everything else — the gallery pictures, the certificate
+ * PDFs, the other desktop shortcuts — is the visitor's to bin, because those
+ * are copies and deleting one costs nothing.
+ *
+ * The CV was NOT on this list until he asked for it, which meant the one
+ * document the whole site exists to hand over could be dragged to the bin —
+ * and the re-seed tombstone pass would then keep it deleted forever after.
+ */
+describe('what protection covers', () => {
+    const drive_seed = to_hard_drive(
+        JSON.parse(readFileSync('static/json/hard_drive.json', 'utf-8')),
+    );
+    const guarded = new Set(protected_items);
+    const name_of = (id: string): string => drive_seed[id]?.name ?? id;
+
+    it('protects the CV — the file and the desktop icon that opens it', () => {
+        for (const id of [RESUME_FILE_ID, my_cv_desktop_exe]) {
+            expect(drive_seed[id], `${id} is not in the seed`).toBeDefined();
+            expect(guarded.has(id), `${name_of(id)} is deletable`).toBe(true);
+        }
+    });
+
+    it('protects every portfolio entry and folder', () => {
+        const entries = Object.values(drive_seed).filter(
+            (i) => i.portfolio_ref != null,
+        );
+        expect(entries.length).toBeGreaterThan(20);
+        for (const entry of entries) {
+            expect(guarded.has(entry.id), entry.name).toBe(true);
+        }
+    });
+
+    it('leaves the visitor their own copies to delete', () => {
+        // pictures and credential PDFs are seeded COPIES of assets the entry
+        // text renders from profile.json regardless — binning one loses the
+        // visitor nothing, and pretending otherwise would make My Pictures a
+        // read-only museum
+        const deletable = Object.values(drive_seed).filter(
+            (i) =>
+                (i.id.startsWith('pic') || i.id.startsWith('doc')) &&
+                i.id !== DOCUMENTS_FOLDER_ID,
+        );
+        expect(deletable.length).toBeGreaterThan(50);
+        for (const item of deletable) {
+            expect(guarded.has(item.id), item.name).toBe(false);
+        }
     });
 });

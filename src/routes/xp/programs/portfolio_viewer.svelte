@@ -4,7 +4,10 @@
     import Window from '../../../lib/components/xp/Window.svelte';
     import { onMount, unmount } from 'svelte';
     import * as fs from '../../../lib/fs';
-    import { runningPrograms } from '../../../lib/store';
+    import { hardDrive, runningPrograms } from '../../../lib/store';
+    import { get } from 'svelte/store';
+    import * as finder from '../../../lib/finder';
+    import { find_document } from '../../../lib/portfolio_sections';
     import { resolve_portfolio_ref } from '../../../lib/portfolio';
     import { required } from '../../../lib/types';
     import type {
@@ -25,10 +28,21 @@
     // injects the real prop value before this code runs)
     const item = fs_item as VfsItem | undefined;
 
+    /*
+     * Resolved once, when the file is opened — the way a property sheet in XP
+     * shows what was true when you opened it. The one drive-dependent part is
+     * where the credential's PDF lives, and that is read here rather than
+     * composed from a constant: the visitor can delete that PDF (it is not
+     * protected, deliberately) and can rename the folder holding it, and this
+     * entry used to keep naming a path that no longer existed.
+     */
     const detail =
         item?.portfolio_ref == null
             ? null
-            : resolve_portfolio_ref(item.portfolio_ref);
+            : resolve_portfolio_ref(item.portfolio_ref, (file_name) => {
+                  const found = find_document(get(hardDrive) ?? {}, file_name);
+                  return found == null ? null : finder.to_url(found);
+              });
 
     let expanded_image: string | null = null;
 
