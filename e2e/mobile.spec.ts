@@ -2,14 +2,15 @@ import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { FIRST_SKILL_GROUP, OWNER_NAME } from './helpers';
 
-/** Content, read rather than spelled — the project list changes with the CV. */
-const FIRST_PROJECT = String(
-    (
-        JSON.parse(readFileSync('src/lib/data/profile.json', 'utf8')) as {
-            projects: { name: string }[];
-        }
-    ).projects[0]?.name,
-);
+/** Content, read rather than spelled — these lists change with the CV. */
+const content = JSON.parse(
+    readFileSync('src/lib/data/profile.json', 'utf8'),
+) as {
+    projects: { name: string }[];
+    certificatesAndAwards: { title: string }[];
+};
+const FIRST_PROJECT = String(content.projects[0]?.name);
+const FIRST_CREDENTIAL = String(content.certificatesAndAwards[0]?.title);
 
 test.describe('mobile portrait (390x844)', () => {
     test.use({ viewport: { width: 390, height: 844 } });
@@ -37,6 +38,15 @@ test.describe('mobile portrait (390x844)', () => {
             page.getByText(FIRST_PROJECT, { exact: true }),
         ).toBeVisible();
         await expect(page.getByText(/coming soon/)).toHaveCount(0);
+
+        // the credentials, which the phone had no way to show at all before
+        // (it has no Explorer, so these accordions are the only route)
+        await page
+            .getByRole('button', { name: 'Certificates & Awards' })
+            .click();
+        await expect(
+            page.getByText(FIRST_CREDENTIAL, { exact: true }),
+        ).toBeVisible();
 
         // resume download + socials
         await expect(page.locator('a[download]')).toHaveAttribute(

@@ -170,10 +170,32 @@ describe('cat', () => {
     it('reaches an en-dash name, not just the em-dash ones', () => {
         const text = out(
             'cat',
-            '/c/Awards/1st Place – RoboCup @Home Education Competition (Egypt).txt',
+            '/c/Certificates & Awards/1st Place – RoboCup @Home Education Competition (Egypt).txt',
         );
         expect(text).toContain('RoboCup');
         expect(text).not.toContain('No such file');
+    });
+
+    it('lists and reads inside a folder whose name has an ampersand', () => {
+        /*
+         * The commands take the RAW remainder of the line (`remainder`), not
+         * `parse().args`, which is what makes an unquoted `&` — and the spaces
+         * either side of it — reach the resolver intact. A real cmd.exe would
+         * have split the line in three at the `&`.
+         */
+        const listed = out('ls', 'Certificates & Awards', C);
+        expect(listed).toContain('RoboCup');
+        expect(listed).not.toContain('No such file');
+
+        const text = out(
+            'cat',
+            'Certificates & Awards/Certificate of Excellence (AAST).txt',
+            C,
+        );
+        expect(text).toContain('Certificate of Excellence');
+        // the entry says where its own document is
+        expect(text).toContain('Certificates & Awards');
+        expect(text).toContain('.pdf');
     });
 
     it('describes a file it has no text for, with its size', () => {

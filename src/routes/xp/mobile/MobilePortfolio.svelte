@@ -1,12 +1,24 @@
 <script lang="ts">
     import { profile } from '../../../lib/profile';
+    import { SECTION_LABELS } from '../../../lib/portfolio_sections';
     import { required } from '../../../lib/types';
     import GitHubIcon from '../../../lib/components/icons/GitHubIcon.svelte';
     import LinkedInIcon from '../../../lib/components/icons/LinkedInIcon.svelte';
     import InstagramIcon from '../../../lib/components/icons/InstagramIcon.svelte';
 
+    /*
+     * The phone has no Explorer, so these accordions are the ONLY way to read
+     * the portfolio here — which is why Certificates & Awards is in the list
+     * even though the desktop's About Me window does not carry it: there, the
+     * folder is sitting in My Computer.
+     */
     type SectionName =
-        'About Me' | 'Experience' | 'Projects' | 'Skills' | 'Education';
+        | 'About Me'
+        | 'Experience'
+        | 'Projects'
+        | 'Skills'
+        | 'Education'
+        | 'Certificates & Awards';
 
     const sections: SectionName[] = [
         'About Me',
@@ -14,6 +26,7 @@
         'Projects',
         'Skills',
         'Education',
+        SECTION_LABELS.certificatesAndAwards,
     ];
 
     let open_section: SectionName | null = null;
@@ -162,7 +175,7 @@
                                     </div>
                                 </div>
                             {/each}
-                        {:else}
+                        {:else if section === 'Education'}
                             {#each profile.education as entry (entry.institution)}
                                 <div class="mb-3">
                                     <p
@@ -178,6 +191,21 @@
                                             ? ` · ${entry.honors}`
                                             : ''}
                                     </p>
+                                </div>
+                            {/each}
+                        {:else}
+                            {#each profile.certificatesAndAwards as credential (credential.title)}
+                                <div class="mb-3">
+                                    <p
+                                        class="text-[12px] font-bold text-slate-900"
+                                    >
+                                        {credential.title}
+                                    </p>
+                                    {#if credential.year !== ''}
+                                        <p class="text-[11px] text-slate-500">
+                                            {credential.year}
+                                        </p>
+                                    {/if}
                                 </div>
                             {/each}
                         {/if}

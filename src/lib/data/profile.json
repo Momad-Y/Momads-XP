@@ -122,11 +122,11 @@
             "images": [
                 {
                     "src": "/assets/images/experience/robocup-first-place-certificate.jpg",
-                    "alt": "First place certificate, RoboCup@Home Education 2024"
+                    "alt": "First place certificate, RoboCup@Home Education Egypt 2024"
                 },
                 {
                     "src": "/assets/images/experience/robocup-egypt-trophy.jpg",
-                    "alt": "RoboCup@Home Egypt 2024 trophy"
+                    "alt": "The RoboCup@Home Egypt 2024 trophy"
                 },
                 {
                     "src": "/assets/images/experience/robocup-egypt-team.jpg",
@@ -218,7 +218,7 @@
             ]
         }
     ],
-    "awards": [
+    "certificatesAndAwards": [
         {
             "title": "1st Place – RoboCup @Home Education Competition (Egypt)",
             "year": "2024",
@@ -247,7 +247,7 @@
                 },
                 {
                     "src": "/assets/images/experience/robocup-netherlands-ranking.jpg",
-                    "alt": "The major team ranking board, Netherlands 2024"
+                    "alt": "Major team ranking, RoboCup@Home Netherlands 2024"
                 },
                 {
                     "src": "/assets/images/experience/robocup-netherlands-team.jpg",
@@ -282,7 +282,7 @@
             ]
         },
         {
-            "title": "Certificate of Excellence – Graduation Honors",
+            "title": "Certificate of Excellence – Graduation Honors (AAST)",
             "year": "2025",
             "images": [
                 {
@@ -297,46 +297,17 @@
                     "src": "/assets/images/awards/graduation-2025-ceremony-2.jpg",
                     "alt": "In cap and gown with the graduation certificate"
                 }
-            ]
-        },
-        {
-            "title": "Certificate of Excellence",
-            "year": "2022",
-            "images": [
-                {
-                    "src": "/assets/images/certifications/certificate-of-excellence-2022.jpg",
-                    "alt": "College of Artificial Intelligence award for academic excellence, 2022"
-                }
-            ]
-        }
-    ],
-    "certifications": [
-        {
-            "title": "Certificate of Excellence – Graduation Honors (AAST, 2025)",
-            "images": [
-                {
-                    "src": "/assets/images/certifications/graduation-honors-2025.jpg",
-                    "alt": "Certificate of excellence for graduation honours, AAST 2025"
-                }
             ],
             "pdf": "/assets/certificates/graduation-honors-2025.pdf"
         },
         {
-            "title": "Certificate of Excellence (AAST, 2022)",
-            "images": [
-                {
-                    "src": "/assets/images/certifications/certificate-of-excellence-2022.jpg",
-                    "alt": "College of Artificial Intelligence award for academic excellence, 2022"
-                }
-            ],
-            "pdf": "/assets/certificates/certificate-of-excellence-2022.pdf"
-        },
-        {
-            "title": "IELTS Academic – Band 7.5 (IELTS Official, 2025)",
+            "title": "IELTS Academic – Band 7.5 (IELTS Official)",
+            "year": "2025",
             "images": []
         },
         {
-            "title": "Certificate of Achievement – Mentorness ML Internship (2024)",
+            "title": "Certificate of Achievement – Mentorness ML Internship",
+            "year": "2024",
             "images": [
                 {
                     "src": "/assets/images/certifications/mentorness-ml-internship-2024.jpg",
@@ -344,6 +315,17 @@
                 }
             ],
             "pdf": "/assets/certificates/mentorness-ml-internship-2024.pdf"
+        },
+        {
+            "title": "Certificate of Excellence (AAST)",
+            "year": "2022",
+            "images": [
+                {
+                    "src": "/assets/images/certifications/certificate-of-excellence-2022.jpg",
+                    "alt": "College of Artificial Intelligence award for academic excellence, 2022"
+                }
+            ],
+            "pdf": "/assets/certificates/certificate-of-excellence-2022.pdf"
         }
     ],
     "projects": [

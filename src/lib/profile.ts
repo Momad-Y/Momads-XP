@@ -63,22 +63,31 @@ export interface EducationEntry {
     images: ProfileImage[];
 }
 
-export interface Award {
+/**
+ * A credential: something won or something held.
+ *
+ * ONE type, because `Award` and `Certification` described the same things.
+ * Two of the nine entries across the old `awards` and `certifications` arrays
+ * were literally the same credential filed twice — the graduation honours and
+ * the 2022 certificate of excellence — one copy carrying the PDF and the other
+ * the ceremony photos. `Award` had a `year` and no document; `Certification` a
+ * document and no year, with the year baked into its title instead. The merged
+ * record simply has both, and every entry says which it has.
+ */
+export interface CertificateOrAward {
     title: string;
+    /** Empty for a credential with no date — the honorary award has none. */
     year: string;
-    images: ProfileImage[];
-}
-
-export interface Certification {
-    title: string;
     images: ProfileImage[];
     /**
      * The credential itself, as a PDF under `static/`.
      *
-     * Seeded as a REAL FILE beside the entry's `.txt` in the Certifications
-     * folder (see `vfs_gen/build.ts`), so double-clicking it opens the PDF
-     * viewer exactly as the CV does — a certificate nobody can read is not a
-     * credential. Optional: a certification may have no document.
+     * Seeded as a REAL FILE under `My Documents/Certificates & Awards/` (see
+     * `vfs_gen/build.ts`), so double-clicking it opens the PDF viewer exactly
+     * as the CV does — a certificate nobody can read is not a credential. The
+     * entry's own `.txt` prints that path (`portfolio.ts`) so the document is
+     * findable from the text. Optional: four of the seven have no document,
+     * and an award may never have one.
      */
     pdf?: string;
 }
@@ -318,8 +327,7 @@ export interface Profile {
     experience: ExperienceEntry[];
     education: EducationEntry[];
     skills: Record<string, string[]>;
-    awards: Award[];
-    certifications: Certification[];
+    certificatesAndAwards: CertificateOrAward[];
     projects: Project[];
     languages: LanguageEntry[];
     systemProperties: ProfileSystemProperties;

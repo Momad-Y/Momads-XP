@@ -4,7 +4,7 @@
  * SYNTHESISED from `profile.json`, not mirrored from the VFS, for two reasons
  * the spec records (`docs/python-fs-spec.md` D-F1):
  *
- *  1. There is nothing to mirror. The 28 portfolio `.txt` items in the seed
+ *  1. There is nothing to mirror. The portfolio `.txt` items in the seed
  *     carry no `storage_type` and no `url` — they are pointers into
  *     `profile.json`, not files with bytes.
  *  2. Mirroring the whole drive would ship the VISITOR's own uploads into a

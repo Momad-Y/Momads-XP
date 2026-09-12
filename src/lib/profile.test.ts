@@ -287,8 +287,7 @@ describe('profile content cannot produce an unreachable VFS name', () => {
         ...profile.experience.map((e) => `${e.company} — ${e.role}`),
         ...profile.projects.map((p) => p.name),
         ...profile.education.map((e) => e.institution),
-        ...profile.awards.map((a) => a.title),
-        ...profile.certifications.map((c) => c.title),
+        ...profile.certificatesAndAwards.map((c) => c.title),
         ...Object.keys(profile.skills),
     ];
 

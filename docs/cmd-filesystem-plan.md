@@ -221,7 +221,7 @@ CLAIMED about the shipped code:
   (`:287`, which would double-list once they are real entries), plus
   `complete.test.ts:3,91,104` and `registry.test.ts:4,169,178`.
 - The seed ships **two** dashes — em (U+2014) in the 6 Experience files, en
-  (U+2013) in the 9 Awards/Certifications files. The plan named only the em
+  (U+2013) in the Awards/Certifications files (now 7, merged into one folder — see `certificates-and-awards-plan.md`). The plan named only the em
   dash; a fixture or E2E typed from it matches nothing.
 - `F:` has no `letter` field. Drive segments key off `name`, not `letter`.
 - `complete.ts` canNOT already do this. `word_at` (`:76`) splits on the last
