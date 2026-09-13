@@ -98,6 +98,58 @@ describe('to_window_options', () => {
         expect('width' in options).toBe(false);
         expect('min_width' in options).toBe(false);
     });
+
+    it('defaults resizable to true for every app that does not ask', () => {
+        // The passthrough is additive: an app that declares nothing must come
+        // out exactly as it did before the field existed.
+        for (const existing of APP_REGISTRY) {
+            if (existing.resizable !== undefined) continue;
+            expect(
+                to_window_options(existing, 'i1').resizable,
+                `${existing.id} changed shape`,
+            ).toBe(true);
+        }
+    });
+
+    it('leaves the three windows that shipped before the field resizable', () => {
+        // Named rather than derived. The loop above skips anything that opts
+        // out, so on its own it would fall silent if a future change made a
+        // shipped window non-resizable by accident.
+        for (const path of [
+            './programs/cmd.svelte',
+            './programs/python.svelte',
+            './programs/music_player.svelte',
+        ]) {
+            const found = find_app(path);
+            expect(found, `${path} left the registry`).toBeDefined();
+            if (found == null) continue;
+            expect(to_window_options(found, 'i1').resizable).toBe(true);
+        }
+    });
+
+    it('lets an app opt out of resizing', () => {
+        // Minesweeper. XP's is a fixed window that snaps to the board, and
+        // `Window.svelte:179` only skips jQuery UI's resizable — which writes
+        // inline width/height itself, fighting the `style:width` binding —
+        // when this is false.
+        expect(
+            to_window_options(app({ resizable: false }), 'i1').resizable,
+        ).toBe(false);
+    });
+
+    it('passes aspect_ratio and maximize_btn through only when set', () => {
+        const plain = to_window_options(app(), 'i1');
+        expect('aspect_ratio' in plain).toBe(false);
+        expect('maximize_btn' in plain).toBe(false);
+
+        // DOOM: DOS video is 4:3, and a stretched frame looks wrong.
+        const doom = to_window_options(
+            app({ aspect_ratio: 4 / 3, maximize_btn: false }),
+            'i2',
+        );
+        expect(doom.aspect_ratio).toBeCloseTo(4 / 3);
+        expect(doom.maximize_btn).toBe(false);
+    });
 });
 
 describe('singleton_paths', () => {

@@ -3,3 +3,8 @@ Copyright (c) 2026 Mohamed Abdelnasser. All rights reserved.
 This portfolio website and its source code are provided for viewing only.
 Forking, redistribution, or commercial use is not permitted without 
 explicit written permission.
+
+Portions of this distribution are third-party components, each licensed
+separately and listed in LICENSE-third-party.md. The restrictions above do not
+apply to those components, and cannot: two of them are GPL-licensed, which
+forbids imposing further restrictions on the rights they grant.

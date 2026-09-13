@@ -1,0 +1,51 @@
+DOOM shareware (episode one) — id Software
+==========================================
+
+Copyright (C) id Software. DOOM is a trademark of id Software LLC.
+
+WHAT IS DISTRIBUTED HERE
+------------------------
+`doom.jsdos` is a container holding, byte for byte unmodified:
+
+    DOOM.EXE    709,905 bytes
+    DOOM1.WAD   4,196,020 bytes
+                MD5 f0cefca49926d00903cf57551d901abe
+
+Both come from the official DOOM 1.9 shareware distribution. Only episode
+one — the shareware episode — is included. The commercial episodes are not.
+
+THE GRANT THIS DISTRIBUTION RELIES ON
+-------------------------------------
+From id Software's Limited Use Software License Agreement, verbatim:
+
+    "you may make copies of the Software to give to other persons. You may
+    not charge or receive any consideration from any other person for the
+    receipt or use of the Software without receiving ID's prior written
+    consent."
+
+No consideration of any kind is charged or received for this copy.
+
+THE AMBIGUITY, STATED RATHER THAN GLOSSED
+-----------------------------------------
+The agreement above authorises copying but does not explicitly address
+extracting the WAD from its original archive, which is what placing it in an
+emulator bundle does. Debian's own `doom-wad-shareware` copyright file records
+the same observation — "the above license does not appear to grant
+distribution permission" — and resolves it with a statement from John Carmack
+of id Software:
+
+    "The DOOM shareware wad is freely distributable."
+
+That, together with Debian's and Ubuntu's long-standing distribution of the
+`doom-wad-shareware` package (which performs the same extraction and
+redistribution, and has passed their licence review), is the basis on which
+this file ships.
+
+This notice quotes the operative grant; it is not the complete agreement. The
+full text accompanies the original shareware archive, which remains available
+from the id Software shareware distribution and its mirrors.
+
+IF ID SOFTWARE TAKES A DIFFERENT VIEW
+-------------------------------------
+Delete `static/games/doom/` and remove the DOOM entry from the Start menu.
+Nothing else in this project depends on it.

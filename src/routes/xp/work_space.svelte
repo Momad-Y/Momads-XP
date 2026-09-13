@@ -145,14 +145,12 @@
     }
 
     async function launch_inner(program: ProgramLaunchRequest) {
-        const {
-            fs_item,
-            exe_item,
-            copying_obj,
-            target_folder_id,
-            path,
-            source,
-        } = program;
+        // `exe_item` stays on ProgramLaunchRequest — callers still set it —
+        // but nothing destructures it here any more: its only reader was the
+        // placeholder branch, removed when the last placeholder became a real
+        // program in Phase 4.
+        const { fs_item, copying_obj, target_folder_id, path, source } =
+            program;
 
         if (focus_existing(path, fs_item)) {
             return;
@@ -472,21 +470,6 @@
                     id: short.generate(),
                     fs_item: full_vfs_item(fs_item),
                     exec_path: path,
-                    get_self: () => program,
-                },
-            });
-            //add to program tray
-            runningPrograms.update((values) => {
-                return [...values, program];
-            });
-        } else if (path == './programs/placeholder.svelte') {
-            const Program = (await import('./programs/placeholder.svelte'))
-                .default;
-            const program: ProgramInstance = mount(Program, {
-                target: node_ref,
-                props: {
-                    id: short.generate(),
-                    fs_item: exe_item ?? fs_item,
                     get_self: () => program,
                 },
             });

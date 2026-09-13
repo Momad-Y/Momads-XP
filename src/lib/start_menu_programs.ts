@@ -31,17 +31,6 @@ export interface ProgramEntry {
     items?: ProgramEntry[];
 }
 
-/**
- * Named placeholder launch: the literal `fs_item` carries name + icon for
- * `placeholder.svelte`'s window chrome.
- */
-const placeholder_entry = (name: string, icon: string): ProgramEntry => ({
-    name,
-    icon,
-    path: './programs/placeholder.svelte',
-    fs_item: { name, icon },
-});
-
 export const ALL_PROGRAMS: ProgramEntry[] = [
     {
         name: 'My Computer',
@@ -106,10 +95,26 @@ export const ALL_PROGRAMS: ProgramEntry[] = [
         icon: '/images/xp/icons/StartMenuPrograms.png',
         top: '-40px',
         items: [
-            placeholder_entry('Minesweeper', '/assets/icons/minesweeper.png'),
-            placeholder_entry('Solitaire', '/assets/icons/solitaire.png'),
-            placeholder_entry('Chess', '/assets/icons/chess.png'),
-            placeholder_entry('DOOM', '/assets/icons/doom.png'),
+            {
+                name: 'Minesweeper',
+                icon: '/assets/icons/minesweeper.png',
+                path: './programs/minesweeper.svelte',
+            },
+            {
+                name: 'Solitaire',
+                icon: '/assets/icons/solitaire.png',
+                path: './programs/solitaire.svelte',
+            },
+            {
+                name: 'Chess',
+                icon: '/assets/icons/chess.png',
+                path: './programs/chess.svelte',
+            },
+            {
+                name: 'DOOM',
+                icon: '/assets/icons/doom.png',
+                path: './programs/doom.svelte',
+            },
         ],
     },
 ];

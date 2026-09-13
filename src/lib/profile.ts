@@ -329,7 +329,6 @@ export interface ProfileCopy {
     commandJokes: { dir: string; matrix: string; hack: string; sudo: string };
     colorRefusal: SudoReply;
     /** Takes `{name}`. */
-    placeholderNotice: string;
     contactRateLimit: string;
     /** `message` takes `{name}`, `{title}` and `{location}`. */
     aboutDialog: { title: string; message: string };
@@ -446,7 +445,6 @@ export const copy: ProfileCopy = {
     dirAside: raw_copy.dirAside,
     commandJokes: raw_copy.commandJokes,
     colorRefusal: raw_copy.colorRefusal,
-    placeholderNotice: raw_copy.placeholderNotice,
     contactRateLimit: raw_copy.contactRateLimit,
     aboutDialog: raw_copy.aboutDialog,
     terminalWelcome: raw_copy.terminalWelcome.map((l) => ({

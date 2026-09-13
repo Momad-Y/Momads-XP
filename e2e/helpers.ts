@@ -86,3 +86,64 @@ export const FIRST_SKILL_GROUP = Object.keys(profile_data.skills)[0] ?? '';
 export const ENTRY_ROLE = profile_data.experience[0]?.role ?? '';
 export const ENTRY_BASENAME = `${profile_data.experience[0]?.company ?? ''} — ${ENTRY_ROLE}`;
 export const ENTRY_FILE = `${ENTRY_BASENAME}.txt`;
+
+/**
+ * Open a program from Start > All Programs, optionally through a level-2
+ * flyout such as Games.
+ *
+ * Selectors are the real ones (`#start-menu-btn`, `#start-menu`,
+ * `#all-programs-flyout`) as `start_menu.spec.ts` uses them. The level-2
+ * flyout opens on hover after a 180ms delay and renders inside the same
+ * `#all-programs-flyout` container, so its items are located there too.
+ */
+export async function openFromStartMenu(
+    page: Page,
+    group: string | null,
+    program: string,
+): Promise<void> {
+    await page.locator('#start-menu-btn').click();
+    await page.locator('#start-menu').getByText('All Programs').hover();
+    const flyout = page.locator('#all-programs-flyout');
+    await expect(flyout).toBeVisible();
+    if (group != null) {
+        await flyout.getByText(group).hover();
+    }
+    await flyout.getByText(program, { exact: true }).click();
+}
+
+/**
+ * Origins the app is allowed to reach: loaded from `app.html` with an SRI
+ * hash, so they are pinned by content rather than trusted by hostname.
+ *
+ * THE SINGLE SOURCE. `no_cdn.spec.ts` asserts an ALLOWLIST rather than a
+ * denylist precisely because a denylist only catches the two hostnames that
+ * were removed, not the next one; duplicating the list per spec would
+ * reintroduce the same drift one file down.
+ */
+export const ALLOWED_ORIGINS = [
+    /^https:\/\/code\.jquery\.com\//,
+    /^https:\/\/unpkg\.com\/loadjs@/,
+];
+
+/**
+ * Collects every request that is neither our own origin nor SRI-pinned.
+ *
+ * The origin test is a literal prefix rather than `new URL(page.url()).origin`
+ * — the first requests fire while the page is still about:blank, so comparing
+ * against the live URL reports the site itself as foreign.
+ */
+export function watchForeignOrigins(page: Page): string[] {
+    const foreign: string[] = [];
+    page.on('request', (req) => {
+        const url = req.url();
+        if (url.startsWith('data:') || url.startsWith('blob:')) return;
+        if (
+            url.startsWith('http://localhost') ||
+            url.startsWith('http://127.0.0.1')
+        )
+            return;
+        if (ALLOWED_ORIGINS.some((re) => re.test(url))) return;
+        foreign.push(url);
+    });
+    return foreign;
+}

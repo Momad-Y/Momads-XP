@@ -90,6 +90,16 @@ jobs:
               env:
                   CI: 'true'
 
+            # Hermetic too, but CPU-heavy: these boot DOSBox and Stockfish.
+            # A separate step with workers: 1 (playwright.config.ts) so they
+            # never contend with `default`'s parallel workers — the config's
+            # own note records machine load, not worker count, as the cause of
+            # its historical flake.
+            - name: E2E (heavy games — serial)
+              run: npx playwright test --project=heavy
+              env:
+                  CI: 'true'
+
             # Real Pyodide, ~5 MB from jsDelivr per spec. Run where production
             # risk actually is — the cutover into `main`, and `main` itself —
             # rather than on every PR into `dev`. Phase 3 shipped two bugs that

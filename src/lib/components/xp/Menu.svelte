@@ -79,8 +79,15 @@
                 {menu_group.name}
             </div>
             {#if menu_group.items != null}
+                <!--
+                    `xp-menu-dropdown` is a test hook, not a style. This panel
+                    carried no class of any kind, so an E2E had nothing to
+                    select: `.menu` exists nowhere and `.context-menu` is the
+                    unrelated right-click menu. Every in-window menu in the app
+                    renders through here.
+                -->
                 <div
-                    class="absolute w-[150px] border-slate-500 shadow hidden {active
+                    class="xp-menu-dropdown absolute w-[150px] border-slate-500 shadow hidden {active
                         ? 'group-hover:block'
                         : 'inactive-class'} border border-slate-200 bg-slate-50 left-0 top-[25px]"
                 >
