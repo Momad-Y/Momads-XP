@@ -254,11 +254,14 @@ remote files, so nothing was lost that time.
 
 Not caused by this change, and not made more likely by it: the loss happens at
 the *return*, through the snapshot's own semantics, and is identical with or
-without the ledger. The fix is ~10 lines in the carry-edits block — when
-`previous != null`, `previous[id] == null` and `cached[id]` exists with
-`storage_type: 'local'`, treat it as a user divergence instead of overwriting
-it — but it is a separate defect in a module whose diff is already large, so it
-goes to the owner as a decision rather than riding along here.
+without the ledger.
+
+**FIXED SEPARATELY, at the owner's call** (`user_edits`): with no baseline for
+an id the visitor nonetheless holds, `storage_type: 'local'` is taken as proof
+their bytes are in it, and `url` + `storage_type` are carried onto the returning
+seed record. Only those two — a name or a sort order cannot be told apart from
+a seed's own change across the gap, and there the seed is the better answer.
+Losing a preference is a shrug; losing a drawing is not.
 
 ## Rejected
 

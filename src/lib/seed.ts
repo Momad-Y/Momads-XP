@@ -138,7 +138,36 @@ function user_edits(
     previous: SeedUserFields | undefined,
 ): SeedUserFields {
     const edits: SeedUserFields = {};
-    if (previous == null) return edits;
+    if (previous == null) {
+        /*
+         * NO BASELINE, BUT THEIR BYTES ARE IN IT.
+         *
+         * An id that LEFT the seed and later came back lands here: when it
+         * left, the snapshot was refreshed to a seed that did not contain it,
+         * so `previous[id]` is gone for good. On its return `{ ...seed }`
+         * replaced the record wholesale and this function had nothing to
+         * compare against — so a wallpaper the visitor had painted over
+         * silently reverted to the shipped one, and because no `del_fs` ran,
+         * `free_blob` never freed the blob either: it stayed in IndexedDB,
+         * referenced by nothing, forever.
+         *
+         * Not hypothetical — ids have left and returned (two in `d5b2ff3`,
+         * when an array reindexed), and the retired-id ledger makes
+         * multi-version gaps the normal case rather than the exception.
+         *
+         * `storage_type: 'local'` is exactly "their bytes are in this item":
+         * `save_file` sets it with an idb key as the `url` on the SAME id, and
+         * `get_file`/`get_url` dereference idb only for 'local'. So carry
+         * those two fields and nothing else — a name or a sort order cannot be
+         * told apart from a seed's own change across the gap, and the seed is
+         * the better answer for those. Losing a preference is a shrug; losing
+         * a drawing is not.
+         */
+        if (cached.storage_type === 'local' && typeof cached.url === 'string') {
+            return { storage_type: 'local', url: cached.url };
+        }
+        return edits;
+    }
     for (const key of USER_FIELDS) {
         const now = cached[key];
         if (now === undefined) continue;
