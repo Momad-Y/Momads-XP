@@ -115,33 +115,36 @@ interface AppDefinition {
 - [ ] **Step 1: Write the failing tests**
 
 ```ts
-// src/lib/app_registry.test.ts — append inside the existing describe
+// src/lib/app_registry.test.ts — append inside the existing describe.
+//
+// USE THE `app()` HELPER ALREADY AT THE TOP OF THIS FILE (:10-17). It builds
+// an AppDefinition with `component: () => Promise.reject(...)`, which needs no
+// cast. Do NOT write `{ default: null as never }` — `no-unsafe-type-assertion`
+// is an ERROR over `src/**/*.ts` (eslint.config.js:28-34) and it applies to
+// test files: three existing tests carry explicit disable comments for it.
 it('defaults resizable to true so shipped apps are unchanged', () => {
-    const cmd = find_app('./programs/cmd.svelte');
-    expect(cmd).toBeDefined();
-    expect(to_window_options(required(cmd, 'cmd'), 'i1').resizable).toBe(true);
+    for (const existing of APP_REGISTRY) {
+        expect(
+            to_window_options(existing, 'i1').resizable,
+            `${existing.id} changed shape`,
+        ).toBe(true);
+    }
 });
 
 it('lets an app opt out of resizing', () => {
-    const app: AppDefinition = {
-        id: 'x', path: './programs/x.svelte', title: 'X', icon: '/x.png',
-        component: () => Promise.resolve({ default: null as never }),
-        resizable: false,
-    };
-    expect(to_window_options(app, 'i1').resizable).toBe(false);
+    expect(to_window_options(app({ resizable: false }), 'i1').resizable).toBe(
+        false,
+    );
 });
 
 it('passes aspect_ratio and maximize_btn through only when set', () => {
-    const base: AppDefinition = {
-        id: 'y', path: './programs/y.svelte', title: 'Y', icon: '/y.png',
-        component: () => Promise.resolve({ default: null as never }),
-    };
-    const plain = to_window_options(base, 'i1');
+    const plain = to_window_options(app(), 'i1');
     expect(plain.aspect_ratio).toBeUndefined();
     expect(plain.maximize_btn).toBeUndefined();
 
     const doom = to_window_options(
-        { ...base, aspect_ratio: 4 / 3, maximize_btn: false }, 'i2',
+        app({ aspect_ratio: 4 / 3, maximize_btn: false }),
+        'i2',
     );
     expect(doom.aspect_ratio).toBeCloseTo(4 / 3);
     expect(doom.maximize_btn).toBe(false);
@@ -179,8 +182,12 @@ In `to_window_options()`, replace the hardcoded `resizable: true` with
 
 - [ ] **Step 4: Run to verify pass**
 
-Run: `npx vitest run src/lib/app_registry.test.ts && npm run check`
-Expected: PASS, 0 svelte-check errors.
+Run: `npx vitest run src/lib/app_registry.test.ts && npm run check && npm run lint`
+Expected: PASS, 0 svelte-check errors, 0 lint errors.
+
+**`npm run lint` is in this list deliberately.** Without it an ESLint-only
+failure introduced here survives until the first task that runs the full
+gate set, several commits later, where it is attributed to the wrong task.
 
 - [ ] **Step 5: Mutation-test the default**
 
@@ -496,15 +503,33 @@ test('Minesweeper resizes its window for Expert', async ({ page }) => {
     await openFromStartMenu(page, 'Games', 'Minesweeper');
     const win = page.locator('#work-space .window', { hasText: 'Minesweeper' });
 
-    const before = await win.boundingBox();
+    // Assert the ACTUAL expected width, not merely "bigger than before".
+    // A window that failed to receive any width at all shrink-wraps its grid,
+    // so a `after > before` comparison passes by coincidence while the sizing
+    // is broken — which is exactly the bug this test exists to catch.
+    const beginner = 9 * 16 + 20;           // cols * CELL_PX + FRAME_W
+    await expect
+        .poll(async () => Math.round((await win.boundingBox())?.width ?? 0))
+        .toBe(beginner);
+
     await win.getByText('Game', { exact: true }).click();
-    await page.locator('.context-menu, .menu').getByText('Expert').click();
+    await page.locator('.xp-menu-dropdown').getByText('Expert').click();
 
     await expect(win.locator('.ms-cell')).toHaveCount(480);          // 30x16
-    const after = await win.boundingBox();
-    expect(after?.width ?? 0).toBeGreaterThan(before?.width ?? 0);
+    const expert = 30 * 16 + 20;
+    await expect
+        .poll(async () => Math.round((await win.boundingBox())?.width ?? 0))
+        .toBe(expert);
 });
 ```
+
+**Before writing the component, add a test hook to the shared menu.**
+`src/lib/components/xp/Menu.svelte:82-86` renders its dropdown panel with no
+class of any kind, so there is nothing for an E2E to select — `.menu` does not
+exist anywhere in the codebase and `.context-menu` is the unrelated right-click
+menu (`ContextMenu.svelte:111`). Add `xp-menu-dropdown` to that panel's class
+list. It is purely additive, it benefits every future in-window menu spec, and
+without it no game's menu is testable.
 
 If `openFromStartMenu` does not exist in `e2e/helpers.ts`, add it there in this
 task — a two-level flyout walk (`Start` → `All Programs` → `Games` → item) —
@@ -601,13 +626,29 @@ Suppress the browser context menu on the grid (`on:contextmenu|preventDefault`).
         title: 'Minesweeper',
         icon: '/assets/icons/minesweeper.png',
         component: () => import('../routes/xp/programs/minesweeper.svelte'),
-        // Sized by the component from the current difficulty; fixed, like XP's.
+        // `default_size` IS REQUIRED, and leaving it out is not a style choice.
+        // `work_space.svelte:551` mounts a registered app with
+        // `options: to_window_options(app, instance_id)`, and its own comment
+        // says registry components "deliberately do not declare their own
+        // `options` default" — Svelte replaces a default wholesale rather than
+        // merging. So the component's `export let options = {...}` below NEVER
+        // RUNS for a registry launch. Without this line `to_window_options()`
+        // emits no width/height at all, `Window.svelte:98-109` skips its clamp
+        // because both are null, and `:435` renders `style:width="undefinedpx"`
+        // — invalid CSS, silently dropped, leaving the window to shrink-wrap.
+        default_size: window_size(PRESETS.beginner),
+        min_size: window_size(PRESETS.beginner),
+        // Fixed, like XP's. Needs Task 1's passthrough.
         resizable: false,
         maximize_btn: false,
         // Multi-instance: pure DOM, nothing to own. Contrast DOOM (D23).
         singleton: false,
     },
 ```
+`app_registry.ts` imports `PRESETS` and `window_size` from
+`./games/minesweeper/difficulty` for this row. That is the only game-logic
+import the registry takes; it is worth it to keep one source of truth for the
+board's pixel size.
 `start_menu_programs.ts` — replace
 `placeholder_entry('Minesweeper', '/assets/icons/minesweeper.png')` with:
 ```ts
@@ -634,7 +675,7 @@ is where that is confirmed rather than assumed.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/routes/xp/programs/minesweeper.svelte src/lib/app_registry.ts src/lib/start_menu_programs.ts e2e/minesweeper.spec.ts e2e/helpers.ts
+git add src/routes/xp/programs/minesweeper.svelte src/lib/app_registry.ts src/lib/start_menu_programs.ts src/lib/components/xp/Menu.svelte e2e/minesweeper.spec.ts e2e/helpers.ts
 git commit -m "feat(minesweeper): playable window with three difficulties"
 ```
 
@@ -765,17 +806,27 @@ describe('klondike', () => {
     it('detects auto-complete only when the stock, waste and all face-down cards are gone', () => {
         const g: Game = deal(fixed);
         expect(auto_complete_available(g)).toBe(false);
-        const done: Game = { ...g, stock: [], waste: [],
-            tableau: g.tableau.map((p) => p.map((c) => ({ ...c, face_up: true }))) as Game['tableau'] };
+        // Build the tuple positionally. `.map()` over a tuple widens to
+        // Card[][], and asserting back to the tuple type trips
+        // `no-unsafe-type-assertion` (an ERROR over src/, test files included).
+        const face_up = (pile: Card[]): Card[] => pile.map((c) => ({ ...c, face_up: true }));
+        const done: Game = { ...g, stock: [], waste: [], tableau: [
+            face_up(g.tableau[0]), face_up(g.tableau[1]), face_up(g.tableau[2]),
+            face_up(g.tableau[3]), face_up(g.tableau[4]), face_up(g.tableau[5]),
+            face_up(g.tableau[6]),
+        ] };
         expect(auto_complete_available(done)).toBe(true);
     });
 
     it('wins when all four foundations hold thirteen cards', () => {
         const g = deal(fixed);
         expect(has_won(g)).toBe(false);
-        const suits = ['clubs', 'diamonds', 'hearts', 'spades'] as const;
-        const full = { ...g, foundations: suits.map((s) =>
-            Array.from({ length: 13 }, (_, i) => card(s, i + 1))) as Game['foundations'] };
+        // Positional again, for the same reason as above.
+        const pile = (s: Card['suit']): Card[] =>
+            Array.from({ length: 13 }, (_, i) => card(s, i + 1));
+        const full: Game = { ...g, foundations: [
+            pile('clubs'), pile('diamonds'), pile('hearts'), pile('spades'),
+        ] };
         expect(has_won(full)).toBe(true);
     });
 
@@ -1896,16 +1947,25 @@ test('DOOM keys do not leak to the desktop @heavy', async ({ page }) => {
     await win.locator('.doom-start').click();
     await expect(win.locator('canvas.doom-screen')).toBeVisible({ timeout: 120_000 });
 
-    // D25: Escape inside a focused DOOM must not close the Start menu.
-    await page.locator('#start-button').click();
-    await expect(page.locator('.start-menu')).toBeVisible();
+    // D25. Real selectors: the button is `#start-menu-btn`
+    // (task_bar.svelte:29) and the menu is the ID `#start-menu`
+    // (start_menu.svelte:184) — as `e2e/start_menu.spec.ts` already uses them.
+    // There is no `#start-button` and no `.start-menu` class in this codebase.
+    //
+    // Arrow keys, not Escape: clicking the canvas closes the Start menu by
+    // click-outside, so an Escape press afterwards would prove nothing. Movement
+    // keys are the ones that must not leak, and they leave the menu open.
     await win.locator('canvas.doom-screen').click();
-    await win.locator('canvas.doom-screen').press('Escape');
-    // focus moved to the game, so the menu closed on the click, not the key —
-    // assert the desktop's own Escape still works instead:
-    await page.locator('#start-button').click();
+    await page.locator('#start-menu-btn').click();
+    await expect(page.locator('#start-menu')).toBeVisible();
+
+    await win.locator('canvas.doom-screen').press('ArrowUp');
+    await win.locator('canvas.doom-screen').press('Space');
+    await expect(page.locator('#start-menu')).toBeVisible();
+
+    // …and the desktop's own Escape still works when no game holds focus.
     await page.keyboard.press('Escape');
-    await expect(page.locator('.start-menu')).toBeHidden();
+    await expect(page.locator('#start-menu')).toBeHidden();
 });
 ```
 
@@ -1975,7 +2035,56 @@ git commit -m "feat(doom): playable shareware DOOM in an XP window"
 
 ---
 
-## Task 15 — Close the phase
+## Task 15 — Bundle budget: games must stay out of the entry chunk (D17, spec §6)
+
+Spec §6 requires confirming that no game code and neither WASM runtime reaches
+the entry bundle or the mobile path, and D17's whole obligation is that the
+registry's lazy `component: () => import(...)` stays lazy. Nothing in the plan
+verified it until now.
+
+The harness already exists: `scripts/verify-build.mjs` runs in CI
+(`.github/workflows/ci.yml:74-75`), looks at `build/`, and already greps
+`vite build`'s captured stdout for Rollup's "dynamically imported … also
+statically imported" warning — which is precisely the warning a stray eager
+import of a game module would produce.
+
+**Files:** Modify `scripts/verify-build.mjs`
+
+- [ ] **Step 1: Add the assertions**
+
+Following that file's own stated rule — *every check proves its target exists
+first*, so a grep cannot pass vacuously because a file moved:
+
+1. Assert the four game chunks exist in `build/_app/immutable/` (proving the
+   check has a target at all), by locating chunks whose content mentions
+   `ms-cell`, `sol-tableau`, `chess-square`, `doom-screen`.
+2. Assert none of those chunk names appear in the entry chunk's import graph
+   — i.e. the entry chunk does not reference them.
+3. Assert the entry chunk contains neither `stockfish` nor `emulators.js`.
+4. Assert the Rollup "also statically imported" warning names none of the four
+   game modules, reported as SKIPPED (not passed) when no build log is given,
+   matching the file's existing convention.
+
+- [ ] **Step 2: Prove the check can fail**
+
+Temporarily add `import '../lib/games/doom/dosbox_adapter';` to a module in the
+entry graph, run `npm run build 2>&1 | tee /tmp/build.log`, then
+`node scripts/verify-build.mjs /tmp/build.log` and confirm it FAILS. Revert.
+
+This step is not optional: a build-output grep that has never been seen to fail
+is the "test that cannot fail" the script's own header says this repo has
+shipped three times.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add scripts/verify-build.mjs
+git commit -m "test(build): keep games and their WASM runtimes out of the entry chunk"
+```
+
+---
+
+## Task 16 — Close the phase
 
 **Files:**
 - Modify: `e2e/no_cdn.spec.ts`, `docs/SPECIFICATION.md`, `README.md` if it
@@ -2009,6 +2118,29 @@ The ten sections §11 requires, including a §Notes recording at minimum:
 - The `heavy` Playwright project and why it is not `@online`.
 - Never ship `js-dos.js` — it hardcodes four remote origins.
 
+Plus, in its own **§Deploy probe** section, the checklist the eventual cutover
+must run. `netlify.toml` is invisible to every local gate, so this is the only
+place it gets written down:
+- `/js/stockfish/stockfish.wasm` and `/js/js-dos/wdosbox.wasm` return
+  `Cache-Control: public, max-age=31536000, immutable`.
+- `/games/doom/doom.jsdos` returns 200 and the same header.
+- **`/` still carries `frame-ancestors 'self'`** and
+  `/html/python-sandbox.html` still carries its full
+  `default-src 'none'; script-src …` policy. Three new `[[headers]]` blocks
+  were added this phase; last-rule-wins means any of them could have silently
+  replaced an existing policy.
+- Open each game on the production host and confirm zero console errors.
+
+- [ ] **Step 3b: Check whether `placeholder_entry` is now dead**
+
+All four of its call sites were the games replaced this phase. Grep
+`start_menu_programs.ts` for remaining uses. If there are none, either delete
+`placeholder_entry` and `placeholder.svelte` together, or keep them with a
+comment saying what they are for — but do not leave an unreferenced helper and
+an unreferenced component with no explanation. Note that `placeholder.svelte`
+may still be reached by other launch paths; check `NOT_PROGRAMS` and
+`work_space.svelte` before deleting anything.
+
 - [ ] **Step 4: Full gate run**
 
 ```bash
@@ -2036,14 +2168,14 @@ owner asks (CLAUDE.md). Report what is sitting on `dev` and leave it there.
 
 **Spec coverage.** Every decision maps to a task: D1→T3,5,8,10,13; D2→T4,6,11,14;
 D3→(no task by design, no VFS change); D4→T4; D5→T3; D6,D7→T5,6; D8→T6;
-D9,D10,D11→T12,13; D12→T14; D13→T9; D14→T8; D15→T11; D16→T11; D17→(preserved by
-the lazy `component:` import in every registry row); D18→T9,12; D19→T15 + each
-game's spec; D20→T2 + appended per vendoring task; D21→T1; D22→T10,13,14;
-D23→T4,6,11,14; D24→T13,14; D25→T13,14; D26→T14; D27→T4,6,11; D28→T6; D29→T8,9;
-D30→T9,12; D31→T7.
+D9,D10,D11→T12,13; D12→T14; D13→T9; D14→T8; D15→T11; D16→T11; **D17→T15**
+(the lazy `component:` import is the mechanism, T15 is what proves it holds);
+D18→T9,12; D19→T16 + each game's spec; D20→T2 + appended per vendoring task;
+D21→T1; D22→T10,13,14; D23→T4,6,11,14; D24→T13,14; D25→T13,14; D26→T14;
+D27→T4,6,11; D28→T6; D29→T8,9; D30→T9,12; D31→T7.
 
 Exit criteria 1-8 from spec §7 and the six added in Part B are covered by
-T4/T6/T11/T14 E2E plus T15's full gate run.
+T4/T6/T11/T14 E2E plus T16's full gate run.
 
 **Sequencing.** T1 blocks T4/T11/T14 (chrome fields). T7 blocks T11 (the
 `@heavy` project must exist before the first tagged spec). T9 blocks T10's
@@ -2060,3 +2192,17 @@ from the vendored bundle, which has no types in `static/`.
 
 **Placeholder scan.** The only literal placeholders are the `<sha256>` values in
 T12's manifest, which are computed during that task from the files it copies.
+
+**Lint reachability.** `eslint.config.js:28-34` applies `strictTypeChecked` and
+`no-unsafe-type-assertion: 'error'` to `src/**/*.ts` with **no exclusion for
+test files** — three shipped tests carry explicit disable comments for it. Every
+test snippet in this plan was re-checked against that rule after gate 4; none
+now contains a downcast. `e2e/**` is a separate, looser config block
+(`:70`), so E2E snippets are not subject to it.
+
+**Gate 4 changed:** T1's tests (reuse the file's own `app()` helper; `npm run
+lint` added to its gate list), T4's registry row (`default_size` — see the
+comment there, it is load-bearing) and its E2E (exact widths, `.xp-menu-dropdown`
+hook added to `Menu.svelte`), T5's tuple construction, T9's import list, T14's
+start-menu selectors and key choice, plus new T15 (bundle budget) and two
+additions to the closing task. Details: `docs/phase-4-redteam-plan.md`.
