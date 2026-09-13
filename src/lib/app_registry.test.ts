@@ -98,6 +98,41 @@ describe('to_window_options', () => {
         expect('width' in options).toBe(false);
         expect('min_width' in options).toBe(false);
     });
+
+    it('defaults resizable to true, so every shipped app is unchanged', () => {
+        // The passthrough below is additive. If it ever changes the output for
+        // an app that does not ask, it has broken a shipped window.
+        for (const existing of APP_REGISTRY) {
+            expect(
+                to_window_options(existing, 'i1').resizable,
+                `${existing.id} changed shape`,
+            ).toBe(true);
+        }
+    });
+
+    it('lets an app opt out of resizing', () => {
+        // Minesweeper. XP's is a fixed window that snaps to the board, and
+        // `Window.svelte:179` only skips jQuery UI's resizable — which writes
+        // inline width/height itself, fighting the `style:width` binding —
+        // when this is false.
+        expect(
+            to_window_options(app({ resizable: false }), 'i1').resizable,
+        ).toBe(false);
+    });
+
+    it('passes aspect_ratio and maximize_btn through only when set', () => {
+        const plain = to_window_options(app(), 'i1');
+        expect('aspect_ratio' in plain).toBe(false);
+        expect('maximize_btn' in plain).toBe(false);
+
+        // DOOM: DOS video is 4:3, and a stretched frame looks wrong.
+        const doom = to_window_options(
+            app({ aspect_ratio: 4 / 3, maximize_btn: false }),
+            'i2',
+        );
+        expect(doom.aspect_ratio).toBeCloseTo(4 / 3);
+        expect(doom.maximize_btn).toBe(false);
+    });
 });
 
 describe('singleton_paths', () => {

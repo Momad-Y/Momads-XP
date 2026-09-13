@@ -73,6 +73,19 @@ export interface AppDefinition {
      * depends on it.
      */
     taskbar?: boolean;
+    /**
+     * Window chrome. These exist because `to_window_options()` below hardcoded
+     * `resizable: true` and the object it returns REPLACES the component's own
+     * `options` default wholesale (see the comment on that function), so a
+     * registered app had no way to be anything else. That blocked Minesweeper,
+     * which is a fixed-size window in XP, and DOOM, which is 4:3.
+     *
+     * All three are optional and the defaults reproduce the previous output
+     * exactly — `app_registry.test.ts` asserts that for every shipped app.
+     */
+    resizable?: boolean;
+    aspect_ratio?: number;
+    maximize_btn?: boolean;
 }
 
 /**
@@ -162,9 +175,10 @@ export function to_window_options(
         title: app.title,
         icon: app.icon,
         exec_path: app.path,
-        // Registry apps are all resizable; the components declared this in
-        // their own `options` default, which this object replaces wholesale.
-        resizable: true,
+        // Registry apps are resizable unless they say otherwise. The
+        // components cannot declare this themselves — this object replaces
+        // their `options` default wholesale.
+        resizable: app.resizable ?? true,
     };
     if (app.default_size != null) {
         options.width = app.default_size.width;
@@ -174,6 +188,11 @@ export function to_window_options(
         options.min_width = app.min_size.width;
         options.min_height = app.min_size.height;
     }
+    // Set only when asked, for the same reason the size keys are: emitting
+    // `aspect_ratio: undefined` would override a default with undefined
+    // rather than leaving it alone.
+    if (app.aspect_ratio != null) options.aspect_ratio = app.aspect_ratio;
+    if (app.maximize_btn != null) options.maximize_btn = app.maximize_btn;
     return options;
 }
 
