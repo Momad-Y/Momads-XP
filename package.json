@@ -54,6 +54,7 @@
         "axios": "^0.27.2",
         "buffer": "^6.0.3",
         "build-url": "^6.0.1",
+        "chess.js": "1.4.0",
         "dragselect": "^2.5.5",
         "fast-sort": "^3.2.1",
         "file-saver": "^2.0.5",
