@@ -89,12 +89,18 @@ shareware release. If id Software takes a different view, remove
 
 Used by the Solitaire program.
 
-- **Shipped as:** `static/assets/cards/*.svg`
+- **Shipped as:** `static/assets/cards/*.png`
 - **Author:** Byron Knoll (2011), via
   <https://github.com/notpeter/Vector-Playing-Cards>
 - **Licence:** released into the public domain, with the WTFPL offered as a
   fallback in jurisdictions that do not recognise the public domain. No
   attribution is required — this credit is a courtesy.
+- **Modified:** the upstream SVGs were rasterised to 142×192 PNG and colour
+  quantised, taking the deck from 8.0 MB to 356 KB. The upstream licence
+  covers this explicitly: "these images, scripts and subsequent
+  transformational output (e.g. custom sized PNGs) are released into the
+  public domain". `back.png` is not from this set — it is drawn for this
+  project and carries no third-party claim.
 
 ## Chess piece artwork — CC BY-SA 3.0
 

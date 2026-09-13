@@ -168,6 +168,17 @@ export const APP_REGISTRY: readonly AppDefinition[] = [
         // Multi-instance: pure DOM, owns no runtime. Contrast Chess and DOOM.
         singleton: false,
     },
+    {
+        id: 'solitaire',
+        path: './programs/solitaire.svelte',
+        title: 'Solitaire',
+        icon: '/assets/icons/solitaire.png',
+        component: () => import('../routes/xp/programs/solitaire.svelte'),
+        default_size: { width: 700, height: 520 },
+        min_size: { width: 620, height: 470 },
+        // Multi-instance, same reasoning as Minesweeper: pure DOM.
+        singleton: false,
+    },
 ];
 
 export function find_app(path: string | undefined): AppDefinition | undefined {
