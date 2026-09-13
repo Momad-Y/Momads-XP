@@ -110,3 +110,40 @@ export async function openFromStartMenu(
     }
     await flyout.getByText(program, { exact: true }).click();
 }
+
+/**
+ * Origins the app is allowed to reach: loaded from `app.html` with an SRI
+ * hash, so they are pinned by content rather than trusted by hostname.
+ *
+ * THE SINGLE SOURCE. `no_cdn.spec.ts` asserts an ALLOWLIST rather than a
+ * denylist precisely because a denylist only catches the two hostnames that
+ * were removed, not the next one; duplicating the list per spec would
+ * reintroduce the same drift one file down.
+ */
+export const ALLOWED_ORIGINS = [
+    /^https:\/\/code\.jquery\.com\//,
+    /^https:\/\/unpkg\.com\/loadjs@/,
+];
+
+/**
+ * Collects every request that is neither our own origin nor SRI-pinned.
+ *
+ * The origin test is a literal prefix rather than `new URL(page.url()).origin`
+ * — the first requests fire while the page is still about:blank, so comparing
+ * against the live URL reports the site itself as foreign.
+ */
+export function watchForeignOrigins(page: Page): string[] {
+    const foreign: string[] = [];
+    page.on('request', (req) => {
+        const url = req.url();
+        if (url.startsWith('data:') || url.startsWith('blob:')) return;
+        if (
+            url.startsWith('http://localhost') ||
+            url.startsWith('http://127.0.0.1')
+        )
+            return;
+        if (ALLOWED_ORIGINS.some((re) => re.test(url))) return;
+        foreign.push(url);
+    });
+    return foreign;
+}

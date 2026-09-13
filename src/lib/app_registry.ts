@@ -179,6 +179,23 @@ export const APP_REGISTRY: readonly AppDefinition[] = [
         // Multi-instance, same reasoning as Minesweeper: pure DOM.
         singleton: false,
     },
+    {
+        id: 'chess',
+        path: './programs/chess.svelte',
+        title: 'Chess',
+        icon: '/assets/icons/chess.png',
+        component: () => import('../routes/xp/programs/chess.svelte'),
+        // Sized to the content: 352px board plus controls, status and the
+        // move list. 620 left a third of the window empty.
+        default_size: { width: 460, height: 516 },
+        min_size: { width: 400, height: 440 },
+        /*
+         * SINGLETON, unlike Minesweeper and Solitaire. Each instance owns a
+         * Stockfish worker and its WASM heap — the same reasoning as Python's
+         * above, not Minesweeper's.
+         */
+        singleton: true,
+    },
 ];
 
 export function find_app(path: string | undefined): AppDefinition | undefined {

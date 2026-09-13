@@ -116,7 +116,11 @@ export const ALL_PROGRAMS: ProgramEntry[] = [
                 icon: '/assets/icons/solitaire.png',
                 path: './programs/solitaire.svelte',
             },
-            placeholder_entry('Chess', '/assets/icons/chess.png'),
+            {
+                name: 'Chess',
+                icon: '/assets/icons/chess.png',
+                path: './programs/chess.svelte',
+            },
             placeholder_entry('DOOM', '/assets/icons/doom.png'),
         ],
     },

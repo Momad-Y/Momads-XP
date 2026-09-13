@@ -2,48 +2,62 @@ import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { bootToDesktop } from './helpers';
 
-// Phase 3 made CMD and Python real, so the placeholder tests moved to the
-// Games flyout — Minesweeper survives until Phase 4.
-//
-// The target MUST be rect-less for the cascade test below: `work_space`'s
-// placeholder branch is the only one that does not pass `exec_path`, and a
-// window with a persisted rect does not cascade. A real Phase 3 app cannot
-// stand in here for that reason.
-async function openPlaceholder(page: Page) {
+/*
+ * Phase 3 made CMD and Python real; Phase 4 made Minesweeper, Solitaire and
+ * Chess real. DOOM is the last `placeholder_entry` and goes in the same phase,
+ * after which nothing in the Start menu reaches `placeholder.svelte` at all.
+ *
+ * Scoped to the flyout on purpose: once the window is open its title bar and
+ * taskbar button carry the same name, so a page-wide locator is a strict-mode
+ * violation on the second call — which is exactly what the cascade test does.
+ */
+async function openGame(page: Page, name: string) {
     await page.locator('#start-menu-btn').click();
     await page.locator('#start-menu').getByText('All Programs').hover();
     const flyout = page.locator('#all-programs-flyout');
     await expect(flyout).toBeVisible();
     await flyout.getByText('Games', { exact: true }).hover();
-    // Scoped to the flyout: once a placeholder window is open its TITLE BAR
-    // and taskbar button also read "Minesweeper", so a page-wide locator is a
-    // strict-mode violation on the second call — which is exactly what the
-    // cascade test below does.
-    await flyout.getByText('Minesweeper', { exact: true }).click();
+    await flyout.getByText(name, { exact: true }).click();
 }
 
 test('a Games start-menu entry opens the named placeholder', async ({
     page,
 }) => {
     await bootToDesktop(page);
-    await openPlaceholder(page);
+    await openGame(page, 'DOOM');
 
     const win = page.locator('#work-space .window').first();
     await expect(win).toBeVisible();
     await expect(
-        win.getByText(
-            'Minesweeper is under construction — coming in a later phase.',
-        ),
+        win.getByText('DOOM is under construction — coming in a later phase.'),
     ).toBeVisible();
     await win.getByText('OK').click();
     await expect(win).toBeHidden();
 });
 
-test('two rect-less windows cascade instead of stacking', async ({ page }) => {
+test('two windows of one app do not land on top of each other', async ({
+    page,
+}) => {
+    /*
+     * THERE ARE TWO ANTI-STACKING MECHANISMS, and this exercises the one that
+     * applies to a registered app:
+     *
+     *   `cascade_position` (cascade.ts, 24px) is for RECT-LESS windows — those
+     *   launched without an `exec_path`. Only the placeholder branch and the
+     *   inherited property sheets take it. Its geometry is unit-tested in
+     *   `cascade.test.ts`, and the DOOM placeholder test above still walks it
+     *   end to end until DOOM becomes real.
+     *
+     *   `calc_nudges` (Window.svelte, 10px pad) is for a DUPLICATE of the same
+     *   `exec_path`, which every registry app carries. That is this test.
+     *
+     * Minesweeper is the target because it is multi-instance and fixed size,
+     * so two copies have an identical base rect and the offset is exact.
+     */
     await bootToDesktop(page);
-    await openPlaceholder(page);
+    await openGame(page, 'Minesweeper');
     await expect(page.locator('#work-space .window')).toHaveCount(1);
-    await openPlaceholder(page);
+    await openGame(page, 'Minesweeper');
     await expect(page.locator('#work-space .window')).toHaveCount(2);
 
     const first = await page
@@ -55,10 +69,8 @@ test('two rect-less windows cascade instead of stacking', async ({ page }) => {
         .nth(1)
         .boundingBox();
     if (!first || !second) throw new Error('window has no bounding box');
-    // both placeholders share the same size → identical base, so the second
-    // sits exactly one 24px cascade step down-right of the first
-    expect(Math.round(second.x - first.x)).toBe(24);
-    expect(Math.round(second.y - first.y)).toBe(24);
+    expect(Math.round(second.x - first.x)).toBe(10);
+    expect(Math.round(second.y - first.y)).toBe(10);
 });
 
 test('a new Text Document opens as an empty page (txt is associated now)', async ({
