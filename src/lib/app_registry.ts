@@ -27,6 +27,7 @@
 import type { Component } from 'svelte';
 import type { ProgramInstance, VfsItem, WindowOptions } from './types';
 import { TERMINAL_MIN_HEIGHT, TERMINAL_MIN_WIDTH } from './term/theme';
+import { PRESETS, window_size } from './games/minesweeper/difficulty';
 
 /**
  * The props every program component accepts. Mirrors what the inherited
@@ -135,6 +136,37 @@ export const APP_REGISTRY: readonly AppDefinition[] = [
         // AudioContext. Two copies would talk over each other, and XP's own
         // Media Player is single-instance.
         singleton: true,
+    },
+    {
+        id: 'minesweeper',
+        path: './programs/minesweeper.svelte',
+        title: 'Minesweeper',
+        icon: '/assets/icons/minesweeper.png',
+        component: () => import('../routes/xp/programs/minesweeper.svelte'),
+        /*
+         * `default_size` IS LOAD-BEARING, and omitting it is not a style
+         * choice. `work_space.svelte` mounts a registered app with an explicit
+         * `options` prop from `to_window_options()`, and Svelte replaces a
+         * component's own default wholesale rather than merging — so
+         * `minesweeper.svelte`'s `options` default never runs on this path.
+         * Without these two lines the window gets no width or height at all,
+         * `Window.svelte` skips its clamp because both are null, and the
+         * template renders `style:width="undefinedpx"`: invalid CSS, dropped
+         * silently, leaving the window to shrink-wrap its grid.
+         *
+         * Imported from the game's own module so the board geometry has one
+         * source of truth; the component reassigns `options` from the same
+         * helper when the difficulty changes.
+         */
+        default_size: window_size(PRESETS.beginner),
+        min_size: window_size(PRESETS.beginner),
+        // Fixed, like XP's — the window snaps to the board rather than being
+        // dragged. Also what keeps jQuery UI's resizable from attaching and
+        // fighting the `style:width` binding (Window.svelte:179).
+        resizable: false,
+        maximize_btn: false,
+        // Multi-instance: pure DOM, owns no runtime. Contrast Chess and DOOM.
+        singleton: false,
     },
 ];
 

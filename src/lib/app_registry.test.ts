@@ -99,14 +99,31 @@ describe('to_window_options', () => {
         expect('min_width' in options).toBe(false);
     });
 
-    it('defaults resizable to true, so every shipped app is unchanged', () => {
-        // The passthrough below is additive. If it ever changes the output for
-        // an app that does not ask, it has broken a shipped window.
+    it('defaults resizable to true for every app that does not ask', () => {
+        // The passthrough is additive: an app that declares nothing must come
+        // out exactly as it did before the field existed.
         for (const existing of APP_REGISTRY) {
+            if (existing.resizable !== undefined) continue;
             expect(
                 to_window_options(existing, 'i1').resizable,
                 `${existing.id} changed shape`,
             ).toBe(true);
+        }
+    });
+
+    it('leaves the three windows that shipped before the field resizable', () => {
+        // Named rather than derived. The loop above skips anything that opts
+        // out, so on its own it would fall silent if a future change made a
+        // shipped window non-resizable by accident.
+        for (const path of [
+            './programs/cmd.svelte',
+            './programs/python.svelte',
+            './programs/music_player.svelte',
+        ]) {
+            const found = find_app(path);
+            expect(found, `${path} left the registry`).toBeDefined();
+            if (found == null) continue;
+            expect(to_window_options(found, 'i1').resizable).toBe(true);
         }
     });
 

@@ -22,12 +22,12 @@ The inherited base of this project is covered separately by
 The chess engine behind the Chess program.
 
 - **Shipped as:**
-  - `static/js/stockfish/stockfish.wasm.js`
-  - `static/js/stockfish/stockfish.wasm`
-  - `static/js/stockfish/Copying.txt` (the full GPL-3.0 text, verbatim)
+    - `static/js/stockfish/stockfish.wasm.js`
+    - `static/js/stockfish/stockfish.wasm`
+    - `static/js/stockfish/Copying.txt` (the full GPL-3.0 text, verbatim)
 - **Identifies itself as:** `Stockfish 2019-08-15 Multi-Variant`
 - **Corresponding source:** <https://github.com/ddugovic/Stockfish> — the
-  **multi-variant fork**, which is what this build is. It is *not* built from
+  **multi-variant fork**, which is what this build is. It is _not_ built from
   <https://github.com/official-stockfish/Stockfish>, and naming that repository
   here would make this pointer wrong.
 - **Packaged by:** <https://github.com/niklasf/stockfish.js>, npm
@@ -46,11 +46,11 @@ cross-origin isolation, which would break other embeds on this site.
 The DOS emulator behind the DOOM program.
 
 - **Shipped as:**
-  - `static/js/js-dos/emulators.js`
-  - `static/js/js-dos/wdosbox.js`
-  - `static/js/js-dos/wdosbox.wasm`
-  - `static/js/js-dos/wlibzip.js`
-  - `static/js/js-dos/wlibzip.wasm`
+    - `static/js/js-dos/emulators.js`
+    - `static/js/js-dos/wdosbox.js`
+    - `static/js/js-dos/wdosbox.wasm`
+    - `static/js/js-dos/wlibzip.js`
+    - `static/js/js-dos/wlibzip.wasm`
 - **Corresponding source:** <https://github.com/caiiiycuk/js-dos>, npm
   `js-dos@8.4.1`. js-dos embeds DOSBox, <https://www.dosbox.com/>.
 - **Copyright:** Alexander Guryanov and contributors; DOSBox by the DOSBox
@@ -65,9 +65,9 @@ services this site does not use.
 The game data behind the DOOM program.
 
 - **Shipped as:**
-  - `static/games/doom/doom.jsdos` — a container holding the unmodified
-    shareware `DOOM1.WAD` and its executable
-  - `static/games/doom/LICENSE-id-shareware.txt` — the licence text, verbatim
+    - `static/games/doom/doom.jsdos` — a container holding the unmodified
+      shareware `DOOM1.WAD` and its executable
+    - `static/games/doom/LICENSE-id-shareware.txt` — the licence text, verbatim
 - **Copyright:** © id Software. DOOM is a trademark of id Software LLC.
 - **Distributed free of charge.** No consideration of any kind is charged or
   received for its receipt or use, which is the condition the licence attaches
