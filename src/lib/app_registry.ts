@@ -196,6 +196,23 @@ export const APP_REGISTRY: readonly AppDefinition[] = [
          */
         singleton: true,
     },
+    {
+        id: 'doom',
+        path: './programs/doom.svelte',
+        title: 'DOOM',
+        icon: '/assets/icons/doom.png',
+        component: () => import('../routes/xp/programs/doom.svelte'),
+        default_size: { width: 640, height: 512 },
+        min_size: { width: 320, height: 280 },
+        // DOS video is 4:3; a stretched frame looks wrong, and this is the
+        // reason `aspect_ratio` exists on AppDefinition at all.
+        aspect_ratio: 4 / 3,
+        /*
+         * SINGLETON: each instance is a full x86 emulator plus its WASM heap
+         * and an AudioContext. Two would contend for CPU with nothing gained.
+         */
+        singleton: true,
+    },
 ];
 
 export function find_app(path: string | undefined): AppDefinition | undefined {

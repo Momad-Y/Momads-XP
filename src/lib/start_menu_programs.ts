@@ -31,17 +31,6 @@ export interface ProgramEntry {
     items?: ProgramEntry[];
 }
 
-/**
- * Named placeholder launch: the literal `fs_item` carries name + icon for
- * `placeholder.svelte`'s window chrome.
- */
-const placeholder_entry = (name: string, icon: string): ProgramEntry => ({
-    name,
-    icon,
-    path: './programs/placeholder.svelte',
-    fs_item: { name, icon },
-});
-
 export const ALL_PROGRAMS: ProgramEntry[] = [
     {
         name: 'My Computer',
@@ -121,7 +110,11 @@ export const ALL_PROGRAMS: ProgramEntry[] = [
                 icon: '/assets/icons/chess.png',
                 path: './programs/chess.svelte',
             },
-            placeholder_entry('DOOM', '/assets/icons/doom.png'),
+            {
+                name: 'DOOM',
+                icon: '/assets/icons/doom.png',
+                path: './programs/doom.svelte',
+            },
         ],
     },
 ];

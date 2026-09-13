@@ -25,22 +25,34 @@ the repo root.
     [sdl]
     autolock=false
 
+    [dosbox]
+    machine=svga_s3
+
     [cpu]
     core=auto
     cputype=auto
     cycles=max
 
     [render]
-    aspect=true
+    aspect=false
+    scaler=none
 
     [autoexec]
     mount c .
     c:
     DOOM.EXE
 
-`autolock=false` matters: pointer lock inside a windowed emulator that lives
-in a draggable XP window is hostile, and the window manager needs the pointer.
-`cycles=max` is what makes DOOM run at full speed in a browser.
+Three of these are load-bearing, not taste:
+
+- `autolock=false` — pointer lock inside an emulator living in a draggable XP
+  window is hostile, and the window manager needs the pointer.
+- `cycles=max` — what makes DOOM run at full speed in a browser.
+- **`aspect=false`** — with aspect correction ON, DOSBox changes its render
+  height mid-stream (200 → 240) and js-dos's frame-line assembler threw
+  `RangeError: offset is out of bounds` on *every* frame, inside
+  `CommandInterfaceOverTransportLayer.onFrameLines`. Nothing rendered and the
+  only symptom was console noise. The 4:3 shape is applied by the window's
+  `aspect_ratio` instead, where it costs nothing.
 
 ## Rebuilding it
 

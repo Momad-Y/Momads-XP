@@ -35,23 +35,19 @@ export interface DosCommandInterface {
  * here — loading the emulator and fetching the game — so `start_doom` itself
  * is pure lifecycle and testable with no network and no DOM.
  */
-export interface DosHost {
-    load: () => Promise<{
-        dosboxWorker: (init: unknown) => Promise<DosCommandInterface>;
-    }>;
-    bundle: () => Promise<Uint8Array>;
+/** The options js-dos accepts; we use exactly one. */
+export interface DosBackendOptions {
+    canvas?: OffscreenCanvas;
 }
 
-/**
- * Where frames go.
- *
- * An interface rather than an `HTMLCanvasElement` so the lifecycle below — the
- * part that actually carries bugs — is testable in node with no DOM. The
- * canvas-backed implementation lives in `doom.svelte` and is covered by E2E.
- */
-export interface FrameSink {
-    resize: (width: number, height: number) => void;
-    paint: (rgba: Uint8Array, width: number, height: number) => void;
+export interface DosHost {
+    load: () => Promise<{
+        dosboxWorker: (
+            init: unknown,
+            options?: DosBackendOptions,
+        ) => Promise<DosCommandInterface>;
+    }>;
+    bundle: () => Promise<Uint8Array>;
 }
 
 export interface DoomSession {
@@ -130,14 +126,35 @@ function read_emulators(): JsDosEmulators | null {
     return typeof emulators === 'undefined' ? null : emulators;
 }
 
+/**
+ * RENDERING IS HANDED TO THE WORKER, not forwarded frame by frame.
+ *
+ * js-dos's worker transport delivers video through an internal `onFrameLines`
+ * assembler and — measured, not assumed — never invokes the `onFrame`
+ * consumer at all: `onFrameSize` fires with 640x400 then 320x200 while
+ * `onFrame` stays silent forever. Its assembler also threw
+ * "offset is out of bounds" on every frame when DOSBox's aspect correction
+ * changed the render height mid-stream.
+ *
+ * Passing an OffscreenCanvas sidesteps that whole path: the worker paints
+ * directly, which is both the fix and the faster option, since no pixel data
+ * crosses postMessage.
+ *
+ * `screen` is nullable so the lifecycle tests can run headless — they assert
+ * that whatever they pass is handed to js-dos, and everything else here is
+ * independent of rendering.
+ */
 export async function start_doom(
     host: DosHost,
-    screen: FrameSink,
+    screen: OffscreenCanvas | null,
     on_sound: (samples: Float32Array) => void,
 ): Promise<DoomSession> {
     const emulators = await host.load();
     const bundle = await host.bundle();
-    const ci = await emulators.dosboxWorker(bundle);
+    const ci = await emulators.dosboxWorker(
+        bundle,
+        screen == null ? {} : { canvas: screen },
+    );
 
     /*
      * EVERY callback below is gated on this flag.
@@ -150,13 +167,6 @@ export async function start_doom(
     let disposed = false;
 
     const events = ci.events();
-    events.onFrame((_rgb, rgba) => {
-        if (disposed || rgba == null) return;
-        const width = ci.width();
-        const height = ci.height();
-        screen.resize(width, height);
-        screen.paint(rgba, width, height);
-    });
     events.onSoundPush((samples) => {
         if (disposed) return;
         on_sound(samples);

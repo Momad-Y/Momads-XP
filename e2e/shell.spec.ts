@@ -20,21 +20,6 @@ async function openGame(page: Page, name: string) {
     await flyout.getByText(name, { exact: true }).click();
 }
 
-test('a Games start-menu entry opens the named placeholder', async ({
-    page,
-}) => {
-    await bootToDesktop(page);
-    await openGame(page, 'DOOM');
-
-    const win = page.locator('#work-space .window').first();
-    await expect(win).toBeVisible();
-    await expect(
-        win.getByText('DOOM is under construction — coming in a later phase.'),
-    ).toBeVisible();
-    await win.getByText('OK').click();
-    await expect(win).toBeHidden();
-});
-
 test('two windows of one app do not land on top of each other', async ({
     page,
 }) => {

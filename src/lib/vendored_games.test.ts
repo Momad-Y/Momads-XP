@@ -89,7 +89,7 @@ const MANIFEST: Record<string, string> = {
     'static/js/js-dos/wlibzip.wasm':
         '25064d970c42ca7ea0fdb8b058204d6e41cc8826a676219677772f5591e8337b',
     'static/games/doom/doom.jsdos':
-        'a770723a67d617b09caf94865433028096190d2e03862ecdff521e3b3901aeb1',
+        '65d767628273aa0e1d4f45f7f2fe92b6b956e3d599868f4078dbdb709db14df2',
 };
 
 describe('vendored js-dos and the DOOM bundle', () => {
