@@ -575,3 +575,370 @@ mechanism. Each is a timeboxed check, not a task.
 8. All gates green: `npm run check`, `lint`, `format:check`,
    `vitest run --coverage` (diff-coverage ≥80% on changed lines), `build`,
    `playwright test --project=default`.
+
+---
+
+# Part B — corrections and additions after gate 2
+
+The red team's findings and dispositions are in `docs/phase-4-redteam-spec.md`.
+Three sub-decisions were graded Weak; ten missing sub-decisions were found.
+Nothing was rejected. Corrections to Part A are stated here rather than edited
+in place, so the reviewed version stays readable.
+
+Also folded in: the three spikes from §5 and the two provenance checks from §6
+were executed during gate 2. Results are noted against the decisions they
+resolve.
+
+## Corrections to Part A
+
+- **D1** — amended. The verdict stands, but "pure functions" did not cover the
+  worker adapters, which is where message-ordering and timeout bugs live. The
+  DOSBox and Stockfish adapters are named files
+  (`src/lib/games/doom/dosbox_adapter.ts`, `src/lib/games/chess/engine.ts`) and
+  get integration-style vitest coverage against a mocked `postMessage`, not
+  just the parsers either side of them.
+- **D3** — amended with a benefit it did not claim: because games never open
+  through Explorer, the "File Transfer" one-time dialog that CLAUDE.md names as
+  an E2E trap cannot fire for game specs. No defensive dismiss step is needed;
+  adding one would be dead code.
+- **D4** — verdict **stands**, mechanism **replaced**. Spike 1 concluded there
+  was no jQuery UI conflict; that conclusion is void because it tested a
+  hand-built options object rather than the registry output (see D21). The
+  correct mechanism is D21's passthrough plus reassignment of the component's
+  `options` variable.
+- **D7** — strengthened, not changed: `Window.svelte:325` scopes jQuery UI
+  draggable to `handle: '.titlebar'`, so pointer capture in the content area
+  cannot fight it. D7 also satisfies §4.6's pointer/touch requirement for
+  ≥1024px touch devices for free.
+- **D8** — provenance **cleared**. The deck is public domain, WTFPL offered as
+  a fallback where public domain is not recognised; no attribution required.
+  Fallback option B is not needed.
+- **D11** — provenance **cleared with a stated caveat**. Free redistribution is
+  granted ("you may make copies of the Software to give to other persons",
+  barred only from charging consideration). The formal text does not explicitly
+  address extracting the WAD from its original archive; the precedent relied on
+  is Debian/Ubuntu's `doom-wad-shareware` package, which does exactly that.
+  `LICENSE-third-party.md` states the ambiguity and the precedent rather than
+  asserting a clean grant. Bundle contents stay byte-identical to upstream.
+- **D14** — upgraded from argued to **proven**. The engine was driven over UCI
+  during gate 2. It advertises exactly one strength knob,
+  `option name Skill Level type spin default 20 min 0 max 20`; there is no
+  `UCI_Elo` and no `UCI_LimitStrength`, so option C is disproven rather than
+  doubted. At Skill Level 0 / depth 6 it answered 1.e4 with 1...e6, a normal
+  French Defence — the evidence for "weaker human, not visible bug".
+- **D20** — **factual correction**. The engine identifies itself as
+  `Stockfish 2019-08-15 Multi-Variant`, the ddugovic multi-variant fork, not
+  vanilla Stockfish 10. The notices file must name that fork as the
+  corresponding source; pointing at official-stockfish/Stockfish would make the
+  GPL source pointer wrong.
+- **D19** — flake mitigation **replaced** by D31. Shrinking assertions does not
+  address CPU contention, which `playwright.config.ts:10-18` documents as the
+  actual cause.
+
+Spike 2 and 3 results (worker entry, `pathPrefix`, module shape) are
+implementation detail and carry into the plan unchanged.
+
+---
+
+## D21 — Registry passthrough for window chrome
+
+**The problem:** `app_registry.ts:167` sets `resizable: true` unconditionally,
+inside the object its own comment says replaces the component's default
+wholesale. `AppDefinition` has no `resizable`, `aspect_ratio` or
+`maximize_btn`. D4, D9 and D12 all need at least one of them.
+
+**Option A — add optional `resizable?`, `aspect_ratio?`, `maximize_btn?` to
+`AppDefinition`, honoured by `to_window_options()`, with `resizable` defaulting
+to `true`.**
+*For:* one typed place; the default preserves today's output byte-for-byte, so
+no shipped window changes; unblocks three decisions at once; moves in the same
+direction as the Phase 6 migration that wants *more* apps on the registry.
+*Against:* widens a contract Phase 3 deliberately kept minimal — three optional
+fields that only games use today.
+
+**Option B — launch games through the inherited `launch()` if-chain instead.**
+*For:* no registry change.
+*Against:* `app_registry.ts:1-25` exists precisely because that if-chain has no
+`else` and silently no-ops on a typo, and lists forgotten taskbar registration
+as this repo's most-repeated defect. Deliberately walking back into it to avoid
+three optional fields is the wrong trade.
+
+**Option C — let the component override `options` after mount.**
+*For:* no registry change.
+*Against:* does not work. `setup_gestures()` reads `options.resizable` during
+mount and has already called `jQuery(el).resizable(...)` by the time the
+component could intervene; undoing it means tearing down a jQuery UI plugin
+instance. Fragile, and invisible to type-checking.
+
+**Verdict: A.** *Deciding factor:* C is defeated by mount ordering and B
+reverses the architecture's direction, so A is the only option that works —
+and its default keeps every shipped window identical.
+
+## D22 — Teardown contract for heavy runtimes
+
+**Option A — every game's `destroy()` releases what it owns, explicitly:
+`ci.exit()` then `worker.terminate()` for DOOM, `worker.terminate()` for the
+chess engine, `ctx.close()` for any AudioContext, `cancelAnimationFrame` for
+any loop, `URL.revokeObjectURL` for any blob.**
+*For:* this is the shipped pattern, twice — `python.svelte` disposes its client
+and `music_player.svelte` cancels its rAF, closes its context and revokes its
+URLs. Without it, opening and closing DOOM three times leaks three DOSBox
+workers and three WASM heaps, and the tab dies.
+*Against:* none. Omitting teardown is not a simpler design, it is a defect.
+
+**Verdict: A — inherited from Phase 3, alternatives weighed there.** Added to
+the exit criteria so it is checked rather than assumed.
+
+## D23 — Singleton policy, per game
+
+**Option A — Minesweeper and Solitaire multi-instance; Chess and DOOM
+singletons.**
+*For:* exactly the distinction `app_registry.ts:97-111` already draws between
+CMD ("multi-instance on purpose: a second terminal is cheap") and Python
+("SINGLETON … each instance owns its own runtime … three Start-Menu clicks is
+a tab kill"). Minesweeper and Solitaire are pure DOM and cost nothing to
+duplicate; a second DOOM is a second x86 emulator and a second WASM heap, and a
+second Chess is a second engine worker.
+*Against:* a visitor cannot compare two chess positions side by side. Trivial.
+
+**Option B — all four singletons.**
+*For:* uniform, least memory.
+*Against:* two Minesweeper boards is a normal thing to want and costs nothing;
+making it impossible is a fidelity loss for no gain.
+
+**Option C — all four multi-instance.**
+*For:* uniform the other way.
+*Against:* the Python precedent says why this fails on a mid-range phone —
+except games are desktop-only (D17), so the argument is weaker here. Still
+loses on DOOM, where two emulators contend for CPU.
+
+**Verdict: A.** *Deciding factor:* the CMD/Python split already encodes the
+right rule — cheap programs multiply, runtime-owning programs do not — and
+these four fall cleanly on either side of it. **Also required per game:**
+`taskbar` left at its default `true`, verified rather than assumed, because
+omitting it is the defect `app_registry.ts:9-12` names eight times.
+
+## D24 — What happens to a running game when its window is minimized
+
+Verified: `Window.svelte:206-221` applies a transform and sets
+`minimized = true`. It does not unmount and does not pause.
+
+**Option A — pause the emulator on minimize, resume on restore; mute while
+minimized.**
+*For:* `CommandInterface` exposes `pause()`, `resume()`, `mute()` and
+`unmute()` as first-class methods, so this is four lines. Leaving it out
+contradicts D10's own rationale: the reason DOSBox is on a worker is to keep
+the desktop responsive, and a minimized-but-running DOOM saturates a core for a
+window nobody can see — on a laptop, audibly.
+*Against:* a player who minimizes mid-firefight returns to a paused game rather
+than a dead one. That is the better outcome anyway.
+
+**Option B — keep running.**
+*For:* matches a real OS, where minimizing does not pause.
+*Against:* a real OS is not running an x86 emulator inside a browser tab that
+also has to keep a window manager smooth.
+
+**Verdict: A for DOOM.** Chess needs nothing: its worker is only busy between
+`go` and `bestmove`. Minesweeper's timer keeps running, as it does in XP.
+*Deciding factor:* `pause()`/`resume()` already exist on the interface, so the
+cost is negligible against a real CPU burn.
+
+## D25 — Keyboard focus and Escape routing
+
+**The problem:** at least six components bind `svelte:window` Escape handlers
+(Menu, Dialog, start menu, my_computer, ContextMenu, …), nothing in
+`Window.svelte` gives window *content* DOM focus, and DOOM needs raw keys
+including Escape for its own menu.
+
+**Option A — give the DOOM surface `tabindex="0"`, focus it when the window
+gains focus, and have its own `keydown`/`keyup` call `stopPropagation()` (plus
+`preventDefault()` for keys the browser would otherwise act on) so desktop
+handlers never see game input. Escape reaches DOOM only when not in
+fullscreen; in fullscreen the browser owns Escape, and DOOM's menu is reached
+from an on-screen button in the window chrome.**
+*For:* precise and local — the desktop's Escape keeps working everywhere else,
+because the handlers are only bypassed while the game surface holds focus.
+Uses standard DOM event flow.
+*Against:* the fullscreen/Escape split is a genuine wart: the same key does two
+different things depending on a mode the player may not be tracking.
+
+**Option B — `navigator.keyboard.lock(['Escape'])` while fullscreen.**
+*For:* Escape would reach DOOM in fullscreen, removing the wart entirely.
+*Against:* Keyboard Lock is Chromium-only; Firefox and Safari ignore it. Making
+DOOM's only route to its own menu depend on it means the menu is unreachable in
+fullscreen for two of three engines. **Rejected** — but it is a legitimate
+progressive enhancement to layer on later, never a load-bearing mechanism.
+
+**Option C — do not capture keys; let events bubble.**
+*For:* nothing to write.
+*Against:* pressing Escape in DOOM would close the Start menu, and movement
+keys would leak into whatever else listens. Non-viable.
+
+**Verdict: A.** *Deciding factor:* B is unavailable on two of three engines,
+and the on-screen menu button makes A's wart survivable while keeping the
+desktop's own Escape semantics intact.
+
+## D26 — AudioContext and the autoplay policy
+
+**Option A — a "Click to start" overlay inside the DOOM window; the
+AudioContext is constructed synchronously in that click handler, and the
+emulator boot is kicked off from the same gesture.**
+*For:* `music_player.svelte:310-314` already documents the constraint in this
+codebase — a context created outside a gesture starts suspended and plays
+silently. An overlay is also the natural place to defer the ~1.8MB js-dos
+download plus the WAD until the visitor actually wants DOOM, rather than on
+window open.
+*Against:* one extra click before the game starts. DOS games opened from a menu
+screen anyway, so this reads as period-appropriate rather than as friction.
+
+**Option B — start on window open and call `ctx.resume()` on the first
+interaction.**
+*For:* no overlay.
+*Against:* the first frames play silently with no explanation, and the download
+starts for anyone who opens the window to look at it.
+
+**Verdict: A.** *Deciding factor:* the repo has already been bitten by exactly
+this and wrote the reason down; A also removes an unconditional multi-megabyte
+download.
+
+## D27 — Reactive wiring at the component boundary
+
+CLAUDE.md documents that in Svelte 5 legacy mode, state written from inside a
+`$:` block does **not** invalidate other `$:` blocks — it shipped once already
+as the Music Player's wrong title.
+
+**Option A — game state is a plain value produced by `src/lib/games/**`
+reducers; the component holds `let state` and **reassigns** it
+(`state = reduce(state, action)`) from event handlers and timers only. `$:` is
+used for read-only derivations and never writes state. Timers start in
+`onMount`.**
+*For:* sidesteps the documented trap by construction rather than by discipline;
+the reducer shape is exactly what D1 needs for unit coverage; one-shot setup in
+`onMount` is what CLAUDE.md prescribes.
+*Against:* marginally more verbose than `$: won = check(board)` — though that
+form stays legal, because it only reads.
+
+**Option B — derive and write inside `$:`.**
+*For:* shorter.
+*Against:* reproduces the shipped bug. A win-detection `$:` that sets
+`game_over`, plus a second `$:` reading `game_over` to stop the timer, is the
+exact documented failure: the write lands and the sibling stays frozen, with no
+error and no warning.
+
+**Verdict: A.** *Deciding factor:* B is a known-shipped defect in this
+codebase, not a hypothetical.
+
+## D28 — `prefers-reduced-motion` and the Solitaire win animation
+
+**Option A — honour `prefers-reduced-motion: reduce`: no bouncing cards, a
+static win state instead.**
+*For:* a full-screen cascade of bouncing cards is close to the canonical
+example of motion that triggers vestibular discomfort; the media query costs
+one CSS block.
+*Against:* the win animation is the single most recognisable thing about XP
+Solitaire, and a visitor who set the preference OS-wide for other reasons loses
+it. Mitigated: they still get a clear win state, and the preference is theirs.
+
+**Verdict: A.** *Deciding factor:* one CSS block against a known accessibility
+harm is not a close call.
+
+## D29 — New npm dependencies and the lockfile
+
+**New this phase:** `chess.js` (runtime dependency, BSD-2-Clause, 1.4.0) and
+`stockfish.js` (dev-only, pinned exactly — see D30).
+
+**CLAUDE.md hard rule, now an explicit action item rather than an assumption:**
+after *any* `package.json` or lockfile change, regenerate with
+`npx -y npm@10 install`. CI runs `npm ci` under npm 10 (Node 22) and a lock
+written by npm 11+ fails it. This applies to each dependency addition
+separately, not once at the end.
+
+*No alternatives — forced by CLAUDE.md.* Recorded because the spec's first
+draft mentioned the rule only as an argument against an already-rejected
+option, which is how an action item goes missing.
+
+## D30 — How the vendored binaries are pinned
+
+D13 said "mirror `static/js/three/`". That pattern's own test header states
+`three` "is a pinned devDependency purely so this comparison has something to
+compare against". Applied literally to both new vendors, that means pinning
+`js-dos` too.
+
+**Option A — pin `stockfish.js` as an exact devDependency with a
+byte-identity test mirroring `vendored_three.test.ts`; pin the js-dos files and
+the `.jsdos` bundle with a committed SHA-256 manifest instead.**
+*For:* `stockfish.js` is 2.3MB unpacked, so the three.js pattern applies
+cleanly and proves provenance, not merely stability. `js-dos` is **29MB
+unpacked** for the 1.8MB we actually ship — paying that on every `npm ci` in CI
+to verify five files is a bad trade, and a checksum manifest catches the thing
+that actually goes wrong (silent drift of a committed binary). The `.jsdos`
+bundle has no npm upstream at all, so a manifest is the only option for it
+regardless.
+*Against:* two mechanisms instead of one, and the manifest proves stability
+rather than provenance — it cannot tell you the bytes came from upstream, only
+that nobody changed them since. Provenance for those files is carried by
+`LICENSE-third-party.md` recording the exact version and source URL.
+
+**Option B — pin both as devDependencies, one mechanism.**
+*For:* uniform; both get genuine provenance.
+*Against:* 29MB added to every CI install to verify 1.8MB of files, and it
+still leaves the `.jsdos` bundle unpinned because it is not an npm artefact.
+So it pays the cost and does not actually achieve uniformity.
+
+**Option C — no pinning; rely on review.**
+*For:* nothing.
+*Against:* this is precisely what `vendored_three.test.ts` exists to prevent,
+and a committed binary blob is the case where review is weakest.
+
+**Verdict: A.** *Deciding factor:* B's uniformity is illusory — the `.jsdos`
+bundle needs a manifest either way — so B pays 29MB per CI run for nothing.
+**What A gives up, explicitly:** the js-dos files get drift protection, not
+provenance proof; the notices file carries the provenance claim instead.
+
+## D31 — How the heavy game specs run in CI
+
+`playwright.config.ts:10-18` records that the `default` project, on the exact
+2-core CI configuration, "still flaked one run in three here", that failures
+"follow overall machine load … not worker count", and that each passes in
+isolation. Phase 4 adds two WASM-boot-heavy specs to that pool.
+
+**Option A — a third Playwright project `heavy` (`grep: /@heavy/`, `workers:
+1`), excluded from `default` via its `grepInvert`, run as its own CI step after
+`default` finishes. DOOM and the Chess-versus-engine spec are tagged `@heavy`;
+Minesweeper, Solitaire and the Chess board-only spec stay in `default`.**
+*For:* it attacks the documented cause — concurrent CPU pressure — rather than
+the symptom, by guaranteeing the two expensive specs never run beside four
+parallel siblings. Keeps every game on every PR, unlike `@online`. Serial
+within the project also makes a genuine failure reproducible.
+*Against:* a third project and a second CI step to maintain; total CI wall-clock
+grows by the serial run.
+
+**Option B — keep them in `default` with smaller assertions.** (Part A's
+answer.)
+*For:* no config change.
+*Against:* shrinking assertions reduces wall-clock, not contention. The config's
+own comment says load is the cause and that worker count is not. This mitigates
+nothing.
+
+**Option C — tag them `@online`.**
+*For:* `default` stays fast.
+*Against:* `@online` runs only on cutovers, so a DOOM regression surfaces at the
+riskiest possible moment; and the tag would be false, since both are hermetic.
+
+**Verdict: A.** *Deciding factor:* B is the only option that does not address
+the documented cause, and C defers failures to the cutover. **What A gives up:**
+CI gets slower by one serial project.
+
+## Additions to the exit criteria (§7)
+
+9. Every game registers in `runningPrograms` and gets a taskbar button —
+   checked explicitly, per D23.
+10. Opening and closing DOOM and Chess three times each leaves no live worker
+    and no open AudioContext (D22).
+11. A minimized DOOM window consumes no CPU (D24).
+12. With the Start menu open, keys pressed inside DOOM do not close it; Escape
+    outside a focused game still closes menus (D25).
+13. `prefers-reduced-motion: reduce` suppresses the Solitaire win animation
+    (D28).
+14. `npx -y npm@10 install` has been run after every `package.json` change, and
+    `npm ci` passes under npm 10 (D29).
