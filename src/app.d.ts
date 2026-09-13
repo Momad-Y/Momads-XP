@@ -53,6 +53,25 @@ declare const jQuery: (element: HTMLElement) => JQueryUiElement;
 /** Global defined inline in app.html; fetches assets to warm the HTTP cache. */
 declare function loadjs(assets: string[]): void;
 
+/**
+ * The js-dos emulator layer (`static/js/js-dos/emulators.js`), a browserify
+ * UMD bundle that assigns `window.emulators`. Injected on demand by
+ * `dosbox_adapter.ts` rather than imported, so like jQuery above it has no
+ * importable module types.
+ *
+ * `| undefined` is load-bearing: the global does not exist until the script
+ * has loaded, and the adapter probes for it with `typeof`.
+ */
+interface JsDosEmulators {
+    /** Where `wdosbox.js` and friends are fetched from. Read at call time. */
+    pathPrefix: string;
+    dosboxWorker: (
+        init: unknown,
+    ) => Promise<import('./lib/games/doom/dosbox_adapter').DosCommandInterface>;
+}
+
+declare const emulators: JsDosEmulators | undefined;
+
 declare const panzoom: (
     element: HTMLElement,
     options?: {
