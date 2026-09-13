@@ -23,6 +23,10 @@ import {
     delete_prompt_message,
 } from '../../../delete_prompt';
 import { required } from '../../../types';
+import {
+    needs_restore_prompt,
+    restore_prompt_message,
+} from '../../../restore_prompt';
 import { scoped_ids } from '../../../selection';
 import type { ContextMenuSpec, FSItemOriginator } from '../../../types';
 
@@ -56,9 +60,77 @@ export const make = ({
 
     return {
         required_width: 180 + 20,
-        required_height: 27 * 11 + 20,
+        required_height: 27 * 12 + 20,
         menu: [
             [
+                /*
+                 * Restore is offered ONLY on a direct child of the bin. Items
+                 * nested inside a binned folder come back with that folder, so
+                 * offering it on them would mean restoring half a tree and
+                 * leaving the rest behind — and they carry no breadcrumbs of
+                 * their own to place it with.
+                 */
+                ...(originator.item.parent == recycle_bin_id
+                    ? [
+                          {
+                              name: 'Restore',
+                              action: () => {
+                                  const data = get(hardDrive) ?? {};
+                                  // A selection can span surfaces, so narrow
+                                  // to what is actually in the bin before
+                                  // acting on any of it.
+                                  const ids = in_scope().filter(
+                                      (id) =>
+                                          data[id]?.parent === recycle_bin_id,
+                                  );
+                                  if (ids.length === 0) return;
+
+                                  const restore_all = () => {
+                                      for (const id of ids) {
+                                          // Re-check at CONFIRM time: the
+                                          // dialog is open while another
+                                          // window can empty the bin.
+                                          if (get(hardDrive)?.[id] == null)
+                                              continue;
+                                          fs.restore_fs(id);
+                                      }
+                                  };
+
+                                  // Entries recycled before breadcrumbs
+                                  // shipped cannot say where they came from,
+                                  // so they land on the Desktop. Doing that
+                                  // silently is what made Restore look broken.
+                                  if (
+                                      !needs_restore_prompt(
+                                          ids,
+                                          fs.restore_origin_known,
+                                      )
+                                  ) {
+                                      restore_all();
+                                      return;
+                                  }
+
+                                  void confirm_delete({
+                                      node_ref:
+                                          originator.my_computer_instance
+                                              ?.window?.node_ref ||
+                                          document.body,
+                                      title: 'Restore Item',
+                                      icon: '/images/xp/icons/RecycleBinempty.png',
+                                      message: restore_prompt_message(
+                                          data[ids[0] ?? '']?.name ?? '',
+                                          ids.length,
+                                      ),
+                                      yes_action: restore_all,
+                                      no_action: () => {
+                                          /* leave it in the bin */
+                                      },
+                                  });
+                              },
+                              font: 'bold',
+                          },
+                      ]
+                    : []),
                 ...(originator.item.parent != recycle_bin_id
                     ? [
                           {
@@ -289,14 +361,11 @@ export const make = ({
                                           // confirmation stuck on screen.
                                           if (get(hardDrive)?.[id] == null)
                                               continue;
-                                          if (!plan.permanent_ids.has(id)) {
-                                              fs.clone_fs(
-                                                  id,
-                                                  recycle_bin_id,
-                                                  null,
-                                              );
+                                          if (plan.permanent_ids.has(id)) {
+                                              fs.del_fs(id);
+                                          } else {
+                                              fs.recycle_fs(id);
                                           }
-                                          fs.del_fs(id);
                                       }
                                   };
 

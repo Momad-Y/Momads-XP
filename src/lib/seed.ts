@@ -13,6 +13,18 @@ import type { HardDrive, VfsItem } from './types';
 
 export { SEED_VERSION } from './generated/seed_version';
 import { SEED_VERSION } from './generated/seed_version';
+import RETIRED_IDS_LIST from './generated/retired_seed_ids.json';
+
+/**
+ * Every id the seed has ever shipped and no longer ships, as a Set — this is
+ * consulted once per cached item on every re-seed.
+ *
+ * A collision with a visitor's own id would delete their file. Their ids come
+ * from `short.generate()`: 22 characters of flickrBase58, so matching one of
+ * these exactly is a 1-in-58²² event, and `is_dropped_seed_item` already
+ * staked the same assumption on the same id space before this existed.
+ */
+const RETIRED_SEED_IDS = new Set<string>(RETIRED_IDS_LIST);
 
 export function shouldReseed(stored: string | null | undefined): boolean {
     return stored !== SEED_VERSION;
@@ -87,7 +99,7 @@ const USER_FIELDS = [
 /**
  * Project a seed into the field snapshot persisted alongside it.
  *
- * Storing this (~6 KB for the 59-item seed, vs 24 KB for the seed itself) is
+ * Storing this (a few KB against the seed's own tens of KB) is
  * what makes the carry UNAMBIGUOUS. Without it we cannot tell "the visitor
  * renamed this" from "a later seed renamed it" — and guessing wrong either
  * discards the visitor's edit or freezes the item against future content
@@ -126,7 +138,36 @@ function user_edits(
     previous: SeedUserFields | undefined,
 ): SeedUserFields {
     const edits: SeedUserFields = {};
-    if (previous == null) return edits;
+    if (previous == null) {
+        /*
+         * NO BASELINE, BUT THEIR BYTES ARE IN IT.
+         *
+         * An id that LEFT the seed and later came back lands here: when it
+         * left, the snapshot was refreshed to a seed that did not contain it,
+         * so `previous[id]` is gone for good. On its return `{ ...seed }`
+         * replaced the record wholesale and this function had nothing to
+         * compare against — so a wallpaper the visitor had painted over
+         * silently reverted to the shipped one, and because no `del_fs` ran,
+         * `free_blob` never freed the blob either: it stayed in IndexedDB,
+         * referenced by nothing, forever.
+         *
+         * Not hypothetical — ids have left and returned (two in `d5b2ff3`,
+         * when an array reindexed), and the retired-id ledger makes
+         * multi-version gaps the normal case rather than the exception.
+         *
+         * `storage_type: 'local'` is exactly "their bytes are in this item":
+         * `save_file` sets it with an idb key as the `url` on the SAME id, and
+         * `get_file`/`get_url` dereference idb only for 'local'. So carry
+         * those two fields and nothing else — a name or a sort order cannot be
+         * told apart from a seed's own change across the gap, and the seed is
+         * the better answer for those. Losing a preference is a shrug; losing
+         * a drawing is not.
+         */
+        if (cached.storage_type === 'local' && typeof cached.url === 'string') {
+            return { storage_type: 'local', url: cached.url };
+        }
+        return edits;
+    }
     for (const key of USER_FIELDS) {
         const now = cached[key];
         if (now === undefined) continue;
@@ -182,10 +223,56 @@ function is_dropped_seed_item(
     item: VfsItem,
     previous: SeedFieldSnapshot | undefined,
 ): boolean {
+    // Guard first, whichever evidence answers below: `clone_fs` stamps
+    // `authored` on every copy a visitor makes — paste, shortcut, bin clone —
+    // so this one check covers all of them regardless of `storage_type`.
+    if (item.authored === true) return false;
+
+    /*
+     * EVIDENCE 1: the ledger — ids we shipped and no longer ship, generated at
+     * build time (`scripts/generate-vfs.ts`, backfilled from git history by
+     * `scripts/backfill-retired-ids.ts`).
+     *
+     * THIS MUST COME BEFORE THE `previous == null` RETURN BELOW, and that is
+     * the whole point of it. Provenance used to be inferred purely from the
+     * visitor's own stored snapshot, which only shipped on 2026-08-23 — so on
+     * an older drive nothing was reapable and every item a later seed dropped
+     * was carried forever: music tracks pointing at 404 URLs after the library
+     * rewrite, and a ghost `C:\Awards` folder after the Certificates & Awards
+     * merge whose `.txt` files rendered "This file cannot be displayed."
+     * Permanently, too — the snapshot written after that boot describes the NEW
+     * seed, so the ghosts never appear in a `previous` again.
+     *
+     * The ledger is also strictly MORE complete than any one snapshot: it
+     * knows ids from seeds older than the one this visitor happens to have
+     * received. Hence one predicate for both, rather than a legacy-only branch
+     * that would drift from this one.
+     */
+    if (RETIRED_SEED_IDS.has(item.id)) {
+        // Their bytes are in it. `save_file` (Paint ▸ Save over a seeded
+        // wallpaper or `my drawing.png`) flips `storage_type` to 'local' and
+        // `url` to an idb key on the SAME id, and `get_file`/`get_url`
+        // dereference idb only for 'local' — so this is exactly the set of
+        // items holding the visitor's own bytes. Carrying a stale icon forever
+        // is a cosmetic cost; deleting someone's drawing is not.
+        if (item.storage_type === 'local') return false;
+        // With a snapshot, prefer its sharper question — did this field change
+        // since the seed they were GIVEN — over the blunt rule above.
+        const was = previous?.[item.id];
+        if (
+            was?.storage_type !== undefined &&
+            item.storage_type !== was.storage_type
+        ) {
+            return false;
+        }
+        return true;
+    }
+
+    // EVIDENCE 2: the visitor's own snapshot, for ids the ledger cannot speak
+    // to — anything shipped by a seed that predates the ledger's own history.
     if (previous == null) return false;
     const was = previous[item.id];
     if (was == null) return false;
-    if (item.authored === true) return false;
     if (
         was.storage_type !== undefined &&
         item.storage_type !== was.storage_type
@@ -194,6 +281,12 @@ function is_dropped_seed_item(
     }
     return true;
 }
+
+/**
+ * Ancestry-walk bound. A drive is a tree a few levels deep; anything past this
+ * is a cycle in corrupt cached data, and boot must not spin on it.
+ */
+const MAX_TREE_DEPTH = 64;
 
 /**
  * Re-seed merge (Phase 2 spec D3): the new seed owns every id it contains; the
@@ -221,18 +314,83 @@ export function merge_on_reseed(
             !is_dropped_seed_item(i, previous),
     );
     const carried = new Set<string>();
-    let grew = true;
-    while (grew) {
-        grew = false;
-        for (const c of candidates) {
-            if (carried.has(c.id)) continue;
-            const p = c.parent;
-            if (p != null && (seed[p] != null || carried.has(p))) {
-                carried.add(c.id);
-                grew = true;
+    /** Carry every candidate whose parent resolves, transitively. */
+    const carry_transitively = (): void => {
+        let grew = true;
+        while (grew) {
+            grew = false;
+            for (const c of candidates) {
+                if (carried.has(c.id)) continue;
+                const p = c.parent;
+                if (p != null && (seed[p] != null || carried.has(p))) {
+                    carried.add(c.id);
+                    grew = true;
+                }
             }
         }
+    };
+    carry_transitively();
+
+    /*
+     * ── ORPHANS: the visitor's own items whose FOLDER the new seed dropped ──
+     *
+     * The pass above carries an item only when its parent survives, so a file
+     * the visitor put inside a seed folder that we later removed matched
+     * nothing and was deleted — silently, on boot, with no bin copy. That
+     * directly contradicts the contract `is_dropped_seed_item` states in its
+     * own header ("it protects an mp3 they upload into a genre folder"): the
+     * protection was real for the item and absent for its container.
+     *
+     * Found by the red team on the Certifications+Awards merge, which drops
+     * `C:\\Awards` — but it was reachable the day the music library started
+     * discovering genres from disk, and `help.html` invites visitors to drop
+     * files into any folder.
+     *
+     * Re-home instead of dropping: put the orphan in the nearest folder of its
+     * own ancestry that still exists, the same rule Recycle Bin restore uses.
+     * Only CANDIDATES are re-homed, and candidates exclude everything
+     * `previous` proves came from a seed — so seed content still dies with its
+     * folder (a renamed genre takes its seeded tracks with it, as before) and
+     * only the visitor's own work is rescued.
+     *
+     * SHALLOWEST FIRST, then carry again: a visitor's folder-inside-a-dropped-
+     * folder must be re-homed before the files inside it are considered, or
+     * whichever the arbitrary object order reached first would win and their
+     * own folder structure would flatten. Re-homing the folder and re-running
+     * the carry pass keeps the children where the visitor put them.
+     */
+    const depth_in_cache = (item: VfsItem): number => {
+        let depth = 0;
+        let cur: VfsItem | undefined = item;
+        // bounded: a corrupt drive must not spin here
+        while (cur?.parent != null && depth <= MAX_TREE_DEPTH) {
+            cur = cached[cur.parent];
+            depth += 1;
+        }
+        return depth;
+    };
+    const rehomed = new Map<string, string>();
+    const by_depth = [...candidates].sort(
+        (a, b) => depth_in_cache(a) - depth_in_cache(b),
+    );
+    for (const c of by_depth) {
+        if (carried.has(c.id)) continue;
+        // its own parent is gone by construction (the carry pass would have
+        // taken it otherwise), so start the search one level up
+        let ancestor = c.parent == null ? undefined : cached[c.parent];
+        let hops = 0;
+        while (ancestor != null && hops <= MAX_TREE_DEPTH) {
+            if (seed[ancestor.id] != null || carried.has(ancestor.id)) {
+                rehomed.set(c.id, ancestor.id);
+                carried.add(c.id);
+                break;
+            }
+            ancestor =
+                ancestor.parent == null ? undefined : cached[ancestor.parent];
+            hops += 1;
+        }
     }
+    carry_transitively();
 
     const result: HardDrive = { ...seed };
 
@@ -292,13 +450,19 @@ export function merge_on_reseed(
         if (c == null) continue;
         result[id] = {
             ...c,
+            // a re-homed orphan's own `parent` pointed at a folder that is
+            // gone; folders render from `children`, but a stale `parent`
+            // breaks every path walk (CMD `cd ..`, the Python mirror, restore)
+            parent: rehomed.get(id) ?? c.parent,
             children: c.children.filter((child) => carried.has(child)),
         };
     }
     for (const id of carried) {
-        const c = cached[id];
+        const c = result[id];
         const p = c?.parent;
-        if (c == null || p == null || seed[p] == null) continue;
+        if (c == null || p == null) continue;
+        // `result[p]`, not `seed[p]`: a carried item's parent may itself be a
+        // carried folder, and a re-homed orphan's new parent is a seed folder
         const parent = result[p];
         if (parent != null && !parent.children.includes(id)) {
             result[p] = { ...parent, children: [...parent.children, id] };

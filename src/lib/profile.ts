@@ -60,18 +60,57 @@ export interface EducationEntry {
     degree: string;
     period: string;
     honors?: string;
+    /**
+     * What the degree actually involved, one bullet per line — the same shape
+     * as `ExperienceEntry.description`, and rendered through the same
+     * `PortfolioDetail.bullets` channel.
+     *
+     * LinkedIn splits this into "Activities and societies" and a description;
+     * three of the four activities restate a description bullet almost word
+     * for word, so `profile.json` carries ONE list rather than printing the
+     * same fact twice in a 300px window.
+     */
+    description: string[];
     images: ProfileImage[];
 }
 
-export interface Award {
+/**
+ * A credential: something won or something held.
+ *
+ * ONE type, because `Award` and `Certification` described the same things.
+ * Two of the nine entries across the old `awards` and `certifications` arrays
+ * were literally the same credential filed twice — the graduation honours and
+ * the 2022 certificate of excellence — one copy carrying the PDF and the other
+ * the ceremony photos. `Award` had a `year` and no document; `Certification` a
+ * document and no year, with the year baked into its title instead. The merged
+ * record simply has both, and every entry says which it has.
+ */
+export interface CertificateOrAward {
     title: string;
+    /** Empty for a credential with no date. */
     year: string;
+    /**
+     * What it was for, one bullet per line.
+     *
+     * Empty for a credential that has no story to tell beyond its own
+     * existence — a language certificate is a score, not an achievement with
+     * detail — which is also all LinkedIn holds for those: an issuer, a date
+     * and a credential ID. The IDs are deliberately not seeded; the IELTS
+     * document was dropped for carrying identifiers.
+     */
+    description: string[];
     images: ProfileImage[];
-}
-
-export interface Certification {
-    title: string;
-    images: ProfileImage[];
+    /**
+     * The credential itself, as a PDF under `static/`.
+     *
+     * Seeded as a REAL FILE under `My Documents/Certificates & Awards/` (see
+     * `vfs_gen/build.ts`), so double-clicking it opens the PDF viewer exactly
+     * as the CV does — a certificate nobody can read is not a credential. The
+     * entry's own `.txt` prints that path (`portfolio.ts`) so the document is
+     * findable from the text. Optional: four of the seven have no document,
+     * and an award may never have one.
+     */
+    pdf?: string;
 }
 
 export interface Project {
@@ -193,6 +232,14 @@ export interface MusicGenre {
 }
 
 export interface ProfileMusic {
+    /**
+     * GENERATOR INPUT ONLY — nothing reads this at runtime any more.
+     *
+     * It names the folders `npm run generate:vfs` creates under My Music and
+     * the order it creates them in. The player itself groups by what is
+     * actually on the drive, so that a folder the visitor makes is a category
+     * too; a genre's display name comes from its folder, not from here.
+     */
     genres: MusicGenre[];
     /**
      * Corrections for artists the ID3 tag gets wrong, keyed `<genre>/<file>`.
@@ -207,6 +254,14 @@ export interface ProfileMusic {
     artists: Record<string, string>;
     /** Shown in the player. Content, so it lives here and not in the component. */
     notice: string;
+    /**
+     * Header for songs sitting loose in My Music with no genre folder.
+     *
+     * The player groups by FOLDER now, so this is the one group name it has to
+     * invent rather than read off the drive — which makes it copy, and copy
+     * lives here.
+     */
+    unsorted_label: string;
 }
 
 /**
@@ -293,8 +348,7 @@ export interface Profile {
     experience: ExperienceEntry[];
     education: EducationEntry[];
     skills: Record<string, string[]>;
-    awards: Award[];
-    certifications: Certification[];
+    certificatesAndAwards: CertificateOrAward[];
     projects: Project[];
     languages: LanguageEntry[];
     systemProperties: ProfileSystemProperties;

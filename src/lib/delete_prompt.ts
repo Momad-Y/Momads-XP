@@ -29,12 +29,28 @@ export function other_items_suffix(count: number): string {
  * Callers must decide this PER ITEM — a batch that mixes the two must not be
  * collapsed to one verdict, which is what permanently destroyed a live file
  * before (red-team CRITICAL).
+ *
+ * IT WALKS ANCESTORS, and must: a recycled folder's children keep pointing at
+ * THAT FOLDER, not at the bin (the same thing `search_panel` has to account
+ * for when it hides recycled files from search results). Comparing only the
+ * immediate parent therefore said "not in the bin" for anything nested inside
+ * a binned folder, and deleting such an item recycled it a second time —
+ * cloning it back to the top of the bin instead of destroying it, where it
+ * arrived with no restore breadcrumbs and could not be put back.
  */
 export function is_permanent_delete(
     parent_id: string | null | undefined,
     recycle_bin_id: string,
+    lookup: (id: string) => { parent?: string } | undefined,
 ): boolean {
-    return parent_id === recycle_bin_id;
+    const seen = new Set<string>();
+    let cursor = parent_id;
+    while (cursor != null && !seen.has(cursor)) {
+        if (cursor === recycle_bin_id) return true;
+        seen.add(cursor);
+        cursor = lookup(cursor)?.parent;
+    }
+    return false;
 }
 
 export interface DeletePlan {
@@ -72,7 +88,7 @@ export function plan_delete(
         if (is_protected(id)) continue; // e.g. portfolio entry files
         ids.push(id);
         if (first_name === '') first_name = item.name;
-        if (is_permanent_delete(item.parent, recycle_bin_id)) {
+        if (is_permanent_delete(item.parent, recycle_bin_id, lookup)) {
             permanent_ids.add(id);
         }
     }

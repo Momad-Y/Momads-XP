@@ -1,9 +1,15 @@
 import type { ProgramDescriptor } from './types';
 import {
+    AUDIO_EXTENSIONS,
+    MPC_AUDIO_EXTENSIONS,
+    VIDEO_EXTENSIONS,
+} from './media_types';
+import {
     MY_DOCUMENTS_ID,
     PORTFOLIO_ENTRY_IDS,
     PORTFOLIO_FOLDER_IDS,
     PYTHON_FOLDER_ID,
+    RESUME_FILE_ID,
 } from './generated/vfs_ids';
 
 export interface DefaultWallpaper {
@@ -124,6 +130,9 @@ export const desktop_folder = 'nt1QdU9Sws26H26UNQZcQU';
 
 export const wallpapers_folder = 'uZ7fBbvbzFvQgAmJZpVbEb';
 
+/** `My CV.exe` on the desktop — an inherited-shell id, like the ones above. */
+export const my_cv_desktop_exe = 'p1MyCvDesktopExe0000001';
+
 export const bliss_wallpaper = 'w38WCkdn67K6JsvjdGug6y';
 
 export const protected_items: string[] = [
@@ -146,6 +155,24 @@ export const protected_items: string[] = [
      * it stay fully deletable.
      */
     PYTHON_FOLDER_ID,
+    /*
+     * THE CV, both of its doors.
+     *
+     * `RESUME_FILE_ID` is `C:\CV.pdf` and `my_cv_desktop_exe` is the desktop
+     * icon that opens it. Neither was protected, so the one document the whole
+     * site exists to hand over could be dragged to the bin — and the tombstone
+     * pass would then keep it deleted through every future re-seed. Owner's
+     * call, on the same principle as the entry files: the portfolio IS the
+     * product, and a visitor's freedom is over their own files.
+     *
+     * Note this protects the FILE, not the reader: launched with no file at
+     * all, `pdf_viewer` falls back to `profile.meta.resumePdf`, so My CV in
+     * All Programs keeps working regardless. The other desktop icons — About
+     * Me, Contact Me, Internet Explorer — stay deletable, as XP's shortcuts
+     * are: each is a launcher with a Start-menu twin, not a document.
+     */
+    RESUME_FILE_ID,
+    my_cv_desktop_exe,
 ];
 
 export const hidden_items: string[] = [
@@ -188,15 +215,36 @@ const ie_program: ProgramDescriptor = {
     name: 'Microsoft Internet Explorer',
 };
 
+/**
+ * Audio opens in the Music Player; video opens in Media Player Classic.
+ *
+ * THE ORDER IS THE DECISION, and it was the other way round until the owner
+ * asked for this: `[0]` is what every double-click uses (`viewer.svelte`,
+ * `desktop_folder.svelte` and `favorites.ts` all take it unconditionally), and
+ * anything beyond `[0]` is what `CMFSItem` renders as the "Open With" submenu
+ * — which it does only for two or more handlers.
+ *
+ * MPC stays available for the audio types it can actually decode
+ * (`MPC_AUDIO_EXTENSIONS`) and is NOT offered for the rest: an Open With entry
+ * that opens a window and plays nothing is worse than no entry. The Music
+ * Player is never offered for video — it cannot show a picture.
+ */
+const audio_doctypes = Object.fromEntries(
+    AUDIO_EXTENSIONS.map((ext) => [
+        ext,
+        MPC_AUDIO_EXTENSIONS.includes(ext)
+            ? [music_player_program, mpc_program]
+            : [music_player_program],
+    ]),
+);
+
+const video_doctypes = Object.fromEntries(
+    VIDEO_EXTENSIONS.map((ext) => [ext, [mpc_program]]),
+);
+
 export const doctypes: Record<string, ProgramDescriptor[]> = {
-    '.wav': [mpc_program],
-    '.mp4': [mpc_program],
-    // MPC stays the DEFAULT handler: it is the shipped double-click behaviour
-    // for .mp3/.wav/.mp4, and changing it would regress every existing
-    // Explorer double-click. The Music Player is the SECOND entry, which is
-    // what makes it appear in the right-click "Open With" submenu
-    // (CMFSItem renders that only when there are >= 2 handlers).
-    '.mp3': [mpc_program, music_player_program],
+    ...audio_doctypes,
+    ...video_doctypes,
     '.webp': [image_viewer],
     '.bmp': [image_viewer, paint_program],
     '.png': [image_viewer, paint_program],
@@ -237,11 +285,22 @@ export const doctypes: Record<string, ProgramDescriptor[]> = {
 };
 
 export const icons: Record<string, string> = {
+    // Audio and video glyphs follow the association: `.ogg` carried a VIDEO
+    // icon while the music library listed it as audio. Every associated
+    // extension needs a row here or `file_icon_url` returns null and Explorer
+    // draws a blank — an item must never be openable-but-iconless.
     '.mp3': 'MPC_audio.png',
     '.wav': 'MPC_audio.png',
+    '.ogg': 'MPC_audio.png',
+    '.m4a': 'MPC_audio.png',
+    '.aac': 'MPC_audio.png',
+    '.flac': 'MPC_audio.png',
     '.mp4': 'MPC_video.png',
-    '.ogg': 'MPC_video.png',
     '.webm': 'MPC_video.png',
+    '.wmv': 'MPC_video.png',
+    '.mkv': 'MPC_video.png',
+    '.avi': 'MPC_video.png',
+    '.mov': 'MPC_video.png',
     '.exe': 'ApplicationWindow.png',
     '.xml': 'XML.png',
     '.dll': 'DLL.png',

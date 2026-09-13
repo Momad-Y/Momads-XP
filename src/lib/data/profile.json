@@ -50,12 +50,7 @@
                 "Developed an ML pricing engine: Elastic Net regression and Monte Carlo simulation (10,000+ scenarios, 95% confidence) across 900+ products, with Playwright + Gemini vision competitor monitoring over 82+ URLs feeding BigQuery back into the models.",
                 "Ship across AWS, GCP and Azure with Docker and CI/CD on GitHub Actions and GitLab CI; integration work spans n8n, webhooks, ETL pipelines and marketing APIs (Meta, Pinterest, Google Ads)."
             ],
-            "images": [
-                {
-                    "src": "/assets/images/avatar.png",
-                    "alt": "Mohamed at Printerpix (test image)"
-                }
-            ]
+            "images": []
         },
         {
             "company": "Udacity",
@@ -67,7 +62,12 @@
                 "Covered Python, HTML, CSS, fundamentals of AI, and data science, along with introductions to networks, cybersecurity, multimedia, and encoding/decoding.",
                 "Mentored students through hands-on projects and activities, achieving an 80%+ graduation rate."
             ],
-            "images": []
+            "images": [
+                {
+                    "src": "/assets/images/experience/udacity-connect-mentorship-certificate.jpg",
+                    "alt": "Certificate of completion, Udacity Connect Mentorship"
+                }
+            ]
         },
         {
             "company": "Robotics Club - AASTMT",
@@ -79,7 +79,24 @@
                 "Conducted sessions teaching Python, C/C++, Competitive Programming, and Arduino to over 300 students.",
                 "Attended the 2023 Maker Faire in Cairo representing the Robotics Club."
             ],
-            "images": []
+            "images": [
+                {
+                    "src": "/assets/images/experience/robotics-club-board.jpg",
+                    "alt": "The AASTMT Robotics Club board"
+                },
+                {
+                    "src": "/assets/images/experience/robotics-club-sessions-1.jpg",
+                    "alt": "Robotics Club teaching sessions, 2023"
+                },
+                {
+                    "src": "/assets/images/experience/robotics-club-sessions-2.jpg",
+                    "alt": "Robotics Club teaching sessions, 2023"
+                },
+                {
+                    "src": "/assets/images/experience/robotics-club-maker-faire-2023.jpg",
+                    "alt": "Representing the Robotics Club at Maker Faire Cairo, 2023"
+                }
+            ]
         },
         {
             "company": "Corporatica",
@@ -102,7 +119,40 @@
                 "Developed real-time computer vision and NLP systems with OpenCV, PyTorch and Hugging Face Transformers on embedded hardware, reaching 30 FPS object detection and about 0.3s speech response latency.",
                 "Led the team's AI software architecture to 1st place nationally in Egypt and 3rd place internationally in the Netherlands at RoboCup@Home."
             ],
-            "images": []
+            "images": [
+                {
+                    "src": "/assets/images/experience/robocup-first-place-certificate.jpg",
+                    "alt": "First place certificate, RoboCup@Home Education Egypt 2024"
+                },
+                {
+                    "src": "/assets/images/experience/robocup-egypt-trophy.jpg",
+                    "alt": "The RoboCup@Home Egypt 2024 trophy"
+                },
+                {
+                    "src": "/assets/images/experience/robocup-egypt-team.jpg",
+                    "alt": "The AAST team at RoboCup@Home Egypt 2024"
+                },
+                {
+                    "src": "/assets/images/experience/robocup-participation-certificate.jpg",
+                    "alt": "Certificate of participation, RoboCup@Home Education Netherlands 2024"
+                },
+                {
+                    "src": "/assets/images/experience/robocup-netherlands-ranking.jpg",
+                    "alt": "Major team ranking, RoboCup@Home Netherlands 2024"
+                },
+                {
+                    "src": "/assets/images/experience/robocup-netherlands-team.jpg",
+                    "alt": "The AAST team at RoboCup@Home Netherlands 2024"
+                },
+                {
+                    "src": "/assets/images/experience/robocup-netherlands-robot.jpg",
+                    "alt": "The team robot at RoboCup@Home Netherlands 2024"
+                },
+                {
+                    "src": "/assets/images/experience/robocup-netherlands-arena.jpg",
+                    "alt": "The RoboCup@Home arena, Netherlands 2024"
+                }
+            ]
         },
         {
             "company": "Mentorness",
@@ -114,7 +164,12 @@
                 "Developed classifiers (Naive Bayes, Random Forest, Logistic Regression) and sequence models (LSTM, GRU).",
                 "Compared multiple models and selected top performers (90%+ accuracy) for deployment."
             ],
-            "images": []
+            "images": [
+                {
+                    "src": "/assets/images/certifications/mentorness-ml-internship-2024.jpg",
+                    "alt": "Certificate of achievement, Mentorness Machine Learning internship"
+                }
+            ]
         }
     ],
     "education": [
@@ -123,52 +178,186 @@
             "degree": "B.Sc. in Artificial Intelligence (Intelligent Systems)",
             "period": "October 2021 – August 2025",
             "honors": "GPA 3.94/4.0 — Excellent with Honours (Summa Cum Laude), ranked 2nd in class",
-            "images": []
+            "description": [
+                "Specialized in Intelligent Systems with a focus on ML, NLP, and CV.",
+                "Proficient in Python, C, C++, JavaScript, with experience in TensorFlow, PyTorch, scikit-learn, LangChain, and OpenCV.",
+                "Built multiple projects such as AI Smart Cane, Robotic Chess Arm, and Celebrity Look-Alike CNN.",
+                "Developed BeMo (AI Assistant Robot) as a graduation project, integrating NLP, CV, robotics, and IoT, later adopted by Dr. Aly Fahmy, Dean of AAST AI College.",
+                "Graduation project research paper (first author) under review: \"Tiny Pi, Big Impact: Edge-Driven Hybrid LLM for Real-Time Conversational Robotics\".",
+                "Represented the college at multiple occasions, including VR and Robotics shows across the Alamein campus and the Abu Qir (Alexandria main campus).",
+                "Served as Vice-President of Software Engineering in the Robotics Club, mentoring newcomers in AI, Arduino, and robotics.",
+                "Led multiple teams to 1st place RoboCup @Home Education Egypt 2024 and 3rd place Major Competition Netherlands 2024.",
+                "ICPC Volunteer: contributed to organizing and supporting the 2024 Luxor contest."
+            ],
+            "images": [
+                {
+                    "src": "/assets/images/education/aast-bachelor-degree.jpg",
+                    "alt": "Bachelor's degree in Artificial Intelligence from the AAST College of Artificial Intelligence"
+                },
+                {
+                    "src": "/assets/images/education/cai-graduation-2025.jpg",
+                    "alt": "Receiving the graduation award on stage at the 2025 AAST ceremony"
+                },
+                {
+                    "src": "/assets/images/education/project-1-discussion-2025.jpg",
+                    "alt": "Presenting BeMo's communication-handler module at the 2025 project defence"
+                },
+                {
+                    "src": "/assets/images/education/project-2-discussion-2025.jpg",
+                    "alt": "With the faculty panel after the 2025 graduation project defence"
+                },
+                {
+                    "src": "/assets/images/education/robotics-show-alamein-2023.jpg",
+                    "alt": "The College of AI robotics show at the Alamein campus, 2023"
+                },
+                {
+                    "src": "/assets/images/education/robotics-show-alamein-2022.jpg",
+                    "alt": "At the AAST fifty-years robotics show, Alamein campus, 2022"
+                },
+                {
+                    "src": "/assets/images/education/dobot-show-alamein-2022.jpg",
+                    "alt": "Demonstrating a Dobot robotic arm at the Alamein campus, 2022"
+                },
+                {
+                    "src": "/assets/images/education/vr-show-abu-qir-2022.jpg",
+                    "alt": "Presenting at the VR and robotics show, Abu Qir campus, 2022"
+                },
+                {
+                    "src": "/assets/images/education/cai-college.jpg",
+                    "alt": "With the team and the college's humanoid robots"
+                }
+            ]
         }
     ],
-    "awards": [
+    "certificatesAndAwards": [
         {
             "title": "1st Place – RoboCup @Home Education Competition (Egypt)",
             "year": "2024",
-            "images": []
+            "description": [
+                "Led Team 3arfeen Hollanda to 1st place in the national RoboCup @Home Education Competition.",
+                "Designed and implemented solutions for vision, speech, and localization tasks, enabling the robot to perceive its environment, interact naturally, and navigate effectively.",
+                "Secured qualification for the RoboCup @Home Education Major Competition."
+            ],
+            "images": [
+                {
+                    "src": "/assets/images/experience/robocup-first-place-certificate.jpg",
+                    "alt": "First place certificate, RoboCup@Home Education Egypt 2024"
+                },
+                {
+                    "src": "/assets/images/experience/robocup-egypt-trophy.jpg",
+                    "alt": "The RoboCup@Home Egypt 2024 trophy"
+                },
+                {
+                    "src": "/assets/images/experience/robocup-egypt-team.jpg",
+                    "alt": "The AAST team at RoboCup@Home Egypt 2024"
+                }
+            ]
         },
         {
             "title": "3rd Place – RoboCup @Home Education Major Competition (Netherlands)",
             "year": "2024",
-            "images": []
+            "description": [
+                "Led Team Wingardium Levioso to 3rd place in the RoboCup @Home Education Major Competition.",
+                "Competed in challenges focused on vision, speech, and localization for autonomous robots.",
+                "Represented Egypt in international robotics competitions, gaining valuable experience."
+            ],
+            "images": [
+                {
+                    "src": "/assets/images/experience/robocup-participation-certificate.jpg",
+                    "alt": "Certificate of participation, RoboCup@Home Education Netherlands 2024"
+                },
+                {
+                    "src": "/assets/images/experience/robocup-netherlands-ranking.jpg",
+                    "alt": "Major team ranking, RoboCup@Home Netherlands 2024"
+                },
+                {
+                    "src": "/assets/images/experience/robocup-netherlands-team.jpg",
+                    "alt": "The AAST team at RoboCup@Home Netherlands 2024"
+                },
+                {
+                    "src": "/assets/images/experience/robocup-netherlands-robot.jpg",
+                    "alt": "The team robot at RoboCup@Home Netherlands 2024"
+                },
+                {
+                    "src": "/assets/images/experience/robocup-netherlands-arena.jpg",
+                    "alt": "The RoboCup@Home arena, Netherlands 2024"
+                }
+            ]
         },
         {
             "title": "Honorary Award – Smart White Cane (AISC), White Cane Conference",
-            "year": "",
-            "images": []
-        },
-        {
-            "title": "Certificate of Excellence – Graduation Honors",
-            "year": "2025",
-            "images": []
-        },
-        {
-            "title": "Certificate of Excellence",
             "year": "2022",
-            "images": []
-        }
-    ],
-    "certifications": [
+            "description": [
+                "Presented the Smart White Cane (AISC) at the White Cane Conference in the Taha Hussein Library, Bibliotheca Alexandrina, where the project received an honorary award for innovation in assistive technology."
+            ],
+            "images": [
+                {
+                    "src": "/assets/images/awards/smart-white-cane-3.jpg",
+                    "alt": "Presenting the Smart White Cane at the Bibliotheca Alexandrina"
+                },
+                {
+                    "src": "/assets/images/awards/smart-white-cane-2.jpg",
+                    "alt": "The Smart White Cane team with the finished cane"
+                },
+                {
+                    "src": "/assets/images/awards/smart-white-cane-1.jpg",
+                    "alt": "On stage with the team at the White Cane Conference"
+                }
+            ]
+        },
         {
-            "title": "Certificate of Excellence – Graduation Honors (AAST, 2025)",
+            "title": "Certificate of Excellence – Graduation Honors (AAST)",
+            "year": "2025",
+            "description": [
+                "Awarded by the Arab Academy for Science, Technology & Maritime Transport for graduating with a B.Sc. in Artificial Intelligence (Intelligent Systems Major), with a GPA of 3.94 (Excellent with Honors – Summa Cum Laude)."
+            ],
+            "images": [
+                {
+                    "src": "/assets/images/certifications/graduation-honors-2025.jpg",
+                    "alt": "Certificate of excellence for graduation honours, AAST 2025"
+                },
+                {
+                    "src": "/assets/images/awards/graduation-2025-ceremony-1.jpg",
+                    "alt": "Receiving the graduation honours award from the faculty"
+                },
+                {
+                    "src": "/assets/images/awards/graduation-2025-ceremony-2.jpg",
+                    "alt": "In cap and gown with the graduation certificate"
+                }
+            ],
+            "pdf": "/assets/certificates/graduation-honors-2025.pdf"
+        },
+        {
+            "title": "IELTS Academic – Band 7.5 (IELTS Official)",
+            "year": "2025",
+            "description": [],
             "images": []
         },
         {
-            "title": "Certificate of Excellence (AAST, 2022)",
-            "images": []
+            "title": "Certificate of Achievement – Mentorness ML Internship",
+            "year": "2024",
+            "description": [],
+            "images": [
+                {
+                    "src": "/assets/images/certifications/mentorness-ml-internship-2024.jpg",
+                    "alt": "Certificate of achievement, Mentorness Machine Learning internship"
+                }
+            ],
+            "pdf": "/assets/certificates/mentorness-ml-internship-2024.pdf"
         },
         {
-            "title": "IELTS Academic – Band 7.5 (IELTS Official, 2025)",
-            "images": []
-        },
-        {
-            "title": "Certificate of Achievement – Mentorness ML Internship (2024)",
-            "images": []
+            "title": "Certificate of Excellence (AAST)",
+            "year": "2022",
+            "description": [
+                "Awarded by the Arab Academy for Science, Technology & Maritime Transport for excellent academic achievement in the B.Sc. Artificial Intelligence program."
+            ],
+            "images": [
+                {
+                    "src": "/assets/images/certifications/certificate-of-excellence-2022.jpg",
+                    "alt": "College of Artificial Intelligence award for academic excellence, 2022"
+                }
+            ],
+            "pdf": "/assets/certificates/certificate-of-excellence-2022.pdf"
         }
     ],
     "projects": [
@@ -184,7 +373,20 @@
                 "Playwright"
             ],
             "url": "https://github.com/Momad-Y/Momads-XP",
-            "images": []
+            "images": [
+                {
+                    "src": "/assets/images/projects/momads-xp-desktop.jpg",
+                    "alt": "The XP desktop as it boots, with the curated icons and taskbar"
+                },
+                {
+                    "src": "/assets/images/projects/momads-xp-explorer.jpg",
+                    "alt": "Explorer showing the music library, with the XP sidebar, address bar and status bar"
+                },
+                {
+                    "src": "/assets/images/projects/momads-xp-music-player.jpg",
+                    "alt": "The Music Player with its live spectrum visualiser and collapsible genre list"
+                }
+            ]
         },
         {
             "name": "BeMo (Be Modern) — Graduation Project",
@@ -198,21 +400,64 @@
                 "Flutter"
             ],
             "url": "",
-            "images": []
+            "images": [
+                {
+                    "src": "/assets/images/projects/bemo-robot.jpg",
+                    "alt": "BeMo, the conversational robot"
+                },
+                {
+                    "src": "/assets/images/projects/bemo-discussion-1.jpg",
+                    "alt": "BeMo at the 2025 project discussion"
+                },
+                {
+                    "src": "/assets/images/projects/bemo-discussion-2.jpg",
+                    "alt": "BeMo at the 2025 project discussion"
+                },
+                {
+                    "src": "/assets/images/projects/bemo-discussion-3.jpg",
+                    "alt": "BeMo at the 2025 project discussion"
+                },
+                {
+                    "src": "/assets/images/projects/bemo-demo-1.jpg",
+                    "alt": "BeMo demo"
+                },
+                {
+                    "src": "/assets/images/projects/bemo-demo-2.jpg",
+                    "alt": "BeMo demo"
+                }
+            ]
         },
         {
             "name": "EUC RAG Agent",
             "description": "A complete RAG system for a fictional university: TXT/CSV/PDF/DOCX preprocessing with cleaning, lemmatization and chunk caching feeding a Chroma vector store, three swappable embedding backends and three generation models selectable at runtime. Live demo: euc-rag.streamlit.app",
             "tech": ["Python", "LangChain", "Chroma", "Gemini", "Streamlit"],
             "url": "https://github.com/Momad-Y/EUC-RAG-Agent",
-            "images": []
+            "images": [
+                {
+                    "src": "/assets/images/projects/euc-rag-chatbot.png",
+                    "alt": "The EUC Chatbot answering a tuition question, with the model and embedding pickers"
+                }
+            ]
         },
         {
             "name": "NexChat",
             "description": "A multimodal AI chatbot: document Q&A over LangChain + FAISS, long-context summarization, image captioning via a vision LLM, and speech in and out — running entirely on free-tier hosted models with a full test suite. Live demo: nexchat.streamlit.app",
             "tech": ["Python", "LangChain", "FAISS", "Streamlit"],
             "url": "https://github.com/Momad-Y/NexChat",
-            "images": []
+            "images": [
+                {
+                    "src": "/assets/images/projects/nexchat-summarization.jpg",
+                    "alt": "NexChat summarising a long document"
+                },
+                {
+                    "src": "/assets/images/projects/nexchat-question-answering.jpg",
+                    "alt": "NexChat answering questions over an uploaded document"
+                },
+                {
+                    "src": "/assets/images/projects/nexchat-image-captioning.jpg",
+                    "alt": "NexChat captioning an uploaded photo"
+                }
+            ]
         },
         {
             "name": "Lyric Logic",
@@ -226,7 +471,75 @@
                 "PostgreSQL"
             ],
             "url": "https://github.com/Momad-Y/Lyric-Logic",
-            "images": []
+            "images": [
+                {
+                    "src": "/assets/images/projects/lyric-logic-app.jpg",
+                    "alt": "Lyric Logic predicting the artist from pasted lyrics, with a confidence score"
+                },
+                {
+                    "src": "/assets/images/projects/lyric-logic-dataset.jpg",
+                    "alt": "The artist dataset the classifier was trained on"
+                }
+            ]
+        },
+        {
+            "name": "LM Box 5",
+            "description": "A retro gaming system played with computer vision instead of controllers — Popping Balloons, Pong and Dinosaur Runner driven by Mediapipe hand tracking and pose detection. Shipped as a full PyGame executable with title screens, animations, sound and settings, an SQLite store for user and gameplay records, and cross-platform releases for Windows, macOS and Linux published free on itch.io.",
+            "tech": [
+                "Python",
+                "PyGame",
+                "Mediapipe",
+                "Computer Vision",
+                "SQLite"
+            ],
+            "url": "https://github.com/Momad-Y/LM-Box-5",
+            "images": [
+                {
+                    "src": "/assets/images/projects/lmbox5-game-menu.png",
+                    "alt": "LM Box 5's game carousel — Balloons, Pong and Runner"
+                },
+                {
+                    "src": "/assets/images/projects/lmbox5-balloons-game.jpg",
+                    "alt": "Popping Balloons, played with hand tracking over the webcam feed"
+                },
+                {
+                    "src": "/assets/images/projects/lmbox5-pong-game.jpg",
+                    "alt": "Two-player Pong controlled by hand position"
+                },
+                {
+                    "src": "/assets/images/projects/lmbox5-runner-game.png",
+                    "alt": "Dinosaur Runner, controlled by body movement"
+                },
+                {
+                    "src": "/assets/images/projects/lmbox5-users.png",
+                    "alt": "The user profiles screen"
+                },
+                {
+                    "src": "/assets/images/projects/lmbox5-leaderboards.png",
+                    "alt": "Per-game leaderboards"
+                },
+                {
+                    "src": "/assets/images/projects/lmbox5-settings.png",
+                    "alt": "Audio, camera and gameplay settings"
+                }
+            ]
+        },
+        {
+            "name": "ACO Simulation",
+            "description": "An Ant Colony Optimization simulation written from scratch with no swarm-algorithm libraries: ant movement (Monte Carlo), pheromone placement and evaporation, and dynamic food and weather algorithms all implemented by hand, visualised live in Pygame with configurable parameters.",
+            "tech": [
+                "Python",
+                "Pygame",
+                "Monte Carlo Simulation",
+                "Swarm Intelligence"
+            ],
+            "url": "https://github.com/Momad-Y/ACO-Simulation",
+            "images": [
+                {
+                    "src": "/assets/images/projects/aco-simulation-window.png",
+                    "alt": "The Ant Colony Optimization simulation running, with pheromone trails and a legend"
+                }
+            ]
         },
         {
             "name": "Magnus & Hikaru Chess Robots",
@@ -238,28 +551,144 @@
                 "Robotics"
             ],
             "url": "https://github.com/Momad-Y/Magnus-Hikaru-Chess-Robots",
-            "images": []
+            "images": [
+                {
+                    "src": "/assets/images/projects/chess-magnus-playing.jpg",
+                    "alt": "Magnus Armsen playing the move the Stockfish engine chose"
+                },
+                {
+                    "src": "/assets/images/projects/chess-magnus-player-move.jpg",
+                    "alt": "A player making their move on the board the arm reads by camera"
+                },
+                {
+                    "src": "/assets/images/projects/chess-magnus-web-app.jpg",
+                    "alt": "Magnus Armsen's web app"
+                },
+                {
+                    "src": "/assets/images/projects/chess-magnus-calibration.jpg",
+                    "alt": "Calibrating the chessboard from the camera feed"
+                },
+                {
+                    "src": "/assets/images/projects/chess-hikaru-rig.jpg",
+                    "alt": "The Hikaru Nakarmsen rig — a Dobot Magician, board, camera and laptop"
+                },
+                {
+                    "src": "/assets/images/projects/chess-hikaru-menu.png",
+                    "alt": "Hikaru Nakarmsen's main menu"
+                },
+                {
+                    "src": "/assets/images/projects/chess-hikaru-play.png",
+                    "alt": "The play screen: virtual board beside the camera before and after views"
+                },
+                {
+                    "src": "/assets/images/projects/chess-presentation-audience.jpg",
+                    "alt": "Presenting the chess robots to visitors"
+                },
+                {
+                    "src": "/assets/images/projects/chess-presentation-arm.jpg",
+                    "alt": "Demonstrating the robotic arm to an audience"
+                }
+            ]
         },
         {
             "name": "OptiCompanion",
             "description": "An application designed to help blind and visually impaired individuals using AI, delivered as a Flutter mobile app.",
             "tech": ["Flutter", "Dart"],
             "url": "https://github.com/Momad-Y/OptiCompanion",
-            "images": []
+            "images": [
+                {
+                    "src": "/assets/images/projects/opticompanion-feature-graphic.jpg",
+                    "alt": "OptiCompanion — an app to help blind and visually impaired people, using AI"
+                },
+                {
+                    "src": "/assets/images/projects/opticompanion-home-screen.jpg",
+                    "alt": "The app's home screen: OCR, object recognition, document reader, feedback and settings"
+                },
+                {
+                    "src": "/assets/images/projects/opticompanion-splash-mockup.jpg",
+                    "alt": "The app's splash screen on a phone"
+                },
+                {
+                    "src": "/assets/images/projects/opticompanion-home-mockup.jpg",
+                    "alt": "The home screen on a phone"
+                }
+            ]
         },
         {
             "name": "Celebrity Look-a-Like CNN",
             "description": "A convolutional neural network that matches a face to its closest celebrity look-alike.",
             "tech": ["Python", "TensorFlow", "OpenCV", "Computer Vision"],
             "url": "https://github.com/Momad-Y/Celebrity-look-a-like-CNN",
-            "images": []
+            "images": [
+                {
+                    "src": "/assets/images/projects/celebrity-real-time-detection.jpg",
+                    "alt": "Real-time celebrity matching from a webcam, with the match and confidence overlaid"
+                },
+                {
+                    "src": "/assets/images/projects/celebrity-test-vs-celeb-grid.jpg",
+                    "alt": "A grid of test photos beside their closest celebrity match and score"
+                },
+                {
+                    "src": "/assets/images/projects/celebrity-celeb-vs-celeb-grid.jpg",
+                    "alt": "Celebrity photos matched against other celebrity photos"
+                },
+                {
+                    "src": "/assets/images/projects/celebrity-imdb-dataset.jpg",
+                    "alt": "A sample of the IMDB celebrity face dataset"
+                },
+                {
+                    "src": "/assets/images/projects/celebrity-preprocessing.jpg",
+                    "alt": "Faces after cropping and normalisation"
+                }
+            ]
+        },
+        {
+            "name": "NFLX Stock Price Prediction",
+            "description": "Built and compared several ML models — Linear Regression, Random Forest and AdaBoost — to predict NFLX stock prices, with data collection, preprocessing and feature engineering, and model performance analysed through visualisations and evaluation metrics.",
+            "tech": ["Python", "Scikit-Learn", "Pandas", "Matplotlib"],
+            "url": "https://github.com/Momad-Y/NFLX-Stock-Price-Prediction",
+            "images": [
+                {
+                    "src": "/assets/images/projects/nflx-all-predictions.png",
+                    "alt": "All model predictions against Netflix's actual closing prices"
+                },
+                {
+                    "src": "/assets/images/projects/nflx-correlation-heatmap.png",
+                    "alt": "Correlation heat map of the open, high, low and close attributes"
+                },
+                {
+                    "src": "/assets/images/projects/nflx-five-year-prices.png",
+                    "alt": "Netflix closing prices across five years"
+                },
+                {
+                    "src": "/assets/images/projects/nflx-close-price-histogram.png",
+                    "alt": "Distribution of Netflix closing prices"
+                },
+                {
+                    "src": "/assets/images/projects/nflx-random-forest.png",
+                    "alt": "Random Forest predictions against actual closing prices"
+                }
+            ]
         },
         {
             "name": "Smart White Cane (AISC)",
             "description": "An AI-assisted white cane for blind and visually impaired users, recognised with an Honorary Award at the White Cane Conference.",
             "tech": ["Python", "Computer Vision", "Embedded Software", "IoT"],
             "url": "https://github.com/YasserSalem1/Smart-Cane",
-            "images": []
+            "images": [
+                {
+                    "src": "/assets/images/awards/smart-white-cane-2.jpg",
+                    "alt": "The Smart White Cane team with the finished cane"
+                },
+                {
+                    "src": "/assets/images/awards/smart-white-cane-3.jpg",
+                    "alt": "Presenting the Smart White Cane at the Bibliotheca Alexandrina"
+                },
+                {
+                    "src": "/assets/images/awards/smart-white-cane-1.jpg",
+                    "alt": "On stage with the team at the White Cane Conference"
+                }
+            ]
         }
     ],
     "skills": {
@@ -470,6 +899,18 @@
                 {
                     "ext": ".mp3",
                     "desc": "MP3 Audio — Media Player, or the fancy one"
+                },
+                {
+                    "ext": ".ogg",
+                    "desc": "OGG Audio — the format nobody agreed on"
+                },
+                {
+                    "ext": ".mp4",
+                    "desc": "MPEG-4 Video — Media Player Classic’s department"
+                },
+                {
+                    "ext": ".mkv",
+                    "desc": "Matroska Video — good luck, codec permitting"
                 }
             ],
             "note": "Change and Advanced are disabled. These associations are perfect as-is."
@@ -556,7 +997,8 @@
             "english-pop/03 - Far Away.mp3": "Demis Roussos",
             "hip-hop/01 - i (Single Version).mp3": "Kendrick Lamar"
         },
-        "notice": "All music legally acquired™ · personal listening only, not for distribution."
+        "notice": "All music legally acquired™ · personal listening only, not for distribution.",
+        "unsorted_label": "Unsorted"
     },
     "copy": {
         "loginStatus": "1337 programs running.",

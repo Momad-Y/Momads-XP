@@ -18,8 +18,13 @@ const pascal_section: Record<PortfolioSection, string> = {
     projects: 'Proj',
     education: 'Edu',
     skills: 'Skill',
-    awards: 'Award',
-    certifications: 'Cert',
+    // 'CertAward', not 'Cert': the section holds trophies as well as
+    // certificates, and an id that calls a 1st-place placement a certificate
+    // reads wrong forever. Entry ids churn on a merge regardless — the index
+    // suffix moves — so there was no stability to protect here. The three
+    // CONTAINER ids did have stability worth keeping, and they kept it: see
+    // `FOLDERS` in build.ts.
+    certificatesAndAwards: 'CertAward',
 };
 
 export function entry_id(section: PortfolioSection, key_text: string): string {

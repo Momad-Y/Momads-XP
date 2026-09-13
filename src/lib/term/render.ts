@@ -8,8 +8,11 @@
  * the earlier rows behind — a duplicated prompt and a line that never
  * recovered. It was reachable before filesystem navigation existed (`echo`
  * with a long argument) and becomes routine with it: the longest seeded
- * filename is 71 characters, which at the `momad@xp:~/Certifications$ ` prompt
- * is a 102-column line inside a ~78-column default window.
+ * filename is 97 characters, which at the
+ * `momad@xp:~/Certificates & Awards$ ` prompt is a 131-column line inside a
+ * ~78-column default window. (Both numbers have grown twice since this was
+ * written — the module's math is width-agnostic, but the figures are what
+ * justify its existence, so they are kept true.)
  *
  * Pure string math, deliberately outside the components: CMD and the Python
  * REPL both redraw, and this repo's scar tissue is full of one rule applied at

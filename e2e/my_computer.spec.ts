@@ -37,18 +37,22 @@ async function enterFolder(page: Page, name: string) {
     return win;
 }
 
-test('Explorer root lists the six portfolio folders', async ({ page }) => {
+test('Explorer root lists the five portfolio folders', async ({ page }) => {
     await openMyComputer(page);
     const win = page.locator('#work-space .window').first();
+    // five, not six: Certifications and Awards are one "Certificates & Awards"
     for (const name of [
         'Experience',
         'Projects',
         'Education',
         'Skills',
-        'Certifications',
-        'Awards',
+        'Certificates & Awards',
     ]) {
         await expect(win.getByText(name, { exact: true })).toBeVisible();
+    }
+    // and the two it replaced are gone, rather than sitting alongside it
+    for (const name of ['Certifications', 'Awards']) {
+        await expect(win.getByText(name, { exact: true })).toHaveCount(0);
     }
 });
 

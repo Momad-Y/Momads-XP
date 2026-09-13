@@ -126,27 +126,34 @@ My Computer
 │   ├── Data & Programming
 │   ├── Backend & Full-Stack
 │   └── Software Development
-├── Certifications/
-│   └── [List from JSON]
-└── Awards/
+└── Certificates & Awards/
     ├── 1st Place — RoboCup @Home (Egypt)
     ├── 3rd Place — RoboCup @Home (Netherlands)
     └── ...
 ```
+
+> **Amended (post-Phase-3).** `Certifications/` and `Awards/` were two folders
+> until the owner merged them into one **Certificates & Awards**. They had to
+> merge: the two `profile.json` arrays described the same two credentials twice
+> — the graduation honours and the 2022 certificate of excellence were in both
+> with different titles, one copy carrying the PDF and the other the ceremony
+> photos. One section, one folder, everywhere it is derived (`C:\`,
+> My Pictures, My Documents, CMD, the Python mirror). See
+> `docs/certificates-and-awards-plan.md`.
 
 - Clicking a folder shows its contents as XP file/folder icons in the right panel
 - Clicking a file (experience entry, project, etc.) opens a detail view within the explorer window or in a new window
 
 **Image & media support per entry:**
 
-Each file (experience, education, award, project, certification) can have associated images and/or GIFs defined in `profile.json`. These are rendered in the detail view when a file is opened.
+Each file (experience, education, project, credential) can have associated images and/or GIFs defined in `profile.json`. These are rendered in the detail view when a file is opened.
 
 Examples:
 
 - **Education → AAST**: Diploma photo, graduation project presentation photo
-- **Awards → RoboCup 1st Place (Egypt)**: Team photo, certificate scan
+- **Certificates & Awards → RoboCup 1st Place (Egypt)**: Team photo, trophy, certificate scan
 - **Experience → Printerpix**: Office photo, system dashboard screenshot
-- **Certifications → IELTS**: Certificate scan
+- **Certificates & Awards → Graduation Honors**: Certificate scan plus the ceremony photos, and the PDF itself under My Documents
 
 Images are displayed as a thumbnail gallery or inline within the detail view. Clicking a thumbnail opens a larger preview (XP-style image viewer or lightbox within the explorer window).
 
@@ -375,6 +382,80 @@ where Pyodide takes ~10 seconds.
 - Track list panel
 - Visualization: simple waveform or spectrum analyzer (Canvas API + Web Audio `AnalyserNode`)
 - Stretch alternative: an additional Spotify Embed mode with a reduced feature set (only the embed's own play/pause/seek)
+
+#### My Pictures library — photos and video (Phase 6)
+
+Owner-requested 2026-09-12: the same thing the Music Player became, for
+pictures and video. `My Pictures` is EMPTY in the seed today (0 children).
+
+**The pipeline is the music one, reused rather than re-invented.** Every piece
+below already exists and is proven; the new work is a second scanner and a
+gallery view, not a second architecture.
+
+| Music | Pictures |
+| --- | --- |
+| `static/audio/music/<genre>/*.mp3` | `static/images/gallery/<album>/*` |
+| `music.genres` in `profile.json` — names and ORDER, generator input only | `pictures.albums` — same shape, same role |
+| `music.artists` overrides, keyed `<genre>/<file>`, stale keys a hard error | `pictures.captions` — alt text and captions, same keying, same hard error |
+| `src/lib/music/scan.ts` | `src/lib/pictures/scan.ts` |
+| ids are `sha256(genre/filename)` | ids are `sha256(album/filename)` |
+| `src/lib/generated/music.ts` sidecar + the VFS seed | `src/lib/generated/pictures.ts` + the VFS seed |
+| `build_library` over the `My Music` subtree | `build_gallery` over the `My Pictures` subtree |
+| `music_player.svelte` reads the drive | the gallery reads the drive |
+
+The scanner inherits every validation `scan.ts` already enforces, because each
+one was written for a real mistake: a folder on disk that `profile.json` does
+not declare (and the reverse) fails the build with the exact line to paste; no
+loose files at the tree root; no empty albums; no byte-identical duplicates;
+stale override keys are an error, not a silent no-op.
+
+Reading the drive rather than the manifest means the gallery inherits, for
+free, all seven behaviours the music player had to be taught: deleting a photo
+in Explorer removes it, deleting an album folder removes the album, emptying
+one leaves the album at zero, a folder or file the visitor adds appears, a
+loose file groups under the unsorted header, and opening a picture from outside
+`My Pictures` still shows it.
+
+**Three places an exact mirror is impossible. These are the decisions.**
+
+1. **No generated thumbnails.** `cover_box.ts` measures crops and deliberately
+   never re-encodes: `zlib` output is not stable across Node versions, and
+   `static/assets/covers` sits on the CI freshness gate, so a re-encode would
+   redden CI on every run for reasons nobody could see. Resizing a photo IS
+   re-encoding, so the same rule forbids build-time thumbnails. The gallery
+   therefore scales originals in CSS — `Previewable.svelte` already lazy-loads
+   them through an `IntersectionObserver` — and the owner exports at sane
+   dimensions. This is in tension with the Phase 6 "optimize images (WebP)"
+   item and should be settled with it: pre-sized WebP variants committed AS
+   SOURCE would satisfy both, since committed inputs are stable by definition.
+2. **Video carries no build-time poster or duration.** Both need a decoder.
+   Reuse the pattern the music player already ships: `<video preload="metadata">`
+   supplies its own first frame, and duration renders as `--:--` until the file
+   is loaded (`format_optional_duration`, and the component-level learned-duration
+   cache beside it).
+3. **One folder, or two.** The owner asked for images AND video under
+   `My Pictures`. XP itself separates `My Pictures` from `My Videos`, and the
+   association work already sends video to Media Player Classic and images to
+   the image viewer, so a split would need no new plumbing. Defaulting to what
+   was asked — one `My Pictures` tree holding both — with the split recorded as
+   a one-line change if wanted at build time.
+
+**Metadata the sidecar carries**, all readable in pure Node from file headers,
+the way `cover_box.ts` already decodes PNG: intrinsic width and height (PNG
+`IHDR`, JPEG `SOF`, WebP `VP8X`/`VP8L`), byte size, and the caption/alt text
+from `profile.json`. Alt text from the profile is also the honest answer to
+part of the Phase 6 a11y item — a gallery of images with no `alt` would add to
+the warning count this phase exists to burn down.
+
+**Consequence for All Programs:** `image_viewer.svelte` is excluded from the
+menu today because it throws without a file (`NOT_PROGRAMS` in
+`src/lib/start_menu_programs.ts`). A gallery is launchable cold, so it belongs
+IN the menu — and the folder-coverage test will require that decision to be
+made explicitly.
+
+**What the owner provides:** the files, in one folder per album under
+`static/images/gallery/`, plus an `albums` list in `profile.json` naming and
+ordering them. Then `npm run generate:vfs`. Same three steps as the music.
 
 ### 3.3 Games
 
@@ -847,7 +928,7 @@ The base repo persists a virtual filesystem in IndexedDB (`idb-keyval`): a seed 
 
 Momad's XP adapts this so all portfolio content stays data-driven:
 
-- A build-time script (`scripts/generate-vfs`) generates the VFS seed from `src/lib/data/profile.json` — the My Computer folder tree (Experience, Projects, Education, Skills, Certifications, Awards) is derived from the JSON, never hand-edited
+- A build-time script (`scripts/generate-vfs`) generates the VFS seed from `src/lib/data/profile.json` — the My Computer folder tree (Experience, Projects, Education, Skills, Certificates & Awards) is derived from the JSON, never hand-edited
 - The seed carries a `SEED_VERSION` — computed as a **content hash** of the generated seed, so it changes automatically with every content edit (no manual bump to forget); on boot, a version mismatch re-seeds IndexedDB so content updates actually reach returning visitors
 - User-created files (Paint drawings, etc.) survive re-seeds where possible; portfolio folders are always replaced by the new seed
 
@@ -986,6 +1067,12 @@ All personal content lives in a single `src/lib/data/profile.json`. Components r
             "degree": "Bachelor's degree, Artificial Intelligence (Intelligent Systems)",
             "period": "October 2021 – July 2025",
             "honors": "Excellent with Honours",
+            // one bullet per line, rendered through `PortfolioDetail.bullets`
+            // — the same channel as an experience entry's, so it reaches the
+            // detail window, CMD `cat` and the Python mirror at once
+            "description": [
+                "Specialized in Intelligent Systems with a focus on ML, NLP, and CV.",
+            ],
             "images": [
                 {
                     "src": "/assets/images/aast-diploma.jpg",
@@ -1040,49 +1127,40 @@ All personal content lives in a single `src/lib/data/profile.json`. Components r
         ],
     },
 
-    "awards": [
+    // ONE array, not `awards` + `certifications`: those two held the same
+    // credentials twice. Awards first, then certificates, each
+    // reverse-chronological with undated entries last — this order IS the
+    // order Explorer, `ls` and `os.listdir` show, because generated items
+    // carry `sort_option: NONE`.
+    "certificatesAndAwards": [
         {
             "title": "1st Place – RoboCup @Home Education Competition (Egypt)",
             "year": "2024",
-            "images": [],
-        },
-        {
-            "title": "3rd Place – RoboCup @Home Education Major Competition (Netherlands)",
-            "year": "2024",
+            // empty for a credential with no story beyond its own existence
+            // (a language certificate is a score) — LinkedIn holds no prose
+            // for those either
+            "description": [
+                "Led Team 3arfeen Hollanda to 1st place in the national RoboCup @Home Education Competition.",
+            ],
             "images": [],
         },
         {
             "title": "Honorary Award – Smart White Cane (AISC), White Cane Conference",
-            "year": "",
+            // empty, not absent: every entry states whether it has a date
+            "year": "2022",
+            "description": [
+                "Presented the Smart White Cane (AISC) at the White Cane Conference …",
+            ],
             "images": [],
         },
         {
-            "title": "Certificate of Excellence – Graduation Honors",
+            "title": "Certificate of Excellence – Graduation Honors (AAST)",
             "year": "2025",
             "images": [],
-        },
-    ],
-
-    "certifications": [
-        {
-            "title": "Certificate of Achievement – Mentorness Machine Learning Internship",
-            "images": [],
-        },
-        {
-            "title": "Certificate of Excellence – Graduation Honors",
-            "images": [],
-        },
-        {
-            "title": "3rd Place – RoboCup @Home Education Major Competition (Netherlands)",
-            "images": [],
-        },
-        {
-            "title": "Certificate of Participation – RoboCup Junior",
-            "images": [],
-        },
-        {
-            "title": "IELTS Academic Certificate",
-            "images": [],
+            // optional. A PDF is seeded under
+            // `My Documents/Certificates & Awards/<title>.pdf` and the entry's
+            // own `.txt` prints that path.
+            "pdf": "/assets/certificates/graduation-honors-2025.pdf",
         },
     ],
 
@@ -1190,9 +1268,23 @@ All personal content lives in a single `src/lib/data/profile.json`. Components r
 
 ## 9. Implementation Phases
 
-> **Status (2026-08-23).** Phases 0, 1 and 2 are complete and **live in
-> production** at <https://momad-xp.netlify.app>. Phase 3 is next. Ticked boxes
-> below mean shipped and deployed, not merely written.
+> **Status (2026-09-12).** Phases 0, 1, 2 and **3** are complete and live in
+> production at <https://momad-xp.netlify.app>. **Phase 4 (Games) is next and
+> needs the owner's explicit go.** Ticked boxes below mean shipped and
+> deployed, not merely written.
+>
+> Phase 3's own gate artefacts are `docs/phase-3-{spec,redteam-spec,plan,redteam-plan,redteam-implementation}.md`,
+> with the handoff in `docs/phase-3-guide.md`.
+>
+> A run of post-Phase-3 work has shipped on top of it, each with its own plan
+> doc: CMD filesystem navigation (`cmd-filesystem-plan.md`), the Python REPL
+> filesystem (`python-fs-plan.md`), removal of both SRI-less CDN origins
+> (`cdn-removal-plan.md`), the real music library (`music-library-plan.md`),
+> the Music Player rebuilt as a live view over `My Music` plus Recycle Bin
+> Restore (`music-library-vfs-plan.md`), audio/video file associations
+> (`media-associations-plan.md`), All Programs completeness, and the portfolio
+> content itself — the missing projects, 35 images and the certificate PDFs,
+> seeded as real files under `My Pictures` and `My Documents`.
 >
 > Everything after Phase 2 also went through a five-lens red team — code,
 > security, visual parity, test integrity and persisted state — recorded in
@@ -1265,7 +1357,7 @@ All personal content lives in a single `src/lib/data/profile.json`. Components r
 - [x] Verify/extend `profile.json` (created in Phase 1) — add projects, `images` arrays, and any fields the Phase 2 apps need
 - [x] Write `scripts/generate-vfs.ts` and wire it into the build: `profile.json` → VFS seed (`hard_drive.json`), with `SEED_VERSION` computed as a content hash of the generated seed (no manual bumping to forget) — §6.7
 - [x] My Computer: Explorer-style window with folder tree and file/folder view
-    - Folder structure: Experience, Projects, Education, Skills, Certifications, Awards
+    - Folder structure: Experience, Projects, Education, Skills, Certificates & Awards (Certifications and Awards were merged post-Phase-3)
     - Clicking items shows detail content sourced from JSON
     - Image/GIF gallery per entry (rendered from `images` array in JSON)
 - [x] About Me: Explorer window with sidebar navigation, bio content, skills tree
@@ -1341,6 +1433,12 @@ surprised by it:
 
 **Goal:** Sounds, animations, final UX details, performance optimization.
 
+- [ ] **`My Pictures` photo and video library** (owner-requested 2026-09-12) —
+      folder-discovered albums seeded into `My Pictures`, built on the music
+      pipeline: see §3.2 "My Pictures library" for the piece-by-piece mapping,
+      the three decisions where an exact mirror is impossible (no generated
+      thumbnails, no build-time video poster or duration, one folder vs
+      `My Videos`), and what the owner supplies
 - [ ] Sound manager: preload all XP sounds; system tray volume control
 - [ ] Wire up all sound triggers (boot, open, close, error, minimize, startup, shutdown)
 - [ ] Window animations: open, close, minimize, maximize transitions

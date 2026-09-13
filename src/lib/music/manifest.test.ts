@@ -141,21 +141,24 @@ describe('format_duration', () => {
 });
 
 describe('.mp3 file association', () => {
-    it('keeps MPC as the default and adds the Music Player second', async () => {
-        // Order is the whole decision. MPC stays doctypes['.mp3'][0] because
-        // that is the shipped double-click behaviour; every other consumer
-        // (viewer.svelte, desktop_folder.svelte, favorites.ts) takes [0]
-        // unconditionally, so changing it would regress every existing
-        // Explorer double-click. The Music Player is [1], which is what makes
-        // CMFSItem render the "Open With" submenu at all — it does so only
-        // when there are >= 2 handlers.
+    it('opens in the Music Player, with MPC second', async () => {
+        // Order is the whole decision, and this REVERSES what shipped before:
+        // MPC used to be [0] on the grounds that it was the existing
+        // double-click behaviour. The owner asked for the opposite — music
+        // files belong to the music player — so [0] is now the Music Player
+        // and MPC is [1], which is what keeps CMFSItem rendering the "Open
+        // With" submenu at all (it does so only for >= 2 handlers).
+        //
+        // Every other consumer (viewer.svelte, desktop_folder.svelte,
+        // favorites.ts) takes [0] unconditionally, so this one line is what
+        // changes every surface that opens a file.
         const { doctypes } = await import('../system');
         const handlers = doctypes['.mp3'] ?? [];
         expect(handlers).toHaveLength(2);
-        expect(handlers[0]?.path).toBe(
+        expect(handlers[0]?.path).toBe('./programs/music_player.svelte');
+        expect(handlers[1]?.path).toBe(
             './programs/media_player_classic.svelte',
         );
-        expect(handlers[1]?.path).toBe('./programs/music_player.svelte');
     });
 
     it('is listed in the Folder Options registered file types', async () => {

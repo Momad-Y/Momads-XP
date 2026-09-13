@@ -241,7 +241,11 @@
         // Bin and the desktop (red-team CRITICAL). The prompt only claims
         // permanence when every item is already binned.
         const all_permanent = batch.every((it) =>
-            is_permanent_delete(it.parent, recycle_bin_id),
+            is_permanent_delete(
+                it.parent,
+                recycle_bin_id,
+                (fs_id) => $hardDrive?.[fs_id],
+            ),
         );
         // Wording lives in src/lib/delete_prompt.ts (unit-tested).
         const dialog: MountedComponent = mount(Dialog, {
@@ -266,14 +270,16 @@
                                 // with it, so skip ids that are already gone
                                 if ($hardDrive?.[it.id] == null) continue;
                                 if (
-                                    !is_permanent_delete(
+                                    is_permanent_delete(
                                         it.parent,
                                         recycle_bin_id,
+                                        (fs_id) => $hardDrive[fs_id],
                                     )
                                 ) {
-                                    fs.clone_fs(it.id, recycle_bin_id, null);
+                                    fs.del_fs(it.id);
+                                } else {
+                                    fs.recycle_fs(it.id);
                                 }
-                                fs.del_fs(it.id);
                             }
                             void unmount(dialog);
                         },

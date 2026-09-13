@@ -5,6 +5,7 @@ import { ROOT } from './path';
 import { strip_ansi } from '../term/ansi';
 import { required, to_hard_drive } from '../types';
 import { profile } from '../profile';
+import { DOCUMENTS_FOLDER_ID } from '../portfolio_sections';
 import type { HardDrive } from '../types';
 
 /** The SHIPPED seed, narrowed rather than asserted into shape. */
@@ -24,6 +25,16 @@ const EXPERIENCE = 'p2FolderExperience';
  * it made a CV update look like a code regression.
  */
 const PRINTERPIX_NAME = `${profile.experience[0]?.company ?? ''} — ${profile.experience[0]?.role ?? ''}.txt`;
+
+/**
+ * The first experience entry that actually carries media, DERIVED rather than
+ * named: this test used to point at Printerpix because it was the only entry
+ * with an image, and that image was a placeholder whose own alt text said
+ * "(test image)". Real media arrived and the placeholder went, which broke the
+ * test — so it now asks the profile which entry has pictures.
+ */
+const WITH_IMAGES = profile.experience.find((e) => e.images.length > 0);
+const WITH_IMAGES_NAME = `${WITH_IMAGES?.company ?? ''} — ${WITH_IMAGES?.role ?? ''}.txt`;
 const PRINTERPIX = required(
     Object.values(drive).find((i) => i.name === PRINTERPIX_NAME),
     `seed entry ${PRINTERPIX_NAME}`,
@@ -151,17 +162,68 @@ describe('cat', () => {
     });
 
     it('names the images it cannot show instead of dropping them', () => {
-        const text = out('cat', PRINTERPIX_NAME, EXPERIENCE);
+        // Fails loudly if NOTHING has media, rather than passing vacuously.
+        expect(WITH_IMAGES, 'no experience entry has images').toBeDefined();
+        const text = out('cat', WITH_IMAGES_NAME, EXPERIENCE);
         expect(text).toMatch(/\[\d+ images? — open this file in My Computer/);
     });
 
     it('reaches an en-dash name, not just the em-dash ones', () => {
         const text = out(
             'cat',
-            '/c/Awards/1st Place – RoboCup @Home Education Competition (Egypt).txt',
+            '/c/Certificates & Awards/1st Place – RoboCup @Home Education Competition (Egypt).txt',
         );
         expect(text).toContain('RoboCup');
         expect(text).not.toContain('No such file');
+    });
+
+    it('lists and reads inside a folder whose name has an ampersand', () => {
+        /*
+         * The commands take the RAW remainder of the line (`remainder`), not
+         * `parse().args`, which is what makes an unquoted `&` — and the spaces
+         * either side of it — reach the resolver intact. A real cmd.exe would
+         * have split the line in three at the `&`.
+         */
+        const listed = out('ls', 'Certificates & Awards', C);
+        expect(listed).toContain('RoboCup');
+        expect(listed).not.toContain('No such file');
+
+        const text = out(
+            'cat',
+            'Certificates & Awards/Certificate of Excellence (AAST).txt',
+            C,
+        );
+        expect(text).toContain('Certificate of Excellence');
+        // the entry says where its own document is — in THIS shell's idiom,
+        // a path that can be pasted straight back into it, rather than the
+        // `My Documents\…` the Explorer window shows
+        expect(text).toContain(
+            '~/My Documents/Certificates & Awards/Certificate of Excellence (AAST).pdf',
+        );
+    });
+
+    it('stops naming the document once the visitor deletes it', () => {
+        /*
+         * Those PDFs are deletable by design — only the entry `.txt`s and the
+         * CV are protected — so the line has to follow the drive. It used to
+         * be composed from a constant, which meant an entry kept pointing at
+         * a folder the visitor had emptied.
+         */
+        const without: HardDrive = Object.fromEntries(
+            Object.entries(drive).filter(
+                ([, item]) => item.parent !== DOCUMENTS_FOLDER_ID,
+            ),
+        );
+        const text = run_fs(
+            'cat',
+            'Certificates & Awards/Certificate of Excellence (AAST).txt',
+            { drive: without, cwd: C },
+        )
+            .lines.map(strip_ansi)
+            .join('\n');
+        expect(text).toContain('Certificate of Excellence');
+        expect(text).toContain('2022'); // the year survives
+        expect(text).not.toContain('.pdf');
     });
 
     it('describes a file it has no text for, with its size', () => {

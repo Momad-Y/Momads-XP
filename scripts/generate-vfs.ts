@@ -22,13 +22,37 @@
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { execSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import {
+    existsSync,
+    mkdirSync,
+    readFileSync,
+    writeFileSync,
+    rmSync,
+    statSync,
+} from 'node:fs';
 import { parseFile } from 'music-metadata';
 import { copy, fill_copy, profile } from '../src/lib/profile';
 import { SEED_EPOCH, build_portfolio } from '../src/lib/vfs_gen/build';
 import { COVER_DIR, scan_music } from '../src/lib/music/scan';
 import type { ScanResult, TrackTags } from '../src/lib/music/scan';
 import type { VfsItem } from '../src/lib/types';
+
+/**
+ * Ids out of either JSON shape the ledger cares about: the seed (an object
+ * keyed by id) or the ledger itself (an array of ids). Narrowed rather than
+ * asserted — a corrupt or empty file must not silently produce a ledger that
+ * reaps nothing, or everything.
+ */
+function id_list(raw: string): string[] {
+    const parsed: unknown = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+        return parsed.filter((id): id is string => typeof id === 'string');
+    }
+    if (typeof parsed === 'object' && parsed !== null) {
+        return Object.keys(parsed);
+    }
+    throw new Error('expected a JSON object or array of ids');
+}
 
 /**
  * `music-metadata` -> the narrow shape `scan_music` needs.
@@ -78,6 +102,7 @@ const MY_COMPUTER_EXE = 'sWTYkZhdpSYCmXP7z6459v';
  * cannot see a literal that is wrong in both).
  */
 const MY_DOCUMENTS = 'xpFolderMyDocuments0001';
+const MY_PICTURES = 'neRHxqN8SPnG1xrivxXxRq';
 const PYTHON_FOLDER = 'xpFolderPythonScripts01';
 const IE_EXE = '2jpDfV5KSoYMArQnHgux5S';
 
@@ -119,7 +144,16 @@ const desktop_exe = (
 const base = JSON.parse(
     readFileSync('scripts/vfs-base.json', 'utf8'),
 ) as Record<string, VfsItem>;
-const built = build_portfolio(profile);
+/** Real size on disk, in KB, CEILED — `size_label` and the upload paths ceil too. */
+function asset_size_kb(url: string): number {
+    const path = join('static', url.split('?')[0] ?? url);
+    return Math.ceil(statSync(path).size / 1024);
+}
+
+const built = build_portfolio(profile, asset_size_kb, {
+    pictures: MY_PICTURES,
+    documents: MY_DOCUMENTS,
+});
 
 const exes: VfsItem[] = [
     desktop_exe(
@@ -164,6 +198,18 @@ seed[C_DRIVE] = {
         ...built.folder_ids,
         built.resume_file_id,
     ],
+};
+
+// ---- My Pictures / My Documents: the portfolio's own assets --------------
+// Organised type / item / file (`My Pictures/Projects/EUC RAG Agent/…`) and
+// pointing at the same static URLs profile.json already renders from, so these
+// add metadata and duplicate no bytes — exactly as the music tree does.
+const my_pictures = seed[MY_PICTURES];
+if (my_pictures == null)
+    throw new Error('My Pictures folder missing from base');
+seed[MY_PICTURES] = {
+    ...my_pictures,
+    children: [...my_pictures.children, ...built.picture_section_ids],
 };
 
 // ---- My Music: discovered from static/audio/music/<genre>/*.mp3 ---------
@@ -236,7 +282,9 @@ seed[MY_DOCUMENTS] = {
     icon: '/images/xp/icons/MyDocuments.png',
     starting_point: true,
     parent: C_DRIVE,
-    children: [PYTHON_FOLDER],
+    // Python's save folder FIRST — it is protected and must never be dropped —
+    // then the credentials tree (`My Documents/Certificates & Awards/…`).
+    children: [PYTHON_FOLDER, ...built.document_section_ids],
     date_created: SEED_EPOCH,
     date_modified: SEED_EPOCH,
     sort_option: 0,
@@ -286,6 +334,40 @@ for (const [id, item] of Object.entries(seed)) {
         throw new Error(`dangling parent ${item.parent} in ${id}`);
     }
 }
+
+/*
+ * ---- retired ids -------------------------------------------------------
+ *
+ * Every id we have shipped and no longer ship. `merge_on_reseed` uses it to
+ * answer "did this come from a seed of ours?" for a visitor whose drive has no
+ * `hard_drive_seed_fields` snapshot — before this, the answer was unknowable
+ * for them and NOTHING was ever reaped, so a dropped seed item was carried
+ * forever: stale music tracks pointing at 404 URLs, and a ghost `C:\Awards`
+ * folder whose `.txt` files rendered "This file cannot be displayed."
+ *
+ * MUST RUN BEFORE THE SEED IS WRITTEN: the `hard_drive.json` on disk right now
+ * IS the previous seed, which is how the ledger learns what was retired
+ * without anyone having to tell it.
+ *
+ *      retired = (ledger ∪ ids(previous seed)) ∖ ids(new seed)
+ *
+ * Idempotent — running the generator twice produces the same file, which CI's
+ * freshness gate requires — and monotone: an id leaves the ledger only by
+ * coming back into the seed. The initial contents came from git history via
+ * `scripts/backfill-retired-ids.ts`, which is deliberately NOT part of this
+ * script: CI clones can be shallow, and generation must not depend on what
+ * history happens to be present.
+ */
+const RETIRED_LEDGER = 'src/lib/generated/retired_seed_ids.json';
+const previous_seed_ids: string[] = existsSync('static/json/hard_drive.json')
+    ? id_list(readFileSync('static/json/hard_drive.json', 'utf8'))
+    : [];
+const ledger_before: string[] = existsSync(RETIRED_LEDGER)
+    ? id_list(readFileSync(RETIRED_LEDGER, 'utf8'))
+    : [];
+const retired = [...new Set([...ledger_before, ...previous_seed_ids])]
+    .filter((id) => seed[id] == null)
+    .sort();
 
 // ---- write -------------------------------------------------------------
 const serialized = JSON.stringify(seed);
@@ -376,6 +458,7 @@ writeFileSync(
     )};\n`,
 );
 
+writeFileSync(RETIRED_LEDGER, `${JSON.stringify(retired, null, 4)}\n`);
 writeFileSync(
     'src/lib/generated/seed_version.ts',
     `// GENERATED by scripts/generate-vfs.ts — do not edit.\nexport const SEED_VERSION = '${version}';\n`,
@@ -395,5 +478,6 @@ execSync(
     { stdio: 'inherit' },
 );
 console.log(
-    `generated: ${Object.keys(seed).length} items, SEED_VERSION ${version}`,
+    `generated: ${Object.keys(seed).length} items, SEED_VERSION ${version}, ` +
+        `${String(retired.length)} retired ids`,
 );

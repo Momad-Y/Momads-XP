@@ -1,0 +1,285 @@
+/**
+ * The Music Player's library, derived from the `My Music` folder on the drive.
+ *
+ * WHY THIS EXISTS: the library used to BE `src/lib/generated/music.ts` — a
+ * constant compiled into the bundle. The player therefore could not see the
+ * filesystem it was nominally playing from. Deleting a song in Explorer left
+ * it listed and playable; deleting a whole genre folder left the header
+ * standing; and a song the visitor added, or a folder they invented, could
+ * never appear at all, because there was no row in the manifest to notice.
+ *
+ * So the drive is the library now, and the generated manifest is demoted to a
+ * METADATA SIDECAR: the art, the artist and the duration that only the
+ * build-time ID3 scan can know, looked up per item. The seeded VFS item id IS
+ * the manifest id (both are `sha256(genre/filename)` — see `scan.ts`), so the
+ * join is exact; `url` is a second key so a copy, or a song that came back
+ * from the Recycle Bin under a fresh id, keeps its cover.
+ *
+ * TITLES DO NOT COME FROM THE SIDECAR. The VFS item's `basename` already IS
+ * the ID3 title for seeded tracks (the generator names the file that way), and
+ * for a visitor's own upload it is the filename, which is the only honest
+ * answer. Reading the title off the drive also means a rename in Explorer
+ * renames the row — and `name` is carried across re-seeds (`USER_FIELDS`), so
+ * that rename survives a deploy.
+ *
+ * EVERYTHING HERE IS PURE and takes the drive as an argument, so the grouping
+ * rules are unit-testable without a browser, a store, or an audio element.
+ */
+import type { HardDrive, VfsItem } from '../types';
+import type { Track } from './manifest';
+import { AUDIO_EXTENSIONS as AUDIO } from '../media_types';
+
+export { AUDIO_EXTENSIONS } from '../media_types';
+
+/**
+ * Group key for songs loose in My Music.
+ *
+ * A COLON PREFIX, because group keys are otherwise folder ids and this one has
+ * to be guaranteed not to collide with a real one: ids come from `short-uuid`
+ * or a sha256 hex digest, so neither can ever contain one. It was written as a
+ * literal NUL at first, which worked and made the whole source file read as
+ * BINARY to git and grep — invisible in a diff and destroyed by any editor
+ * round-trip. Svelte throws
+ * `each_key_duplicate` and stops rendering the whole list if two groups ever
+ * share a key — which a plain string like `'unsorted'` invites the moment a
+ * visitor names a folder that.
+ */
+export const UNSORTED_GROUP_KEY = '::unsorted';
+
+/**
+ * Group key for a file opened from OUTSIDE My Music.
+ *
+ * A sentinel for the same reason as above, and then some: the obvious choice —
+ * the file's own parent folder id — collides catastrophically in the COMMON
+ * case. Every track that ships lives inside My Music, so that parent id is
+ * already a group key, and two groups sharing an `{#each}` key throws
+ * `each_key_duplicate` and stops the whole list rendering.
+ */
+export const EXTRA_GROUP_KEY = '::extra';
+
+/** What the build-time scan knows and the drive does not. */
+export interface TrackMeta {
+    artist: string | null;
+    cover: string | null;
+    cover_box: Track['cover_box'];
+    duration_s: number | null;
+}
+
+export interface LibraryTrack extends TrackMeta {
+    /** The VFS item id. */
+    id: string;
+    title: string;
+    /** A remote path, or an idb-keyval key when `storage_type` is `local`. */
+    url: string | null;
+    storage_type: VfsItem['storage_type'];
+    /** The group this track renders under; see `UNSORTED_GROUP_KEY`. */
+    group_key: string;
+}
+
+export interface LibraryGroup {
+    key: string;
+    name: string;
+    tracks: LibraryTrack[];
+}
+
+export interface Library {
+    groups: LibraryGroup[];
+    /** Every track, in render order — what prev/next walk. */
+    flat: LibraryTrack[];
+}
+
+const EMPTY: Library = { groups: [], flat: [] };
+
+/**
+ * Metadata keyed by manifest id AND by url.
+ *
+ * The url keys are deliberately non-unique: `clone_fs` copies `url` verbatim
+ * and only dedupes the NAME, so a visitor's copy of a seeded song shares its
+ * url. Last write wins, which is harmless — the entries agree, because they
+ * describe the same file. The effect is that a copy inherits the original's
+ * art and artist, which is what anyone would expect of a copy.
+ */
+export function metadata_index(
+    tracks: readonly Track[],
+): ReadonlyMap<string, TrackMeta> {
+    const index = new Map<string, TrackMeta>();
+    for (const track of tracks) {
+        const meta: TrackMeta = {
+            artist: track.artist,
+            cover: track.cover,
+            cover_box: track.cover_box,
+            duration_s: track.duration_s,
+        };
+        index.set(track.id, meta);
+        index.set(track.url, meta);
+    }
+    return index;
+}
+
+/** A file the player can actually play. `.lnk` shortcuts fall out for free. */
+export function is_audio(item: VfsItem): boolean {
+    if (item.type !== 'file') return false;
+    // `fake` means the url is a `./programs/*.svelte` path, not bytes.
+    if (item.storage_type === 'fake') return false;
+    return AUDIO.includes(item.ext.toLowerCase());
+}
+
+function to_track(
+    item: VfsItem,
+    meta: ReadonlyMap<string, TrackMeta>,
+    group_key: string,
+): LibraryTrack {
+    const found =
+        meta.get(item.id) ??
+        (item.url != null ? meta.get(item.url) : undefined);
+    return {
+        id: item.id,
+        title: item.basename === '' ? item.name : item.basename,
+        url: item.url ?? null,
+        storage_type: item.storage_type,
+        group_key,
+        artist: found?.artist ?? null,
+        cover: found?.cover ?? null,
+        cover_box: found?.cover_box ?? null,
+        duration_s: found?.duration_s ?? null,
+    };
+}
+
+/**
+ * Every audio file in a folder's subtree, in `children` order.
+ *
+ * It recurses so that a song in a folder-inside-a-genre still appears,
+ * attributed to the genre. The alternative — only direct children count —
+ * makes such a song silently invisible, which is the worse failure. `seen`
+ * guards a malformed drive; a cycle would otherwise hang the render.
+ */
+function collect(
+    drive: HardDrive,
+    folder: VfsItem,
+    meta: ReadonlyMap<string, TrackMeta>,
+    group_key: string,
+    seen: Set<string>,
+): LibraryTrack[] {
+    if (seen.has(folder.id)) return [];
+    seen.add(folder.id);
+
+    const out: LibraryTrack[] = [];
+    for (const child_id of folder.children) {
+        const child = drive[child_id];
+        if (child == null) continue; // stale id on a cached drive
+        if (child.type === 'folder') {
+            out.push(...collect(drive, child, meta, group_key, seen));
+        } else if (is_audio(child)) {
+            out.push(to_track(child, meta, group_key));
+        }
+    }
+    return out;
+}
+
+/**
+ * The library as it stands on the drive right now.
+ *
+ * CATEGORIES ARE THE DIRECT CHILD FOLDERS of My Music — one level, matching
+ * the seeded shape and what Explorer shows. An empty one still renders, with a
+ * count of zero: the visitor deleted the songs, not the genre.
+ *
+ * ORDER IS `children` ORDER, which preserves the owner's curated genre order
+ * for free (the generator writes the folders in `profile.json` order) and puts
+ * a visitor's new folder where they made it. Two honest costs:
+ * `merge_on_reseed` appends carried children to the END of a parent's array,
+ * so a song the visitor added mid-genre drifts to the bottom of it after a
+ * deploy; and Explorer's own sort is display-only and never reorders
+ * `children`, so a re-sorted folder there can disagree with the player.
+ * Sorting alphabetically would fix both and scramble the owner's deliberate
+ * track order, because VFS names are ID3 titles while the curated order lives
+ * in the `NN - ` filename prefixes the manifest keeps.
+ *
+ * NEVER THROWS. A missing My Music is reachable — a legacy cached drive, a
+ * re-seed fallback — and this runs inside a reactive statement, where a throw
+ * takes the whole component down rather than just the list.
+ */
+export function build_library(
+    drive: HardDrive,
+    my_music_id: string,
+    meta: ReadonlyMap<string, TrackMeta>,
+    unsorted_label: string,
+    /**
+     * A file the player was launched with, which may live anywhere on the
+     * drive. Passed as an ID and resolved HERE, on every rebuild — never as a
+     * snapshot. A snapshot would survive the drive write that DELETES the
+     * file, so the player would go back to listing and playing a song that no
+     * longer exists, which is the defect this module exists to fix.
+     *
+     * Ignored when the file is already in the library, which is the ordinary
+     * case: it is then just another row, and adding it twice would put a
+     * duplicate id in `flat` and send prev/next to the wrong place.
+     */
+    extra_id: string | null = null,
+): Library {
+    const root = drive[my_music_id];
+    if (root == null) return EMPTY;
+
+    const groups: LibraryGroup[] = [];
+    const loose: LibraryTrack[] = [];
+    const seen = new Set<string>([root.id]);
+
+    for (const child_id of root.children) {
+        const child = drive[child_id];
+        if (child == null) continue;
+        if (child.type === 'folder') {
+            groups.push({
+                key: child.id,
+                name: child.name,
+                tracks: collect(drive, child, meta, child.id, seen),
+            });
+        } else if (is_audio(child)) {
+            loose.push(to_track(child, meta, UNSORTED_GROUP_KEY));
+        }
+    }
+
+    // Last, after the folders — the order Explorer itself lists a folder in —
+    // and absent entirely when there is nothing loose to put in it.
+    if (loose.length > 0) {
+        groups.push({
+            key: UNSORTED_GROUP_KEY,
+            name: unsorted_label,
+            tracks: loose,
+        });
+    }
+
+    const extra = extra_group(drive, meta, extra_id, groups, unsorted_label);
+    if (extra != null) groups.push(extra);
+
+    return { groups, flat: groups.flatMap((group) => group.tracks) };
+}
+
+/**
+ * The launched file as its own group, or null when it needs none.
+ *
+ * Named after the folder it came from, so "why is this here" answers itself: a
+ * song opened from the Desktop reads "Desktop". Falls back to the unsorted
+ * label when the parent cannot be resolved, which only a malformed drive
+ * produces.
+ */
+function extra_group(
+    drive: HardDrive,
+    meta: ReadonlyMap<string, TrackMeta>,
+    extra_id: string | null,
+    groups: readonly LibraryGroup[],
+    unsorted_label: string,
+): LibraryGroup | null {
+    if (extra_id == null) return null;
+    const item = drive[extra_id];
+    if (item == null || !is_audio(item)) return null;
+    const already = groups.some((group) =>
+        group.tracks.some((track) => track.id === extra_id),
+    );
+    if (already) return null;
+
+    const parent = item.parent == null ? undefined : drive[item.parent];
+    return {
+        key: EXTRA_GROUP_KEY,
+        name: parent?.name ?? unsorted_label,
+        tracks: [to_track(item, meta, EXTRA_GROUP_KEY)],
+    };
+}

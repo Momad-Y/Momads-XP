@@ -1,15 +1,28 @@
-# Session handoff — Phase 2 closed out, Phase 3 next
+# Session handoff — Phase 3 closed out, Phase 4 next
 
-Read this first, then `docs/redteam-post-phase-2.md`, then
-`docs/phase-2-guide.md`. §1 is the live task; everything after it is the
-record of how Phase 2 got here and the rules that must not be undone.
+Read this first, then `docs/phase-3-guide.md`. §1 is the live task; everything
+after it is the record of how Phase 2 got here and the rules that must not be
+undone — still current, since none of it was undone by Phase 3.
 
 ---
 
-## 1. NEXT UP — Phase 3, on the owner's "go"
+## 1. NEXT UP — Phase 4 (Games), on the owner's "go"
 
-Phase 2 is closed out and deployed (§2). **Phase 3 is specced but not started.**
-The owner will say "go"; until then, do not begin.
+**Phase 3 is complete and deployed.** CMD, the Python REPL, Paint and the Music
+Player all shipped, along with the jspaint hardening the owner added to its
+scope; the handoff is `docs/phase-3-guide.md`.
+
+A long run of post-Phase-3 work has shipped since, each with its own plan doc —
+see the status block in `SPECIFICATION.md` §9 for the list. The two items left
+open from it are the **custom domain** (code side is one line in
+`src/lib/site.ts`; the rest is buying it and pointing DNS) and the **`My
+Pictures` photo/video library**, which is specced into Phase 6.
+
+**Phase 4 is specced but not started.** The owner will say "go"; until then, do
+not begin.
+
+> The Phase 3 scope notes below are kept as the record of what was built, not
+> as a live task list.
 
 ### Scope (SPECIFICATION.md §9, Phase 3 — "Developer & Interactive Apps")
 

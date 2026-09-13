@@ -363,5 +363,35 @@
         "name": "7-zip archive",
         "mime": "application/x-7z-compressed",
         "ext": ".7z"
+    },
+    {
+        "name": "OGG audio",
+        "mime": "audio/ogg",
+        "ext": ".ogg"
+    },
+    {
+        "name": "MPEG-4 audio",
+        "mime": "audio/mp4",
+        "ext": ".m4a"
+    },
+    {
+        "name": "FLAC audio",
+        "mime": "audio/flac",
+        "ext": ".flac"
+    },
+    {
+        "name": "Matroska video",
+        "mime": "video/x-matroska",
+        "ext": ".mkv"
+    },
+    {
+        "name": "QuickTime video",
+        "mime": "video/quicktime",
+        "ext": ".mov"
+    },
+    {
+        "name": "Windows Media Video",
+        "mime": "video/x-ms-wmv",
+        "ext": ".wmv"
     }
 ]

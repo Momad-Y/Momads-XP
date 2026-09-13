@@ -2,7 +2,7 @@
     import { onMount, onDestroy, mount, tick } from 'svelte';
     import { get } from 'svelte/store';
     import Wallpaper from './wallpaper.svelte';
-    import { queueProgram, runningPrograms } from '../../lib/store';
+    import { queueProgram, runningPrograms, hardDrive } from '../../lib/store';
     import { HOMEPAGE } from '../../lib/search';
     import { show_no_association_dialog } from '../../lib/no_association';
     import short from 'short-uuid';
@@ -66,12 +66,33 @@
 
     onDestroy(() => {});
 
-    function focus_existing(path: string | undefined): boolean {
+    /**
+     * Singleton paths whose mount is in flight.
+     *
+     * Registration happens AFTER the dynamic `import()` below, and Svelte 5's
+     * `mount()` does not flush `onMount` — so two launches issued inside that
+     * window both find `runningPrograms` empty and both mount, producing two
+     * of a program the registry promises is unique (two AudioContexts, two
+     * taskbar buttons). Latent until now: the Music Player could only be
+     * launched from the Start menu. It is now the handler for every audio
+     * double-click, which changes the odds entirely.
+     */
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- a launch guard, never rendered; a SvelteSet would make every claim and release invalidate the whole desktop for no visible difference
+    const launching = new Set<string>();
+
+    function focus_existing(
+        path: string | undefined,
+        fs_item: Partial<VfsItem> | undefined,
+    ): boolean {
         // Registry singletons count too, or `AppDefinition.singleton` would be
         // a field that type-checks and does nothing — the exact class of defect
         // the registry exists to remove.
         const singletons = [...singleton_programs, ...singleton_paths()];
         if (path == null || !singletons.includes(path)) return false;
+        // Claimed but not yet registered: swallow this launch rather than
+        // mounting a second copy. The payload is lost, which only a second
+        // double-click inside one mount can cause.
+        if (launching.has(path)) return true;
         const open = get(runningPrograms).find(
             (p) => p.options.exec_path === path,
         );
@@ -82,6 +103,14 @@
         // leaves the two tied and the sheet buried.
         void tick().then(() => {
             open.window?.restore(); // restore() focuses too
+            // Hand the file over, for programs that take one. Resolved from
+            // the drive rather than passed through: `ProgramLaunchRequest`
+            // carries a PARTIAL item (the Start menu queues `{url}`-only
+            // payloads) and `full_vfs_item` throws on those — a throw here
+            // would surface to the visitor as the no-association dialog.
+            const id = fs_item?.id;
+            const full = id == null ? undefined : get(hardDrive)?.[id];
+            if (full != null) void open.open_fs_item?.(full);
         });
         return true;
     }
@@ -107,6 +136,10 @@
                 program.fs_item?.name ?? program.path ?? 'This program',
             );
         } finally {
+            // Unconditional: `launch_inner` may have claimed the path and then
+            // thrown, and a path left claimed would make every later launch of
+            // that singleton a silent no-op.
+            if (program.path != null) launching.delete(program.path);
             queueProgram.set(null);
         }
     }
@@ -121,9 +154,13 @@
             source,
         } = program;
 
-        if (focus_existing(path)) {
+        if (focus_existing(path, fs_item)) {
             return;
         }
+        // Claimed for the duration of the mount, so a second launch of the
+        // same singleton arriving before registration is swallowed rather
+        // than mounting a duplicate. Released in `launch`'s `finally`.
+        if (path != null) launching.add(path);
 
         if (path == './programs/my_computer.svelte') {
             const Program = (await import('./programs/my_computer.svelte'))

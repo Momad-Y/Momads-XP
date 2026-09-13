@@ -4,6 +4,7 @@
     import { profile } from '../../lib/profile';
     import * as utils from '../../lib/utils';
     import { required } from '../../lib/types';
+    import { ALL_PROGRAMS } from '../../lib/start_menu_programs';
     import type { MountedComponent, VfsItem } from '../../lib/types';
     import GitHubIcon from '../../lib/components/icons/GitHubIcon.svelte';
     import LinkedInIcon from '../../lib/components/icons/LinkedInIcon.svelte';
@@ -27,15 +28,6 @@
         webapp?: unknown;
         items?: (StartMenuItem | null)[];
     }
-
-    /** Named placeholder launch (design decision 5): the literal fs_item
-     *  carries name + icon for placeholder.svelte's window chrome. */
-    const placeholder_entry = (name: string, icon: string): StartMenuItem => ({
-        name,
-        icon,
-        path: './programs/placeholder.svelte',
-        fs_item: { name, icon },
-    });
 
     function social_url(platform: string): string {
         return required(
@@ -114,69 +106,11 @@
     ];
 
     // ── All Programs flyout (§3.4) ──
-    const programs: (StartMenuItem | null)[] = [
-        {
-            name: 'My Computer',
-            icon: '/images/xp/icons/MyComputer.png',
-            path: './programs/my_computer.svelte',
-        },
-        {
-            name: 'About Me',
-            icon: '/assets/icons/about-me.png',
-            path: './programs/about_me.svelte',
-        },
-        {
-            name: 'My CV',
-            icon: '/assets/icons/my-cv.png',
-            // no fs_item: the viewer falls back to profile.meta.resumePdf
-            // (a partial fs_item would throw in full_vfs_item)
-            path: './programs/pdf_viewer.svelte',
-        },
-        {
-            name: 'Internet Explorer',
-            icon: '/images/xp/icons/InternetExplorer6.png',
-            path: './programs/internet_explorer.svelte',
-        },
-        {
-            name: 'Contact Me',
-            icon: '/assets/icons/contact-me.png',
-            path: './programs/contact_me.svelte',
-        },
-        {
-            name: 'Command Prompt',
-            icon: '/images/xp/icons/CommandPrompt.png',
-            path: './programs/cmd.svelte',
-        },
-        {
-            name: 'Python',
-            icon: '/images/xp/icons/Python.png',
-            path: './programs/python.svelte',
-        },
-        {
-            name: 'Paint',
-            icon: '/images/xp/icons/Paint.png',
-            path: './programs/paint.svelte',
-        },
-        {
-            name: 'Music Player',
-            icon: '/images/xp/icons/WindowsMediaPlayer9.png',
-            path: './programs/music_player.svelte',
-        },
-        {
-            name: 'Games',
-            icon: '/images/xp/icons/StartMenuPrograms.png',
-            top: '-40px',
-            items: [
-                placeholder_entry(
-                    'Minesweeper',
-                    '/assets/icons/minesweeper.png',
-                ),
-                placeholder_entry('Solitaire', '/assets/icons/solitaire.png'),
-                placeholder_entry('Chess', '/assets/icons/chess.png'),
-                placeholder_entry('DOOM', '/assets/icons/doom.png'),
-            ],
-        },
-    ];
+    // The list lives in `src/lib/start_menu_programs.ts` so it can be TESTED:
+    // the video player was missing from here for as long as it has existed,
+    // and nothing could have caught it. A test now walks the programs folder
+    // and fails on any component that is neither listed nor explained.
+    const programs: (StartMenuItem | null)[] = [...ALL_PROGRAMS];
 
     let programs_open = false;
     let ap_open = false; // All Programs desktop flyout visible

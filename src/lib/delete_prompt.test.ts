@@ -45,14 +45,49 @@ describe('other_items_suffix', () => {
 });
 
 describe('is_permanent_delete', () => {
+    /** A drive shaped `bin > binned-folder > nested`, plus a live folder. */
+    const drive: Record<string, { parent?: string }> = {
+        [BIN]: {},
+        'binned-folder': { parent: BIN },
+        nested: { parent: 'binned-folder' },
+        deeper: { parent: 'nested' },
+        'live-folder': { parent: 'my-documents' },
+        'my-documents': {},
+    };
+    const lookup = (id: string) => drive[id];
+
     it('is permanent only inside the Recycle Bin', () => {
-        expect(is_permanent_delete(BIN, BIN)).toBe(true);
-        expect(is_permanent_delete('some-folder', BIN)).toBe(false);
+        expect(is_permanent_delete(BIN, BIN, lookup)).toBe(true);
+        expect(is_permanent_delete('live-folder', BIN, lookup)).toBe(false);
     });
 
     it('treats a missing parent as not-permanent', () => {
-        expect(is_permanent_delete(null, BIN)).toBe(false);
-        expect(is_permanent_delete(undefined, BIN)).toBe(false);
+        expect(is_permanent_delete(null, BIN, lookup)).toBe(false);
+        expect(is_permanent_delete(undefined, BIN, lookup)).toBe(false);
+    });
+
+    /*
+     * A recycled folder's children keep pointing at THAT FOLDER, not at the
+     * bin. Comparing only the immediate parent therefore said "not in the bin"
+     * for everything nested inside one, and deleting such an item recycled it
+     * a SECOND time — cloning it back to the top of the bin, where it arrived
+     * with no restore breadcrumbs and could never be put back.
+     */
+    it('is permanent for an item nested inside a binned folder', () => {
+        expect(is_permanent_delete('binned-folder', BIN, lookup)).toBe(true);
+        expect(is_permanent_delete('nested', BIN, lookup)).toBe(true);
+    });
+
+    it('walks all the way up, not just one level', () => {
+        expect(is_permanent_delete('deeper', BIN, lookup)).toBe(true);
+    });
+
+    it('survives a drive whose parents form a cycle', () => {
+        const cyclic: Record<string, { parent?: string }> = {
+            a: { parent: 'b' },
+            b: { parent: 'a' },
+        };
+        expect(is_permanent_delete('a', BIN, (id) => cyclic[id])).toBe(false);
     });
 });
 

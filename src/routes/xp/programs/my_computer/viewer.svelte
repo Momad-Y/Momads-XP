@@ -84,12 +84,25 @@
         // width. XP keeps column widths and scrolls horizontally instead.
         Details: 'min-w-full w-max flex-row items-center px-1 my-0.5',
     }[view_mode];
-    $: icon_box = {
-        Thumbnails: 'w-[80px] h-[80px]',
-        Tiles: 'w-[48px] h-[48px]',
-        Icons: 'w-[32px] h-[32px]',
-        List: 'w-[16px] h-[16px]',
-        Details: 'w-[16px] h-[16px]',
+    /**
+     * The icon edge, in px — ONE number per mode, for both branches below.
+     *
+     * It used to be a pair of Tailwind classes (`w-[32px] h-[32px]`) while
+     * `Previewable` sized ITSELF, and this was the only one of its four call
+     * sites that never passed `size` — so every image preview in Explorer
+     * rendered at the component's 50px default no matter what the cell was.
+     * In Icons that put a 50px picture in a 32px cell inside a 60px-tall item:
+     * it spilled 18px over its own filename. List and Details were worse (50
+     * in 16, bleeding across rows), Tiles overflowed by 2, and Thumbnails —
+     * the mode whose entire point is a big preview — showed 50px in an 80px
+     * cell. A number the icon and the preview BOTH read cannot drift again.
+     */
+    $: icon_px = {
+        Thumbnails: 80,
+        Tiles: 48,
+        Icons: 32,
+        List: 16,
+        Details: 16,
     }[view_mode];
 
     /**
@@ -673,18 +686,22 @@
                     }}
                 >
                     {#if previewable_exts.includes(item.ext)}
-                        <div class="{icon_box} shrink-0">
-                            <Previewable
-                                default_icon={file_icon_url(item)}
-                                fs_id={item.id}
-                            ></Previewable>
-                        </div>
+                        <!-- no wrapper: Previewable sizes itself and is
+                             already shrink-0, exactly as at the other three
+                             call sites. The wrapper was what hid the mismatch. -->
+                        <Previewable
+                            size={icon_px}
+                            default_icon={file_icon_url(item)}
+                            fs_id={item.id}
+                        ></Previewable>
                     {:else}
                         <div
-                            class="{icon_box} shrink-0 bg-contain bg-no-repeat bg-center
+                            class="shrink-0 bg-contain bg-no-repeat bg-center
                         {item.type == 'folder'
                                 ? 'bg-[url(/images/xp/icons/FolderClosed.png)]'
                                 : 'bg-[url(/images/xp/icons/Default.png)]'} "
+                            style:width="{icon_px}px"
+                            style:height="{icon_px}px"
                             style:background-image={file_icon_url(item)}
                         ></div>
                     {/if}

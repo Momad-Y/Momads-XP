@@ -85,3 +85,19 @@ export function format_duration(seconds: number): string {
     const rest = total % 60;
     return `${String(minutes)}:${rest.toString().padStart(2, '0')}`;
 }
+
+/**
+ * A track-list duration cell, for a duration that may not be known yet.
+ *
+ * SEPARATE FROM `format_duration` ON PURPOSE. That one is contract-tested to
+ * render `0:00` for NaN, and the player uses it for the CURRENT-TIME readout,
+ * where `0:00` is exactly right before anything has loaded. A row for a song
+ * the visitor added has no duration at all until the file is decoded, and
+ * `0:00` there is a lie — it claims an empty track.
+ */
+export function format_optional_duration(seconds: number | null): string {
+    if (seconds == null || !Number.isFinite(seconds) || seconds < 0) {
+        return '--:--';
+    }
+    return format_duration(seconds);
+}
