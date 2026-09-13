@@ -33,8 +33,30 @@ export default defineConfig({
      *     npx playwright test --project=online    # real Pyodide, needs the net
      */
     projects: [
-        { name: 'default', grepInvert: /@online/ },
+        /*
+         * `default` must exclude BOTH tags. Excluding only `@online` would run
+         * the heavy specs twice — once here, in parallel, which is the
+         * contention the `heavy` project exists to avoid, and once there.
+         */
+        { name: 'default', grepInvert: /@online|@heavy/ },
         { name: 'online', grep: /@online/ },
+        /*
+         * HERMETIC, like `default`. The tag means EXPENSIVE, not networked:
+         * DOOM boots a DOSBox WASM image and Chess instantiates Stockfish, and
+         * both are self-hosted.
+         *
+         * It exists because of the note above: `default` flakes about one run
+         * in three under machine load, the cause is overall CPU contention
+         * rather than worker count, and every failure passes in isolation.
+         * Dropping two WASM boots into that pool would make it worse, so they
+         * get a pool of one. Run as its OWN CI step, after `default`, so the
+         * two never overlap.
+         *
+         * Do NOT tag these `@online` instead: that project runs only on
+         * cutovers, so a DOOM regression would surface at the riskiest moment,
+         * and the tag would be a lie.
+         */
+        { name: 'heavy', grep: /@heavy/, workers: 1 },
     ],
     webServer: {
         // CI builds earlier in the pipeline — reuse that build instead of duplicating it
