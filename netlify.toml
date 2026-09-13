@@ -92,6 +92,24 @@
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
+# Vendored js-dos and the DOOM bundle. Same reasoning as /js/three/* and
+# /js/stockfish/*: static files are copied into `build/` verbatim, and
+# wdosbox.wasm is 1.4MB with the bundle 2.1MB more. Frozen by the checksum
+# manifest in `vendored_games.test.ts`, so the content cannot change silently.
+#
+# Declared BEFORE the block below on purpose — see its KEEP THIS BLOCK LAST
+# note. Both rules name only Cache-Control, so the `/*` CSP still applies;
+# DOOM needs no CSP of its own because `/*` sets no script-src to violate.
+[[headers]]
+  for = "/js/js-dos/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/games/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
 # The Pyodide host page. Runs on an OPAQUE origin (sandbox without
 # allow-same-origin), so `'self'` here matches nothing the page loads —
 # the bootstrap is inline and the runtime comes from the CDN.
