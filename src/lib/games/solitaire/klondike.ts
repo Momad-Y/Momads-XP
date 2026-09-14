@@ -131,8 +131,17 @@ export function can_move(game: Game, from: Source, to: Target): boolean {
     );
 }
 
-/** Remove the source cards, flipping whatever they uncovered. */
+/**
+ * Remove the source cards, flipping whatever they uncovered.
+ *
+ * The `count === 0` guard is not theoretical. Every `slice(0, -count)` below
+ * becomes `slice(0, -0)` — and `-0 === 0` in JavaScript, so that is
+ * `slice(0, 0)`, which returns an EMPTY array and would silently delete the
+ * whole pile. `move()` cannot reach it today (`can_move` requires at least one
+ * card), but nothing in the signature says so.
+ */
 function without(game: Game, from: Source, count: number): Game {
+    if (count <= 0) return game;
     if (from.pile === 'waste') {
         return { ...game, waste: game.waste.slice(0, -count) };
     }
@@ -196,4 +205,45 @@ export function auto_complete_available(game: Game): boolean {
 
 export function has_won(game: Game): boolean {
     return game.foundations.every((pile) => pile.length === 13);
+}
+
+/**
+ * Play every card that can go home, repeatedly, until nothing moves.
+ *
+ * ONLY top-card-to-foundation moves, which means it can stall: an Ace buried
+ * under its own 2 deadlocks, because the 2 cannot go home until the Ace does
+ * and this never moves the 2 aside. Callers must therefore check `has_won()`
+ * on the result rather than assuming it finished — `auto_complete_available()`
+ * says the position is fully visible, not that it is winnable this way.
+ *
+ * Terminates: every iteration either moves at least one card to a foundation
+ * (of which there are 52) or breaks.
+ */
+export function auto_finish(game: Game): Game {
+    let current = game;
+    let moved = true;
+    while (moved && !has_won(current)) {
+        moved = false;
+        for (let column = 0; column < TABLEAU_COLUMNS; column++) {
+            const from: Source = { pile: 'tableau', index: column, depth: 0 };
+            for (let f = 0; f < 4; f++) {
+                const to: Target = { pile: 'foundation', index: f };
+                if (!can_move(current, from, to)) continue;
+                current = move(current, from, to);
+                moved = true;
+                break;
+            }
+        }
+        // The waste can hold a playable card too when a caller invokes this
+        // outside `auto_complete_available`'s preconditions.
+        for (let f = 0; f < 4; f++) {
+            const from: Source = { pile: 'waste' };
+            const to: Target = { pile: 'foundation', index: f };
+            if (!can_move(current, from, to)) continue;
+            current = move(current, from, to);
+            moved = true;
+            break;
+        }
+    }
+    return current;
 }
