@@ -1,4 +1,4 @@
-import { scancode_for } from './keymap';
+import { key_code_for } from './keymap';
 
 export const JSDOS_PATH_PREFIX = '/js/js-dos/';
 export const DOOM_BUNDLE_URL = '/games/doom/doom.jsdos';
@@ -188,9 +188,9 @@ export async function start_doom(
         },
         key: (code, pressed) => {
             if (disposed) return;
-            const scancode = scancode_for(code);
-            if (scancode === 0) return;
-            ci.sendKeyEvent(scancode, pressed);
+            const key_code = key_code_for(code);
+            if (key_code === 0) return;
+            ci.sendKeyEvent(key_code, pressed);
         },
         dispose: async () => {
             if (disposed) return;

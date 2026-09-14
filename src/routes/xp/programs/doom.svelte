@@ -271,14 +271,31 @@
                 on:click={send_menu_key}>Menu (Esc)</button
             >
             <span class="text-slate-600">
-                Arrows move · Ctrl fires · Space opens
+                Esc opens the menu · Arrows move · Ctrl fires · Space opens
             </span>
         </div>
 
-        <div class="relative grow">
+        <!--
+            `min-h-0` is what keeps DOOM inside its window, and it was verified
+            that way rather than assumed: with the emulator running, removing
+            it fails the maximize E2E and removing `object-contain` does not.
+
+            A canvas is a replaced element, so it carries an intrinsic aspect
+            ratio, and a flex item defaults to `min-height: auto` — this box
+            therefore refused to shrink below the height that ratio implies at
+            the current width. Maximized, DOSBox's 320x200 at 1280px wide asks
+            for 800px inside a 742px column, and DOOM's status bar rendered
+            past the bottom of the window and behind the taskbar.
+
+            `object-contain` fixes a different thing: the window is asked to
+            hold 4:3, but its titlebar and toolbar eat into that, so the area
+            left for the canvas never is 4:3 and DOOM was drawn slightly tall
+            even unmaximized. It letterboxes instead of stretching.
+        -->
+        <div class="relative min-h-0 grow">
             <canvas
                 bind:this={screen_el}
-                class="doom-screen h-full w-full bg-black"
+                class="doom-screen h-full w-full bg-black object-contain"
                 style:image-rendering="pixelated"
                 tabindex="0"
                 aria-label="DOOM"
@@ -306,6 +323,16 @@
                         >
                         <p class="text-[11px] text-slate-400">
                             Shareware episode one · id Software
+                        </p>
+                        <!--
+                            DOOM boots into its attract demo, not into a game.
+                            Without this line a visitor watches the demo play
+                            itself and reasonably concludes the window is a
+                            video - which is exactly the report that sent us
+                            looking and turned up the broken keymap.
+                        -->
+                        <p class="text-[11px] text-slate-400">
+                            Press Esc for the menu to start a new game
                         </p>
                     {/if}
                 </div>
