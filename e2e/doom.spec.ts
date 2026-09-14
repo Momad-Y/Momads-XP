@@ -48,6 +48,99 @@ test('DOOM boots from a click and renders a frame @heavy', async ({ page }) => {
     expect(foreign).toEqual([]);
 });
 
+test('DOOM hands the emulator the key codes js-dos expects @heavy', async ({
+    page,
+}) => {
+    /*
+     * THE TEST THAT WAS MISSING, and the reason DOOM shipped unplayable.
+     *
+     * `keymap.ts` spoke DOS set-1 scancodes (Escape = 1, ArrowUp = 328) while
+     * js-dos 8.4.1 wants its own `KBD_KEYS` enum, which is GLFW's numbering
+     * (Escape = 256, ArrowUp = 265). js-dos drops a code it does not know
+     * WITHOUT ERROR, so the emulator booted, ran its attract demo, produced
+     * audio, painted frames — and ignored every key. Every DOOM test passed.
+     *
+     * Nothing observable on this thread could have caught it: the canvas is
+     * transferred to the worker so pixels cannot be read back, screenshots of
+     * the demo differ whether or not input works, and the Escape-isolation
+     * test below only proves the key did NOT reach the desktop.
+     *
+     * So this asserts at the one boundary that matters — the exact number
+     * handed to `sendKeyEvent` — by wrapping js-dos before the app loads it.
+     * The wrapper lives entirely in the test; nothing test-only ships.
+     */
+    test.setTimeout(180_000);
+
+    await page.addInitScript(() => {
+        const recorded = [];
+        window.__doom_keys = recorded;
+
+        // `emulators.js` assigns `window.emulators`; intercept the assignment
+        // so the command interface can be wrapped the moment it is created.
+        let value;
+        Object.defineProperty(window, 'emulators', {
+            configurable: true,
+            get: () => value,
+            set: (assigned) => {
+                value = assigned;
+                if (typeof assigned?.dosboxWorker !== 'function') return;
+                const original = assigned.dosboxWorker.bind(assigned);
+                assigned.dosboxWorker = async (...args) => {
+                    const ci = await original(...args);
+                    const send = ci.sendKeyEvent.bind(ci);
+                    ci.sendKeyEvent = (code, pressed) => {
+                        recorded.push([code, pressed]);
+                        send(code, pressed);
+                    };
+                    return ci;
+                };
+            },
+        });
+    });
+
+    await bootToDesktop(page);
+    await openFromStartMenu(page, 'Games', 'DOOM');
+    const win = page.locator('#work-space .window', { hasText: 'DOOM' });
+    await win.locator('.doom-start').click();
+
+    const canvas = win.locator('canvas.doom-screen');
+    await expect(canvas).toBeVisible({ timeout: 120_000 });
+    await canvas.click();
+
+    const sent = async (): Promise<[number, boolean][]> =>
+        page.evaluate(() => window.__doom_keys ?? []);
+
+    // Escape is the key that gets a visitor out of the attract demo and into
+    // the menu. If this one number is wrong, DOOM is a video.
+    await canvas.press('Escape');
+    await expect
+        .poll(async () => (await sent()).some(([c, p]) => c === 256 && p))
+        .toBe(true);
+
+    // The rest of what the on-screen hint promises.
+    for (const [key, code] of [
+        ['ArrowUp', 265],
+        ['ArrowDown', 264],
+        ['ArrowLeft', 263],
+        ['ArrowRight', 262],
+        ['Control', 341],
+        [' ', 32],
+        ['Enter', 257],
+    ] as [string, number][]) {
+        await canvas.press(key);
+        const codes = (await sent()).map(([c]) => c);
+        expect(codes, `${key} was not forwarded as ${String(code)}`).toContain(
+            code,
+        );
+    }
+
+    // A key DOOM has no use for must not be forwarded at all. The keymap
+    // returns 0 for it and the adapter drops it before reaching js-dos.
+    const before = (await sent()).length;
+    await canvas.press('ContextMenu');
+    expect((await sent()).length).toBe(before);
+});
+
 test('DOOM keeps Escape away from the desktop @heavy', async ({ page }) => {
     /*
      * ESCAPE, not the arrow keys.

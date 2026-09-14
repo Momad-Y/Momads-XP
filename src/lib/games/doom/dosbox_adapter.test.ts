@@ -110,13 +110,18 @@ describe('doom dosbox adapter', () => {
         expect(ci.unmute).toHaveBeenCalledTimes(1);
     });
 
-    it('forwards key events as scancodes', async () => {
+    it('forwards key events as js-dos key codes', async () => {
         const ci = fake_ci();
         const s = await start_doom(host_for(ci), null, () => undefined);
+        // 265 is GLFW's ArrowUp, which is what js-dos's KBD_KEYS enum uses.
+        // The value matters: the adapter shipped set-1 scancodes once, and
+        // js-dos dropped every one of them silently.
         s.key('ArrowUp', true);
-        expect(ci.sendKeyEvent).toHaveBeenCalledWith(328, true);
+        expect(ci.sendKeyEvent).toHaveBeenCalledWith(265, true);
+        s.key('ArrowUp', false);
+        expect(ci.sendKeyEvent).toHaveBeenCalledWith(265, false);
         s.key('F13', true); // unmapped
-        expect(ci.sendKeyEvent).toHaveBeenCalledTimes(1);
+        expect(ci.sendKeyEvent).toHaveBeenCalledTimes(2);
     });
 
     it('routes sound samples to the sink it was given', async () => {

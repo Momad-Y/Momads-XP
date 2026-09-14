@@ -271,7 +271,7 @@
                 on:click={send_menu_key}>Menu (Esc)</button
             >
             <span class="text-slate-600">
-                Arrows move · Ctrl fires · Space opens
+                Esc opens the menu · Arrows move · Ctrl fires · Space opens
             </span>
         </div>
 
@@ -306,6 +306,16 @@
                         >
                         <p class="text-[11px] text-slate-400">
                             Shareware episode one · id Software
+                        </p>
+                        <!--
+                            DOOM boots into its attract demo, not into a game.
+                            Without this line a visitor watches the demo play
+                            itself and reasonably concludes the window is a
+                            video - which is exactly the report that sent us
+                            looking and turned up the broken keymap.
+                        -->
+                        <p class="text-[11px] text-slate-400">
+                            Press Esc for the menu to start a new game
                         </p>
                     {/if}
                 </div>
