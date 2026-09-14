@@ -231,3 +231,73 @@ test('minimizing DOOM stops the emulator, restoring restarts it @heavy', async (
     await expect(shell).toHaveAttribute('data-paused', 'false');
     await expect.poll(ticks, { timeout: 30_000 }).toBeGreaterThan(paused_at);
 });
+
+test('the DOOM screen stays inside its window when maximized @heavy', async ({
+    page,
+}) => {
+    /*
+     * @heavy because it MUST start the emulator, and the first draft of this
+     * test did not — which made it useless.
+     *
+     * A canvas nobody has drawn on has the default 300x150 intrinsic size, so
+     * at 1280px wide its implied height is 640px and it fits a maximized
+     * window comfortably. Only once js-dos hands the worker the canvas and
+     * DOSBox settles on 320x200 does the implied height become 800px, against
+     * 714px of room. The cheap version of this test maximized an unstarted
+     * DOOM, measured zero spill, and passed against the broken layout.
+     *
+     * The bug: a canvas is a replaced element with an intrinsic aspect ratio,
+     * and a flex item defaults to `min-height: auto`, so the canvas box would
+     * not shrink below the height that ratio implied. DOOM's status bar — the
+     * ammo, health and armour readouts — rendered past the bottom of the
+     * window and behind the taskbar. Audio kept flowing and frames kept
+     * changing, so every other DOOM test stayed green.
+     */
+    test.setTimeout(180_000);
+    await bootToDesktop(page);
+    await openFromStartMenu(page, 'Games', 'DOOM');
+    const win = page.locator('#work-space .window', { hasText: 'DOOM' });
+    await win.locator('.doom-start').click();
+
+    const canvas = win.locator('canvas.doom-screen');
+    await expect(canvas).toBeVisible({ timeout: 120_000 });
+    // Wait for DOSBox to settle on its own resolution: that is what gives the
+    // canvas the intrinsic ratio this test is about.
+    await expect
+        .poll(
+            async () =>
+                canvas.evaluate((el: HTMLCanvasElement) => el.width === 320),
+            { timeout: 120_000 },
+        )
+        .toBe(true);
+
+    const spill = async (): Promise<{ bottom: number; right: number }> =>
+        win.evaluate((el: HTMLElement) => {
+            const screen = el.querySelector('canvas.doom-screen');
+            if (screen == null) throw new Error('doom canvas missing');
+            const frame = el.getBoundingClientRect();
+            const box = screen.getBoundingClientRect();
+            return {
+                bottom: Math.round(box.bottom - frame.bottom),
+                right: Math.round(box.right - frame.right),
+            };
+        });
+
+    expect(
+        await spill(),
+        'the screen spills out of the window as opened',
+    ).toEqual({ bottom: 0, right: 0 });
+
+    await win
+        .locator('.titlebar button:has(img[src*="Maximize"])')
+        .first()
+        .click();
+    await expect
+        .poll(async () => (await win.boundingBox())?.width ?? 0)
+        .toBeGreaterThan(1000);
+
+    expect(
+        await spill(),
+        'the screen spills out of the maximized window',
+    ).toEqual({ bottom: 0, right: 0 });
+});
