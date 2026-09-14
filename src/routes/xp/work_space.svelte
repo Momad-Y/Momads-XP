@@ -524,12 +524,24 @@
                     fs_item: full_vfs_item(fs_item),
                     exec_path: app.path,
                     get_self: () => program,
-                    // For a REGISTERED app the registry is the source of
-                    // truth for title/icon/size, so passing this replaces
-                    // nothing: registry components deliberately do not declare
-                    // their own `options` default. (The inherited branches
-                    // above are the opposite — their components own it — which
-                    // is why this is a separate path rather than a rewrite.)
+                    /*
+                     * For a REGISTERED app the registry is the source of truth
+                     * for title/icon/size, and this prop REPLACES whatever
+                     * default the component declares — Svelte does not merge
+                     * them.
+                     *
+                     * The Phase 4 components DO declare their own `options`
+                     * default (for the case where they are mounted outside the
+                     * registry), which is exactly why a registry row that
+                     * omits `default_size` produces a window with no width at
+                     * all. An earlier version of this comment claimed no
+                     * registry component declared one; that was never a rule
+                     * the code enforced.
+                     *
+                     * The inherited branches above are the opposite — their
+                     * components own their options — which is why this is a
+                     * separate path rather than a rewrite.
+                     */
                     options: to_window_options(app, instance_id),
                 },
             });

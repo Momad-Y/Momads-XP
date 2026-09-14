@@ -1413,10 +1413,12 @@ surprised by it:
 
 Gate artefacts:
 `docs/phase-4-{spec,redteam-spec,plan,redteam-plan,redteam-implementation}.md`,
-with the handoff in `docs/phase-4-guide.md`. **Gate 6's review was not
-independent** — two fresh-context subagents died on API rate limits, so it was
-self-reviewed; `phase-4-redteam-implementation.md` says so in its first
-paragraph and lists what a fresh pass should still cover.
+with the handoff in `docs/phase-4-guide.md`. Gate 6 ran twice: the first two
+attempts at an independent reviewer died on API rate limits and were replaced
+by a self-review, then an independent pass completed and found 6 HIGH, 6 MEDIUM
+and 8 LOW — including three tests it proved could not fail, two of which the
+self-review had written. Both records are kept:
+`phase-4-redteam-implementation.md` (self) and `-2.md` (independent).
 
 **§3.3 said "a simple AI" while the §5 table named Stockfish.** The owner
 resolved it in favour of §5: a real engine, deliberately weakened. `Skill

@@ -12,6 +12,11 @@ import {
 } from './klondike';
 
 const fixed = (): number => 0.5;
+const card_key = (c: Card): string => `${c.suit}${String(c.rank)}`;
+const required_card = (c: Card | undefined): Card => {
+    if (c == null) throw new Error('expected a card');
+    return c;
+};
 const card = (suit: Suit, rank: number, face_up = true): Card => ({
     suit,
     rank,
@@ -303,6 +308,110 @@ describe('klondike', () => {
             ],
         };
         expect(has_won(full)).toBe(true);
+    });
+});
+
+describe('auto_finish', () => {
+    const suits: Suit[] = ['clubs', 'diamonds', 'hearts', 'spades'];
+
+    it('sends every card home from a solved-but-unplayed position', () => {
+        // One suit per column, ace on top, so every step is a legal home move.
+        const g = deal(fixed);
+        const columns = suits.map((s) =>
+            Array.from({ length: 13 }, (_, i) => card(s, 13 - i)),
+        );
+        const start: Game = {
+            ...g,
+            stock: [],
+            waste: [],
+            foundations: [[], [], [], []],
+            tableau: [
+                columns[0] ?? [],
+                columns[1] ?? [],
+                columns[2] ?? [],
+                columns[3] ?? [],
+                [],
+                [],
+                [],
+            ],
+        };
+        expect(has_won(auto_finish(start))).toBe(true);
+    });
+
+    it('terminates instead of spinning when it cannot finish', () => {
+        /*
+         * THE case the component must handle. An Ace buried under its own 2
+         * deadlocks: the 2 cannot go home before the Ace, and this never moves
+         * the 2 aside. It must stop, not loop — and the caller must not
+         * assume a win.
+         */
+        const g = deal(fixed);
+        const stuck: Game = {
+            ...g,
+            stock: [],
+            waste: [],
+            foundations: [[], [], [], []],
+            tableau: [
+                [card('clubs', 1), card('clubs', 2)],
+                [],
+                [],
+                [],
+                [],
+                [],
+                [],
+            ],
+        };
+        const after = auto_finish(stuck);
+        expect(has_won(after)).toBe(false);
+        expect(after.tableau[0]).toHaveLength(2);
+    });
+
+    it('never mutates the game it was given', () => {
+        const g = deal(fixed);
+        const before = JSON.stringify(g);
+        auto_finish(g);
+        expect(JSON.stringify(g)).toBe(before);
+    });
+});
+
+describe('draw_from_stock ordering', () => {
+    it('recycles the waste back in dealing order, not reversed', () => {
+        /*
+         * Pins the ORDER, not just the lengths. The previous test asserted
+         * only counts, so dropping the `.reverse()` in `draw_from_stock` left
+         * every test green while the stock came back inverted — the cycle a
+         * player sees on the second pass would differ from the first.
+         */
+        let g: Game = { ...deal(fixed), draw: 1 };
+        const original = [...g.stock].map((c) => `${c.suit}${String(c.rank)}`);
+        for (let i = 0; i < 24; i++) g = draw_from_stock(g);
+        g = draw_from_stock(g); // recycle
+        expect(g.stock.map((c) => `${c.suit}${String(c.rank)}`)).toEqual(
+            original,
+        );
+        expect(g.stock.every((c) => !c.face_up)).toBe(true);
+    });
+
+    it('draws three at a time and leaves the last one on top', () => {
+        // Draw-3 is offered in the Game menu and had no test at all.
+        let g: Game = { ...deal(fixed), draw: 3 };
+        const top_three = g.stock.slice(-3).map((c) => card_key(c));
+        g = draw_from_stock(g);
+        expect(g.waste).toHaveLength(3);
+        expect(g.stock).toHaveLength(21);
+        expect(g.waste.map((c) => card_key(c))).toEqual(top_three);
+        // The playable card is the last one off the stock.
+        expect(card_key(required_card(g.waste.at(-1)))).toBe(top_three[2]);
+        expect(g.waste.every((c) => c.face_up)).toBe(true);
+    });
+
+    it('takes only what is left when fewer than three remain', () => {
+        let g: Game = { ...deal(fixed), draw: 3 };
+        for (let i = 0; i < 7; i++) g = draw_from_stock(g); // 21 of 24
+        expect(g.stock).toHaveLength(3);
+        g = draw_from_stock(g);
+        expect(g.stock).toHaveLength(0);
+        expect(g.waste).toHaveLength(24);
     });
 });
 
