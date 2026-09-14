@@ -1,6 +1,19 @@
 # Phase 4 — red team of the implementation (gate 6)
 
-**NO INDEPENDENT PASS RAN. Read this section first.**
+> **An independent pass DID run, on the second attempt.** Everything below the
+> horizontal rule is the earlier SELF-review, kept for the record because the
+> independent reviewer graded it — and found it badly insufficient. The
+> independent findings and their dispositions are in
+> `phase-4-redteam-implementation-2.md`.
+>
+> The headline: the independent reviewer **mutation-tested the tests** and
+> proved three of them could not fail, including two written by the
+> self-review to close its own findings. Self-review caught real bugs but
+> could not see its own blind spots. Read the second document first.
+
+---
+
+**The self-review below ran because no independent reviewer could start.**
 
 Gates 2 and 4 used fresh-context subagents, as §11 requires. Gate 6 could not:
 two attempts died on API rate limits — the session limit, then the weekly

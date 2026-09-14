@@ -35,7 +35,7 @@ describe('APP_REGISTRY', () => {
 
     it('every app declares a non-empty title and icon', () => {
         // The registry is the sole source of window chrome for registered
-        // apps — the components deliberately declare no `options` default —
+        // apps — the registry is the source of truth for a registered app's chrome —
         // so a blank title here ships a blank title bar.
         for (const a of APP_REGISTRY) {
             expect(a.title.length).toBeGreaterThan(0);

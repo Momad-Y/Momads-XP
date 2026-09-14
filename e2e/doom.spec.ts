@@ -48,7 +48,17 @@ test('DOOM boots from a click and renders a frame @heavy', async ({ page }) => {
     expect(foreign).toEqual([]);
 });
 
-test('DOOM keeps its keys away from the desktop @heavy', async ({ page }) => {
+test('DOOM keeps Escape away from the desktop @heavy', async ({ page }) => {
+    /*
+     * ESCAPE, not the arrow keys.
+     *
+     * The first version pressed ArrowUp and Space and asserted the Start menu
+     * stayed open — which it always would: `start_menu.svelte`'s keydown
+     * handler begins `if (event.key !== 'Escape') return;`, so arrows could
+     * never have closed it. Deleting `stopPropagation` from the component left
+     * that test green. Escape is the one key where the desktop and the game
+     * genuinely compete, so it is the only one worth asserting.
+     */
     test.setTimeout(180_000);
     await bootToDesktop(page);
     await openFromStartMenu(page, 'Games', 'DOOM');
@@ -59,28 +69,16 @@ test('DOOM keeps its keys away from the desktop @heavy', async ({ page }) => {
     await expect(canvas).toBeVisible({ timeout: 120_000 });
     await canvas.click();
 
-    /*
-     * Real selectors: the button is `#start-menu-btn` and the menu is the id
-     * `#start-menu`, as start_menu.spec.ts uses them.
-     *
-     * Arrow keys rather than Escape: clicking the canvas already closes the
-     * Start menu by click-outside, so an Escape press afterwards would prove
-     * nothing. Movement keys are what must not leak, and they leave the menu
-     * open — while the canvas holds focus.
-     */
+    // Open the Start menu, then press Escape INTO the focused game.
     await page.locator('#start-menu-btn').click();
     await expect(page.locator('#start-menu')).toBeVisible();
+    await canvas.press('Escape');
+    await expect(
+        page.locator('#start-menu'),
+        'Escape leaked out of the game and closed the Start menu',
+    ).toBeVisible();
 
-    await canvas.press('ArrowUp');
-    await canvas.press('Space');
-    await expect(page.locator('#start-menu')).toBeVisible();
-
-    /*
-     * …and the desktop's own Escape still works once the game does NOT hold
-     * focus. Blurring explicitly rather than clicking something: while the
-     * canvas is focused, swallowing Escape is the correct behaviour, so a
-     * press here without the blur would assert the opposite of the design.
-     */
+    // …and the desktop's own Escape still works once no game holds focus.
     await canvas.evaluate((el: HTMLCanvasElement) => {
         el.blur();
     });
@@ -88,25 +86,21 @@ test('DOOM keeps its keys away from the desktop @heavy', async ({ page }) => {
     await expect(page.locator('#start-menu')).toBeHidden();
 });
 
-test('minimizing DOOM pauses it, restoring resumes it @heavy', async ({
+test('minimizing DOOM stops the emulator, restoring restarts it @heavy', async ({
     page,
 }) => {
     /*
-     * Guards the wiring: minimizing must reach the emulator, and restoring
-     * must let it go again. A minimized DOOM that keeps running burns a core
-     * for a window nobody can see.
+     * Asserts the EMULATOR stopped, not that a flag flipped.
      *
-     * THE ASSERTION IS ON STATE, NOT PIXELS, and that is not laziness.
-     * Screenshots cannot answer this: a minimized window is hidden, so its
-     * canvas shots come back essentially blank (526 bytes against 91,889 while
-     * visible), and comparing across a restore fails too because `resume()`
-     * fires first and DOOM runs at ~35fps. Both probes were tried; both
-     * measure the window's visibility rather than the emulator's state.
+     * The previous version checked only `data-paused`, which mirrors the bound
+     * `minimized` prop — replacing the whole body of `sync_running()` with a
+     * no-op left it green. Pixels cannot settle it either: the canvas is
+     * transferred to the worker so it cannot be read back, and a minimized
+     * window screenshots blank (526 bytes against ~92KB visible).
      *
-     * That the emulator honours pause/resume is unit-tested against a fake in
-     * `dosbox_adapter.test.ts`. This covers the half that lives in the
-     * component, which would break silently if `accessors` ever left
-     * Window.svelte.
+     * Audio is the one signal a running emulator sends the main thread. If the
+     * buffer count stops advancing while minimized and resumes afterwards, the
+     * emulator really stopped.
      */
     test.setTimeout(180_000);
     await bootToDesktop(page);
@@ -117,12 +111,30 @@ test('minimizing DOOM pauses it, restoring resumes it @heavy', async ({
         timeout: 120_000,
     });
 
-    const shell = win.locator('[data-paused]');
-    await expect(shell).toHaveAttribute('data-paused', 'false');
+    const shell = win.locator('[data-audio-ticks]');
+    const ticks = async (): Promise<number> =>
+        Number((await shell.getAttribute('data-audio-ticks')) ?? '0');
+
+    // The emulator must be producing audio at all, or the rest proves nothing.
+    await expect.poll(ticks, { timeout: 60_000 }).toBeGreaterThan(0);
+    const running_before = await ticks();
+    await page.waitForTimeout(1500);
+    expect(
+        await ticks(),
+        'the emulator produced no audio while running — this test cannot measure anything',
+    ).toBeGreaterThan(running_before);
 
     await win.locator('.titlebar').getByRole('button').first().click();
     await expect(shell).toHaveAttribute('data-paused', 'true');
+    await page.waitForTimeout(1200); // let any in-flight buffers land
+    const paused_at = await ticks();
+    await page.waitForTimeout(2500);
+    expect(
+        await ticks(),
+        'the emulator kept producing audio while minimized — it was not paused',
+    ).toBe(paused_at);
 
     await page.locator('.program-tile').filter({ hasText: 'DOOM' }).click();
     await expect(shell).toHaveAttribute('data-paused', 'false');
+    await expect.poll(ticks, { timeout: 30_000 }).toBeGreaterThan(paused_at);
 });

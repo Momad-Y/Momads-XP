@@ -105,10 +105,20 @@
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
+# Scoped to the bundle, not all of /games/*: the folder also holds README.md
+# and LICENSE-id-shareware.txt, and freezing those for a year means a licence
+# correction could not reach anyone who had already loaded them.
+[[headers]]
+  for = "/games/doom/doom.jsdos"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Those two files are directly linkable but are notices, not destinations.
+# Same treatment as /html/* gets, and it names no CSP, so `/*` still applies.
 [[headers]]
   for = "/games/*"
   [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
+    X-Robots-Tag = "noindex, nofollow"
 
 # The Pyodide host page. Runs on an OPAQUE origin (sandbox without
 # allow-same-origin), so `'self'` here matches nothing the page loads —

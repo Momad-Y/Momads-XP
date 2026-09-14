@@ -3,9 +3,14 @@ import type { Page } from '@playwright/test';
 import { bootToDesktop } from './helpers';
 
 /*
- * Phase 3 made CMD and Python real; Phase 4 made Minesweeper, Solitaire and
- * Chess real. DOOM is the last `placeholder_entry` and goes in the same phase,
- * after which nothing in the Start menu reaches `placeholder.svelte` at all.
+ * Every All Programs entry is a real program now — Phase 4 finished the job
+ * and the placeholder mechanism was deleted with it.
+ *
+ * NOTE what that cost: `cascade_position` (the 24px rect-less cascade in
+ * `cascade.ts`) lost its only end-to-end walker, because the placeholder was
+ * the sole launch path that passed no `exec_path`. Its geometry is unit-tested
+ * in `cascade.test.ts`; the remaining rect-less windows are the inherited
+ * property sheets, which no spec opens twice.
  *
  * Scoped to the flyout on purpose: once the window is open its title bar and
  * taskbar button carry the same name, so a page-wide locator is a strict-mode

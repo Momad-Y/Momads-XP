@@ -1,7 +1,7 @@
 <svelte:options accessors={true} />
 
 <script lang="ts">
-    import { onDestroy, onMount, unmount } from 'svelte';
+    import { onDestroy, unmount } from 'svelte';
     import { Chess, type Square } from 'chess.js';
     import Window from '../../../lib/components/xp/Window.svelte';
     import { runningPrograms } from '../../../lib/store';
@@ -42,6 +42,8 @@
     let level: Level = 'easy';
     let engine: Engine | null = null;
     let thinking = false;
+    /** Bumped whenever the position the engine is answering stops being current. */
+    let generation = 0;
     /**
      * chess.js mutates in place, so there is no new object for Svelte to see.
      * Everything the view reads is pulled into this snapshot, which is
@@ -102,10 +104,22 @@
         return `/assets/chess/${colour}${type.toUpperCase()}.svg`;
     }
 
-    onMount(() => {
-        // One-shot init in onMount, never in a `$:` block.
-        engine = create_engine();
-    });
+    /**
+     * The engine is created ON FIRST USE, not on mount.
+     *
+     * Creating it in `onMount` downloaded 96KB of JS plus a 559KB WASM binary
+     * and spun up a Worker every time the Chess window opened — including for
+     * a two-player game, which never asks the engine anything. It also made
+     * the board-only E2E boot Stockfish in the parallel Playwright pool, which
+     * is exactly what the serial `heavy` project exists to prevent.
+     *
+     * Same principle DOOM applies with its click-to-start gate: do not spend a
+     * visitor's bandwidth until they ask for the thing that needs it.
+     */
+    function ensure_engine(): Engine {
+        engine ??= create_engine();
+        return engine;
+    }
 
     onDestroy(() => {
         // The window can close mid-search; dispose settles any in-flight
@@ -119,12 +133,27 @@
     }
 
     async function reply() {
-        if (opponent !== 'computer' || engine == null) return;
+        if (opponent !== 'computer') return;
         if (game.isGameOver()) return;
+
+        /*
+         * The reply is only valid for the position that asked for it.
+         *
+         * `New Game`, or switching to two-player, can land while the engine is
+         * still searching — trivially at "hard", which searches to depth 12.
+         * The adapter only abandons a request when a NEW one is issued, which
+         * neither of those does, so without this token the answer arrives and
+         * gets played onto a board it was never computed for. chess.js throws
+         * on the illegal move, and since this is fired as `void reply()` that
+         * surfaces as an unhandled rejection rather than anything visible.
+         */
+        const token = ++generation;
         thinking = true;
         refresh();
-        const best = await engine.best_move(level, uci_history());
+        const best = await ensure_engine().best_move(level, uci_history());
+        if (token !== generation) return; // superseded; drop it silently
         thinking = false;
+
         if (best == null) {
             refresh();
             return;
@@ -137,7 +166,13 @@
             refresh();
             return;
         }
-        game.move({ from, to, promotion: best.promotion ?? 'q' });
+        try {
+            game.move({ from, to, promotion: best.promotion ?? 'q' });
+        } catch {
+            // chess.js THROWS on an illegal move. `on_square` guards the human
+            // side for the same reason; the engine side needs it too, because
+            // a stale or malformed reply must not take the window down.
+        }
         refresh();
     }
 
@@ -181,9 +216,22 @@
     }
 
     function new_game() {
+        // Invalidate any search in flight, or its answer lands on this board.
+        generation += 1;
         game = new Chess();
         selected = null;
         thinking = false;
+        refresh();
+    }
+
+    /**
+     * Changing the opponent or the difficulty abandons the current search and
+     * re-renders the status line, which reads both.
+     */
+    function on_settings_change() {
+        generation += 1;
+        thinking = false;
+        selected = null;
         refresh();
     }
 
@@ -206,6 +254,7 @@
                 <select
                     class="border border-slate-500 text-[11px]"
                     bind:value={opponent}
+                    on:change={on_settings_change}
                 >
                     <option value="computer">Computer</option>
                     <option value="two-player">Two players</option>
@@ -216,6 +265,7 @@
                 <select
                     class="border border-slate-500 text-[11px]"
                     bind:value={level}
+                    on:change={on_settings_change}
                 >
                     {#each LEVELS as l (l)}
                         <option value={l}>{LEVEL_LABELS[l]}</option>

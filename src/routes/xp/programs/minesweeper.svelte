@@ -61,7 +61,12 @@
      * once in this codebase as the Music Player's frozen title. Every state
      * change below happens in an event handler or the interval callback.
      */
-    $: mine_display = String(Math.max(flags_left(board), 0)).padStart(3, '0');
+    /*
+     * NOT clamped at zero. `flags_left` documents that it may go negative,
+     * "exactly as XP's counter does" — over-flagging shows -01, -02 and so on,
+     * and clamping contradicted the module it reads from.
+     */
+    $: mine_display = format_counter(flags_left(board));
     $: time_display = String(Math.min(seconds, 999)).padStart(3, '0');
     $: face = board.status;
     $: preset = PRESETS[level];
@@ -109,6 +114,14 @@
         if (timer != null) clearInterval(timer);
         timer = undefined;
     });
+
+    /** XP's three-digit LED: negatives render as `-01`, not `000`. */
+    function format_counter(value: number): string {
+        if (value < 0) {
+            return `-${String(Math.min(-value, 99)).padStart(2, '0')}`;
+        }
+        return String(Math.min(value, 999)).padStart(3, '0');
+    }
 
     function restart() {
         board = new_board(PRESETS[level]);

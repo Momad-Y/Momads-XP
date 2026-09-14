@@ -1,7 +1,7 @@
 <svelte:options accessors={true} />
 
 <script lang="ts">
-    import { onMount, unmount } from 'svelte';
+    import { onDestroy, onMount, unmount } from 'svelte';
     import Window from '../../../lib/components/xp/Window.svelte';
     import Menu from '../../../lib/components/xp/Menu.svelte';
     import { runningPrograms, zIndex } from '../../../lib/store';
@@ -11,6 +11,12 @@
         SUITS,
         type Card,
     } from '../../../lib/games/solitaire/deck';
+    import {
+        launch,
+        MAX_IN_FLIGHT,
+        step_cascade,
+        type Bouncer,
+    } from '../../../lib/games/solitaire/cascade';
     import {
         auto_complete_available,
         auto_finish,
@@ -41,6 +47,10 @@
         null;
     /** Set when auto-complete ran and could not finish; hides the button. */
     let auto_complete_stalled = false;
+    /** Cards mid-flight in the win cascade. Empty unless the game is won. */
+    let bouncing: Bouncer[] = [];
+    let bounce_frame: number | undefined;
+    let felt_el: HTMLDivElement | undefined;
 
     export let options: WindowOptions = {
         title: 'Solitaire',
@@ -103,10 +113,80 @@
         ).matches;
     });
 
+    onDestroy(() => {
+        stop_bounce();
+    });
+
+    function stop_bounce() {
+        if (bounce_frame != null) cancelAnimationFrame(bounce_frame);
+        bounce_frame = undefined;
+        bouncing = [];
+    }
+
+    /**
+     * XP's win cascade: the foundations pour onto the felt and bounce.
+     *
+     * Suppressed entirely under `prefers-reduced-motion: reduce` — a
+     * full-window cascade of bouncing cards is close to the canonical example
+     * of motion that causes vestibular discomfort, and the static "You won"
+     * panel already states the outcome.
+     */
+    function start_bounce() {
+        if (reduced_motion) return;
+        const felt = felt_el;
+        if (felt == null) return;
+        const width = felt.clientWidth;
+        const height = felt.clientHeight;
+
+        const queued = game.foundations
+            .flat()
+            .map((c) => card_code(c))
+            .reverse();
+        let at = 0;
+
+        const step = () => {
+            // Release one card every frame until the pile is spent, capped so
+            // they cascade rather than dumping all 52 at once.
+            if (at < queued.length && bouncing.length < MAX_IN_FLIGHT) {
+                const code = queued[at++];
+                if (code != null) {
+                    bouncing = [
+                        ...bouncing,
+                        launch(code, { width, height }, Math.random),
+                    ];
+                }
+            }
+            bouncing = step_cascade(bouncing, { width, height });
+
+            if (at < queued.length || bouncing.length > 0) {
+                bounce_frame = requestAnimationFrame(step);
+            } else {
+                bounce_frame = undefined;
+            }
+        };
+        bounce_frame = requestAnimationFrame(step);
+    }
+
     function restart(draw: 1 | 3) {
+        stop_bounce();
         game = deal(Math.random, draw);
         dragging = null;
         auto_complete_stalled = false;
+        won_shown = false;
+    }
+
+    /**
+     * Fires the cascade exactly once per win.
+     *
+     * Called from the handlers that can produce a win rather than from a `$:`
+     * block: a reactive statement that also WROTE `won_shown` would not
+     * invalidate its siblings, which is the legacy-mode trap CLAUDE.md records.
+     */
+    let won_shown = false;
+    function check_win() {
+        if (won_shown || !has_won(game)) return;
+        won_shown = true;
+        start_bounce();
     }
 
     /**
@@ -119,7 +199,8 @@
      */
     function finish() {
         game = auto_finish(game);
-        if (!has_won(game)) auto_complete_stalled = true;
+        if (has_won(game)) check_win();
+        else auto_complete_stalled = true;
     }
 
     function face_of(card: Card): string {
@@ -134,6 +215,7 @@
             const to: Target = { pile: 'foundation', index: i };
             if (can_move(game, from, to)) {
                 game = move(game, from, to);
+                check_win();
                 return;
             }
         }
@@ -167,6 +249,7 @@
         const index = Number(target.dataset.index ?? '0');
         if (kind !== 'tableau' && kind !== 'foundation') return;
         game = move(game, active.from, { pile: kind, index });
+        check_win();
     }
 
     export function destroy() {
@@ -184,6 +267,7 @@
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
             class="sol-felt relative grow select-none overflow-hidden bg-[#0a6b3d] p-3"
+            bind:this={felt_el}
             data-reduced-motion={reduced_motion}
             on:pointermove={move_drag}
             on:pointerup={end_drag}
@@ -309,6 +393,17 @@
                     {/each}
                 </div>
             {/if}
+
+            <!-- the win cascade; empty unless a game was just won -->
+            {#each bouncing as card (`${card.code}-${String(card.x)}`)}
+                <img
+                    class="sol-bounce pointer-events-none absolute w-[71px] rounded shadow-lg"
+                    style:left="{card.x}px"
+                    style:top="{card.y}px"
+                    src="/assets/cards/{card.code}.png"
+                    alt=""
+                />
+            {/each}
 
             {#if won}
                 <div

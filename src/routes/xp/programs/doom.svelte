@@ -26,6 +26,23 @@
     let ctx: AudioContext | undefined;
     let gain: GainNode | undefined;
     let next_play_at = 0;
+    /**
+     * Audio buffers received from the emulator, sampled on a timer.
+     *
+     * This is the ONLY signal the main thread gets from a running emulator:
+     * the canvas is transferred to the worker, so its pixels cannot be read
+     * back, and a minimized window screenshots blank. Without it there is no
+     * way to assert that pausing actually stopped anything — the previous test
+     * only checked a data attribute mirroring the minimized prop, and passed
+     * with the pause call deleted.
+     *
+     * The raw count is NOT reactive: buffers arrive dozens of times a second
+     * and re-rendering on each would be absurd. It is copied to the reactive
+     * `audio_ticks` four times a second instead.
+     */
+    let audio_chunks = 0;
+    let audio_ticks = 0;
+    let tick_timer: ReturnType<typeof setInterval> | undefined;
     let state: 'idle' | 'starting' | 'running' | 'failed' = 'idle';
     let error_text = '';
     /**
@@ -95,6 +112,9 @@
         gain.connect(ctx.destination);
         next_play_at = ctx.currentTime;
 
+        tick_timer = setInterval(() => {
+            audio_ticks = audio_chunks;
+        }, 250);
         void launch();
     }
 
@@ -126,6 +146,15 @@
                 return;
             }
             session = started;
+            /*
+             * Apply the CURRENT minimized state immediately. The reactive
+             * statement above fires on `is_minimized`, not on `session`, so a
+             * visitor who minimized during the several-second load would
+             * otherwise get an emulator running at full speed with audio,
+             * behind a window they cannot see, until they restore and
+             * minimize again.
+             */
+            sync_running(is_minimized);
             state = 'running';
             screen_el?.focus();
         } catch (error) {
@@ -137,6 +166,7 @@
 
     /** Queue one buffer from the emulator, scheduled back to back. */
     function push_audio(samples: Float32Array) {
+        audio_chunks += 1;
         const context = ctx;
         const sink = gain;
         if (context == null || sink == null || samples.length === 0) return;
@@ -168,10 +198,15 @@
      * everywhere else.
      */
     function on_key(event: KeyboardEvent, pressed: boolean) {
-        if (session == null) return;
+        /*
+         * Isolate FIRST, forward second. The canvas only has focus because the
+         * visitor is playing, so its keys are never meant for the desktop —
+         * including during the load and after teardown, when `session` is null
+         * and an early return would have let arrows and Escape through.
+         */
         event.stopPropagation();
         event.preventDefault();
-        session.key(event.code, pressed);
+        session?.key(event.code, pressed);
     }
 
     function toggle_fullscreen() {
@@ -190,6 +225,8 @@
 
     onDestroy(() => {
         destroyed = true;
+        if (tick_timer != null) clearInterval(tick_timer);
+        tick_timer = undefined;
         // Terminate the emulator and release the audio graph. Without this,
         // opening and closing DOOM leaks a DOSBox worker and an AudioContext
         // per open — the browser caps contexts, so it fails visibly.
@@ -218,6 +255,7 @@
         slot="content"
         class="absolute inset-0 flex flex-col bg-black"
         data-paused={is_minimized}
+        data-audio-ticks={audio_ticks}
         bind:this={shell_el}
     >
         <div

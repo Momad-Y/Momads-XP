@@ -88,6 +88,8 @@ const MANIFEST: Record<string, string> = {
         'b8e55c2aa4c96e961c9965f289c0f40b5d44f02a557dcf980ddc29787b493842',
     'static/js/js-dos/wlibzip.wasm':
         '25064d970c42ca7ea0fdb8b058204d6e41cc8826a676219677772f5591e8337b',
+    'static/js/js-dos/COPYING':
+        'edaef632cbb643e4e7a221717a6c441a4c1a7c918e6e4d56debc3d8739b233f6',
     'static/games/doom/doom.jsdos':
         '65d767628273aa0e1d4f45f7f2fe92b6b956e3d599868f4078dbdb709db14df2',
 };
@@ -131,6 +133,19 @@ describe('vendored js-dos and the DOOM bundle', () => {
         expect(notice).toContain('id Software');
         expect(notice).toContain('freely distributable');
         expect(notice).toContain('f0cefca49926d00903cf57551d901abe');
+    });
+
+    it('ships the GPL-2 licence text beside the js-dos binaries', () => {
+        /*
+         * GPL-2.0 §1 and §3 require the licence to accompany the conveyed
+         * work — the same obligation the Stockfish test above states for
+         * GPL-3 §4, which was applied there and missed here. Grepping the
+         * notices file for the string "GPL-2.0" is not compliance; the text
+         * has to actually ship.
+         */
+        const text = readFileSync('static/js/js-dos/COPYING', 'utf8');
+        expect(text).toContain('GNU GENERAL PUBLIC LICENSE');
+        expect(text).toContain('Version 2, June 1991');
     });
 
     it('names js-dos and DOOM in the third-party notices', () => {
