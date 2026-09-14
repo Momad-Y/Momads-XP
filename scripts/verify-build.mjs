@@ -107,24 +107,35 @@ if (!existsSync(BUILD)) {
             readFileSync(f, 'utf8').includes('.xterm'),
         );
         if (with_xterm.length === 0) {
-            // A FAIL, not a skip, once the terminal apps are actually in the
-            // build. As a pure skip/ok pair this check had no failing path at
-            // all — it could never go red, which contradicts the header's
-            // claim that every check proves its target first.
-            const terminals_built = existsSync(join(BUILD, '_app'))
-                ? readdirSync(join(BUILD, '_app', 'immutable', 'nodes'), {
-                      withFileTypes: true,
-                  }).length > 0
-                : false;
-            const has_terminal_chunk = all_css.some((f) =>
-                readFileSync(f, 'utf8').includes('.xterm'),
-            );
-            if (terminals_built && !has_terminal_chunk) {
-                skip(
-                    'xterm CSS not emitted — terminal apps may not be in this build',
+            /*
+             * A FAIL, not a skip.
+             *
+             * The previous version of this branch computed `has_terminal_chunk`
+             * by re-testing the condition it was already inside — so it was
+             * unconditionally false — and then called `skip()` on BOTH sides of
+             * the resulting if/else. It could not go red under any input, which
+             * is the exact defect this file's header warns about, in the file
+             * that warns about it.
+             *
+             * The target is proved to exist first: if the terminal apps are in
+             * this build at all, their stylesheet must have been emitted
+             * somewhere, and its absence means the split stopped happening.
+             */
+            const terminal_module = join(BUILD, '_app', 'immutable');
+            const terminals_built =
+                existsSync(terminal_module) &&
+                walk_files(terminal_module).some(
+                    (f) =>
+                        f.endsWith('.js') &&
+                        readFileSync(f, 'utf8').includes('xterm'),
+                );
+            if (terminals_built) {
+                fail(
+                    'xterm CSS is in no stylesheet, but the terminal apps ARE ' +
+                        'in this build — the CSS split has stopped emitting it',
                 );
             } else {
-                skip('xterm CSS not emitted yet (terminal apps not built)');
+                skip('xterm CSS not emitted (terminal apps not in this build)');
             }
         } else if (with_xterm.length > 1) {
             fail(
@@ -313,6 +324,98 @@ if (!log_path) {
             );
         } else {
             ok('no Rollup static+dynamic import warning');
+        }
+    }
+}
+
+// ── 4. games and their WASM runtimes stay out of the entry bundle ────────────
+// SPECIFICATION.md §4.6 excludes games from the mobile experience, and the
+// registry's lazy `component: () => import(...)` is the only thing that makes
+// that true. An eager import from any shared module would pull Minesweeper,
+// Solitaire, chess.js or the DOOM/Stockfish adapters into first paint, and
+// nothing else in this repo can see it: vitest runs before `npm run build` and
+// never looks at `build/`.
+//
+// The Rollup check above catches the subtle half (a module imported BOTH ways
+// is not split at all). This catches the blunt half: game code sitting in the
+// entry chunk outright.
+//
+// PROVEN TO FAIL, which took three attempts and is worth recording. Importing
+// a game module into `desktop.svelte` does NOT trip it — desktop is itself
+// lazily loaded, so nothing reaches the entry bundle. Importing one into
+// `+page.svelte` as `void CONSTANT` does not trip it either: Rollup tree-shakes
+// the import away entirely. Only a reference with an observable effect (the
+// constant rendered into the markup) puts the module in a preloaded chunk and
+// turns this red. Any future change here must be re-proven the same way.
+if (existsSync(BUILD)) {
+    const entry_html = readFileSync(join(BUILD, 'index.html'), 'utf8');
+    const entry_scripts = [
+        ...entry_html.matchAll(/(?:href|src)="([^"]+\.js)"/g),
+    ].map((m) => m[1]);
+
+    // PROVE THE TARGET EXISTS FIRST — a grep that silently matches nothing is
+    // the "test that cannot fail" this file was written to stop.
+    const chunk_dir = join(BUILD, '_app', 'immutable');
+    if (!existsSync(chunk_dir)) {
+        fail('no _app/immutable — cannot check the entry bundle for game code');
+    } else {
+        const all_js = walk_files(chunk_dir).filter((f) => f.endsWith('.js'));
+        const sources = all_js.map((f) => readFileSync(f, 'utf8'));
+
+        // Markers that only each game's own chunk should contain.
+        const MARKERS = {
+            minesweeper: 'ms-mine-count',
+            solitaire: 'sol-tableau',
+            chess: 'chess-square',
+            doom: 'doom-screen',
+        };
+        for (const [game, marker] of Object.entries(MARKERS)) {
+            const holders = all_js.filter((f, i) =>
+                sources[i].includes(marker),
+            );
+            if (holders.length === 0) {
+                fail(
+                    `${game}: marker "${marker}" found in NO chunk — the check ` +
+                        'has no target, so it cannot fail; update the marker',
+                );
+                continue;
+            }
+            const in_entry = holders.filter((f) =>
+                entry_scripts.some((s) => f.endsWith(s.replace(/^.*\//, ''))),
+            );
+            if (in_entry.length > 0) {
+                fail(
+                    `${game} is in a chunk index.html loads eagerly ` +
+                        `(${in_entry.join(', ')}) — it must stay lazy`,
+                );
+            } else {
+                ok(`${game} is only in a lazily loaded chunk`);
+            }
+        }
+
+        // The two WASM runtimes must not be referenced from the entry chunk.
+        const entry_sources = all_js
+            .filter((f) =>
+                entry_scripts.some((s) => f.endsWith(s.replace(/^.*\//, ''))),
+            )
+            .map((f) => readFileSync(f, 'utf8'));
+        if (entry_sources.length === 0) {
+            skip(
+                'index.html links no _app/immutable script — cannot check runtimes',
+            );
+        } else {
+            for (const [name, needle] of [
+                ['Stockfish', '/js/stockfish/'],
+                ['js-dos', '/js/js-dos/'],
+            ]) {
+                if (entry_sources.some((src) => src.includes(needle))) {
+                    fail(
+                        `${name} (${needle}) is referenced from the entry bundle`,
+                    );
+                } else {
+                    ok(`${name} is not referenced from the entry bundle`);
+                }
+            }
         }
     }
 }

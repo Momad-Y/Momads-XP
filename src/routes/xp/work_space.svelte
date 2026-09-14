@@ -145,14 +145,12 @@
     }
 
     async function launch_inner(program: ProgramLaunchRequest) {
-        const {
-            fs_item,
-            exe_item,
-            copying_obj,
-            target_folder_id,
-            path,
-            source,
-        } = program;
+        // `exe_item` stays on ProgramLaunchRequest — callers still set it —
+        // but nothing destructures it here any more: its only reader was the
+        // placeholder branch, removed when the last placeholder became a real
+        // program in Phase 4.
+        const { fs_item, copying_obj, target_folder_id, path, source } =
+            program;
 
         if (focus_existing(path, fs_item)) {
             return;
@@ -479,21 +477,6 @@
             runningPrograms.update((values) => {
                 return [...values, program];
             });
-        } else if (path == './programs/placeholder.svelte') {
-            const Program = (await import('./programs/placeholder.svelte'))
-                .default;
-            const program: ProgramInstance = mount(Program, {
-                target: node_ref,
-                props: {
-                    id: short.generate(),
-                    fs_item: exe_item ?? fs_item,
-                    get_self: () => program,
-                },
-            });
-            //add to program tray
-            runningPrograms.update((values) => {
-                return [...values, program];
-            });
         } else if (path == './programs/copier.svelte') {
             const Program = (await import('./programs/copier.svelte')).default;
             const program: ProgramInstance = mount(Program, {
@@ -541,12 +524,24 @@
                     fs_item: full_vfs_item(fs_item),
                     exec_path: app.path,
                     get_self: () => program,
-                    // For a REGISTERED app the registry is the source of
-                    // truth for title/icon/size, so passing this replaces
-                    // nothing: registry components deliberately do not declare
-                    // their own `options` default. (The inherited branches
-                    // above are the opposite — their components own it — which
-                    // is why this is a separate path rather than a rewrite.)
+                    /*
+                     * For a REGISTERED app the registry is the source of truth
+                     * for title/icon/size, and this prop REPLACES whatever
+                     * default the component declares — Svelte does not merge
+                     * them.
+                     *
+                     * The Phase 4 components DO declare their own `options`
+                     * default (for the case where they are mounted outside the
+                     * registry), which is exactly why a registry row that
+                     * omits `default_size` produces a window with no width at
+                     * all. An earlier version of this comment claimed no
+                     * registry component declared one; that was never a rule
+                     * the code enforced.
+                     *
+                     * The inherited branches above are the opposite — their
+                     * components own their options — which is why this is a
+                     * separate path rather than a rewrite.
+                     */
                     options: to_window_options(app, instance_id),
                 },
             });

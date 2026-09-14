@@ -1268,10 +1268,10 @@ All personal content lives in a single `src/lib/data/profile.json`. Components r
 
 ## 9. Implementation Phases
 
-> **Status (2026-09-12).** Phases 0, 1, 2 and **3** are complete and live in
-> production at <https://momad-xp.netlify.app>. **Phase 4 (Games) is next and
-> needs the owner's explicit go.** Ticked boxes below mean shipped and
-> deployed, not merely written.
+> **Status (2026-09-14).** Phases 0, 1, 2 and **3** are complete and live in
+> production at <https://momad-xp.netlify.app>. **Phase 4 (Games) is complete
+> and sitting on `dev`, awaiting the owner's cutover.** Ticked boxes below mean
+> written and merged to `dev`; everything through Phase 3 is also deployed.
 >
 > Phase 3's own gate artefacts are `docs/phase-3-{spec,redteam-spec,plan,redteam-plan,redteam-implementation}.md`,
 > with the handoff in `docs/phase-3-guide.md`.
@@ -1400,16 +1400,38 @@ surprised by it:
 
 **Exit criteria:** All four apps are functional and styled authentically, and the vendored Paint bundle ships no unreviewed third-party data paths.
 
-### Phase 4: Games — ⬜ NEXT
+### Phase 4: Games — ✅ COMPLETE
 
 **Goal:** Minesweeper, Solitaire, Chess, DOOM.
 
-- [ ] Minesweeper: Custom implementation; 3 difficulty levels; timer; mine counter
-- [ ] Solitaire: Klondike; drag-and-drop cards; win animation
-- [ ] Chess: chess.js + chessboard UI; single-threaded Stockfish WASM for AI opponent (see §5 — the multithreaded build's COOP/COEP requirement breaks other embeds)
-- [ ] DOOM: js-dos embedding with shareware WAD; fullscreen toggle
+- [x] Minesweeper: Custom implementation; 3 difficulty levels; timer; mine counter
+- [x] Solitaire: Klondike; drag-and-drop cards; win animation
+- [x] Chess: chess.js + chessboard UI; single-threaded Stockfish WASM for AI opponent (see §5 — the multithreaded build's COOP/COEP requirement breaks other embeds)
+- [x] DOOM: js-dos embedding with shareware WAD; fullscreen toggle
 
 **Exit criteria:** All four games are playable within XP windows.
+
+Gate artefacts:
+`docs/phase-4-{spec,redteam-spec,plan,redteam-plan,redteam-implementation}.md`,
+with the handoff in `docs/phase-4-guide.md`. Gate 6 ran twice: the first two
+attempts at an independent reviewer died on API rate limits and were replaced
+by a self-review, then an independent pass completed and found 6 HIGH, 6 MEDIUM
+and 8 LOW — including three tests it proved could not fail, two of which the
+self-review had written. Both records are kept:
+`phase-4-redteam-implementation.md` (self) and `-2.md` (independent).
+
+**§3.3 said "a simple AI" while the §5 table named Stockfish.** The owner
+resolved it in favour of §5: a real engine, deliberately weakened. `Skill
+Level` is the only strength knob this build exposes — driving the shipped
+binary shows no `UCI_Elo` and no `UCI_LimitStrength`.
+
+Two GPL components ship as a result (js-dos GPL-2.0, Stockfish GPL-3.0), so
+`LICENSE-third-party.md` now carves them out of `LICENSE` — GPL-2 §6 and
+GPL-3 §10 forbid the blanket "redistribution is not permitted" applying to
+them.
+
+**The placeholder mechanism is gone.** DOOM was its last caller; every entry
+in All Programs is now a real program.
 
 ### Phase 5: AI Chatbot (Internet Explorer)
 

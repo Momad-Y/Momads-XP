@@ -27,6 +27,7 @@
 import type { Component } from 'svelte';
 import type { ProgramInstance, VfsItem, WindowOptions } from './types';
 import { TERMINAL_MIN_HEIGHT, TERMINAL_MIN_WIDTH } from './term/theme';
+import { PRESETS, window_size } from './games/minesweeper/difficulty';
 
 /**
  * The props every program component accepts. Mirrors what the inherited
@@ -73,6 +74,19 @@ export interface AppDefinition {
      * depends on it.
      */
     taskbar?: boolean;
+    /**
+     * Window chrome. These exist because `to_window_options()` below hardcoded
+     * `resizable: true` and the object it returns REPLACES the component's own
+     * `options` default wholesale (see the comment on that function), so a
+     * registered app had no way to be anything else. That blocked Minesweeper,
+     * which is a fixed-size window in XP, and DOOM, which is 4:3.
+     *
+     * All three are optional and the defaults reproduce the previous output
+     * exactly — `app_registry.test.ts` asserts that for every shipped app.
+     */
+    resizable?: boolean;
+    aspect_ratio?: number;
+    maximize_btn?: boolean;
 }
 
 /**
@@ -123,6 +137,82 @@ export const APP_REGISTRY: readonly AppDefinition[] = [
         // Media Player is single-instance.
         singleton: true,
     },
+    {
+        id: 'minesweeper',
+        path: './programs/minesweeper.svelte',
+        title: 'Minesweeper',
+        icon: '/assets/icons/minesweeper.png',
+        component: () => import('../routes/xp/programs/minesweeper.svelte'),
+        /*
+         * `default_size` IS LOAD-BEARING, and omitting it is not a style
+         * choice. `work_space.svelte` mounts a registered app with an explicit
+         * `options` prop from `to_window_options()`, and Svelte replaces a
+         * component's own default wholesale rather than merging — so
+         * `minesweeper.svelte`'s `options` default never runs on this path.
+         * Without these two lines the window gets no width or height at all,
+         * `Window.svelte` skips its clamp because both are null, and the
+         * template renders `style:width="undefinedpx"`: invalid CSS, dropped
+         * silently, leaving the window to shrink-wrap its grid.
+         *
+         * Imported from the game's own module so the board geometry has one
+         * source of truth; the component reassigns `options` from the same
+         * helper when the difficulty changes.
+         */
+        default_size: window_size(PRESETS.beginner),
+        min_size: window_size(PRESETS.beginner),
+        // Fixed, like XP's — the window snaps to the board rather than being
+        // dragged. Also what keeps jQuery UI's resizable from attaching and
+        // fighting the `style:width` binding (Window.svelte:179).
+        resizable: false,
+        maximize_btn: false,
+        // Multi-instance: pure DOM, owns no runtime. Contrast Chess and DOOM.
+        singleton: false,
+    },
+    {
+        id: 'solitaire',
+        path: './programs/solitaire.svelte',
+        title: 'Solitaire',
+        icon: '/assets/icons/solitaire.png',
+        component: () => import('../routes/xp/programs/solitaire.svelte'),
+        default_size: { width: 700, height: 520 },
+        min_size: { width: 620, height: 470 },
+        // Multi-instance, same reasoning as Minesweeper: pure DOM.
+        singleton: false,
+    },
+    {
+        id: 'chess',
+        path: './programs/chess.svelte',
+        title: 'Chess',
+        icon: '/assets/icons/chess.png',
+        component: () => import('../routes/xp/programs/chess.svelte'),
+        // Sized to the content: 352px board plus controls, status and the
+        // move list. 620 left a third of the window empty.
+        default_size: { width: 460, height: 516 },
+        min_size: { width: 400, height: 440 },
+        /*
+         * SINGLETON, unlike Minesweeper and Solitaire. Each instance owns a
+         * Stockfish worker and its WASM heap — the same reasoning as Python's
+         * above, not Minesweeper's.
+         */
+        singleton: true,
+    },
+    {
+        id: 'doom',
+        path: './programs/doom.svelte',
+        title: 'DOOM',
+        icon: '/assets/icons/doom.png',
+        component: () => import('../routes/xp/programs/doom.svelte'),
+        default_size: { width: 640, height: 512 },
+        min_size: { width: 320, height: 280 },
+        // DOS video is 4:3; a stretched frame looks wrong, and this is the
+        // reason `aspect_ratio` exists on AppDefinition at all.
+        aspect_ratio: 4 / 3,
+        /*
+         * SINGLETON: each instance is a full x86 emulator plus its WASM heap
+         * and an AudioContext. Two would contend for CPU with nothing gained.
+         */
+        singleton: true,
+    },
 ];
 
 export function find_app(path: string | undefined): AppDefinition | undefined {
@@ -162,9 +252,10 @@ export function to_window_options(
         title: app.title,
         icon: app.icon,
         exec_path: app.path,
-        // Registry apps are all resizable; the components declared this in
-        // their own `options` default, which this object replaces wholesale.
-        resizable: true,
+        // Registry apps are resizable unless they say otherwise. The
+        // components cannot declare this themselves — this object replaces
+        // their `options` default wholesale.
+        resizable: app.resizable ?? true,
     };
     if (app.default_size != null) {
         options.width = app.default_size.width;
@@ -174,6 +265,11 @@ export function to_window_options(
         options.min_width = app.min_size.width;
         options.min_height = app.min_size.height;
     }
+    // Set only when asked, for the same reason the size keys are: emitting
+    // `aspect_ratio: undefined` would override a default with undefined
+    // rather than leaving it alone.
+    if (app.aspect_ratio != null) options.aspect_ratio = app.aspect_ratio;
+    if (app.maximize_btn != null) options.maximize_btn = app.maximize_btn;
     return options;
 }
 

@@ -13,37 +13,21 @@
  * page load, and `music_player.spec.ts` pulls a random visualizer, and so
  * skypack, whenever it plays audio.
  */
-import { test, expect, type Page } from '@playwright/test';
-import { bootToDesktop } from './helpers';
+import { test, expect } from '@playwright/test';
+import {
+    bootToDesktop,
+    openFromStartMenu,
+    watchForeignOrigins,
+} from './helpers';
 
-/** Loaded from app.html with an SRI hash, so they are not part of this problem. */
-const ALLOWED = [
-    /^https:\/\/code\.jquery\.com\//,
-    /^https:\/\/unpkg\.com\/loadjs@/,
-];
-
-/**
- * Collects every request that is neither our own origin nor SRI-pinned.
- *
- * The origin test is a literal prefix rather than `new URL(page.url()).origin`
- * — the first requests fire while the page is still about:blank, so comparing
- * against the live URL reports the site itself as foreign.
+/*
+ * The allowlist and the watcher now live in `helpers.ts` as the single source.
+ * They were declared here, and `chess.spec.ts` grew a weaker copy of the same
+ * idea — which promptly failed on the app's own SRI-pinned jQuery. One list,
+ * one place: duplicating it reintroduces exactly the drift this file exists to
+ * catch, one file down.
  */
-function watch_origins(page: Page): string[] {
-    const foreign: string[] = [];
-    page.on('request', (req) => {
-        const url = req.url();
-        if (url.startsWith('data:') || url.startsWith('blob:')) return;
-        if (
-            url.startsWith('http://localhost') ||
-            url.startsWith('http://127.0.0.1')
-        )
-            return;
-        if (ALLOWED.some((re) => re.test(url))) return;
-        foreign.push(url);
-    });
-    return foreign;
-}
+const watch_origins = watchForeignOrigins;
 
 test('the desktop boots without contacting a third-party origin', async ({
     page,
@@ -173,5 +157,42 @@ test('every visualizer runs on vendored three.js', async ({ page }) => {
 
     expect(failures).toEqual([]);
     expect(errors).toEqual([]);
+    expect(foreign).toEqual([]);
+});
+
+test('every game runs without contacting a third-party origin @heavy', async ({
+    page,
+}) => {
+    /*
+     * The guard that would catch a js-dos or Stockfish URL slipping back in.
+     *
+     * Both are vendored precisely so this holds: js-dos's own UI layer
+     * hardcodes br.cdn.dos.zone, net.dos.zone, v8.js-dos.com and a Yandex API
+     * gateway, and shipping it instead of the emulator layer would fail here.
+     *
+     * Tagged @heavy because DOOM boots a DOSBox image and Chess instantiates
+     * Stockfish — expensive, not networked.
+     */
+    test.setTimeout(180_000);
+    const foreign = watch_origins(page);
+    await bootToDesktop(page);
+
+    for (const game of ['Minesweeper', 'Solitaire', 'Chess']) {
+        await openFromStartMenu(page, 'Games', game);
+        await expect(
+            page.locator('#work-space .window', { hasText: game }),
+        ).toBeVisible();
+    }
+
+    // DOOM only downloads anything once its start gate is clicked, so the
+    // click is the part that matters here.
+    await openFromStartMenu(page, 'Games', 'DOOM');
+    const doom = page.locator('#work-space .window', { hasText: 'DOOM' });
+    await doom.locator('.doom-start').click();
+    await expect(doom.locator('canvas.doom-screen')).toBeVisible({
+        timeout: 120_000,
+    });
+    await page.waitForTimeout(3000);
+
     expect(foreign).toEqual([]);
 });

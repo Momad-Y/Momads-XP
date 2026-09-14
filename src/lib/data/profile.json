@@ -1191,7 +1191,6 @@
             "headline": "Black text on a black background. Bold choice, genius.",
             "aside": "Refusing, on the grounds that you would never find the prompt again."
         },
-        "placeholderNotice": "{name} is under construction — coming in a later phase.",
         "contactRateLimit": "That was fast! Please wait a moment and try sending again."
     }
 }
