@@ -106,3 +106,18 @@ After deploying, against the production host (not the URL the CLI echoes):
 
 Everything above. The cutover and the production deploy happen only when the
 owner asks (CLAUDE.md).
+
+## Visual red team (post-ship)
+
+`docs/phase-4-visual-redteam.md` records two browser-driven passes per game,
+run after Phase 4 shipped, and the five defects they found — DOOM ignoring
+every key, Solitaire's drag-and-drop never completing, Minesweeper's board
+overflowing its window, maximized DOOM drawing behind the taskbar, and deep
+Solitaire piles hiding their top card.
+
+Read the "Why the gates missed all of this" table before adding a test here.
+Every one of those bugs sat behind a test that could not fail: one asserted
+`> 0` on a lookup table, one derived its expected width from the constant it
+was checking, one covered every interaction except the broken one, and one
+proved a key did NOT reach the desktop without ever checking it reached the
+game.
