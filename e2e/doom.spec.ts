@@ -87,3 +87,42 @@ test('DOOM keeps its keys away from the desktop @heavy', async ({ page }) => {
     await page.keyboard.press('Escape');
     await expect(page.locator('#start-menu')).toBeHidden();
 });
+
+test('minimizing DOOM pauses it, restoring resumes it @heavy', async ({
+    page,
+}) => {
+    /*
+     * Guards the wiring: minimizing must reach the emulator, and restoring
+     * must let it go again. A minimized DOOM that keeps running burns a core
+     * for a window nobody can see.
+     *
+     * THE ASSERTION IS ON STATE, NOT PIXELS, and that is not laziness.
+     * Screenshots cannot answer this: a minimized window is hidden, so its
+     * canvas shots come back essentially blank (526 bytes against 91,889 while
+     * visible), and comparing across a restore fails too because `resume()`
+     * fires first and DOOM runs at ~35fps. Both probes were tried; both
+     * measure the window's visibility rather than the emulator's state.
+     *
+     * That the emulator honours pause/resume is unit-tested against a fake in
+     * `dosbox_adapter.test.ts`. This covers the half that lives in the
+     * component, which would break silently if `accessors` ever left
+     * Window.svelte.
+     */
+    test.setTimeout(180_000);
+    await bootToDesktop(page);
+    await openFromStartMenu(page, 'Games', 'DOOM');
+    const win = page.locator('#work-space .window', { hasText: 'DOOM' });
+    await win.locator('.doom-start').click();
+    await expect(win.locator('canvas.doom-screen')).toBeVisible({
+        timeout: 120_000,
+    });
+
+    const shell = win.locator('[data-paused]');
+    await expect(shell).toHaveAttribute('data-paused', 'false');
+
+    await win.locator('.titlebar').getByRole('button').first().click();
+    await expect(shell).toHaveAttribute('data-paused', 'true');
+
+    await page.locator('.program-tile').filter({ hasText: 'DOOM' }).click();
+    await expect(shell).toHaveAttribute('data-paused', 'false');
+});

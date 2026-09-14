@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { colour_of, fresh_deck, shuffle, type Card, type Suit } from './deck';
 import {
     auto_complete_available,
+    auto_finish,
     can_move,
     deal,
     draw_from_stock,
@@ -302,5 +303,86 @@ describe('klondike', () => {
             ],
         };
         expect(has_won(full)).toBe(true);
+    });
+});
+
+describe('auto_finish', () => {
+    const suits: Suit[] = ['clubs', 'diamonds', 'hearts', 'spades'];
+
+    it('sends every card home from a solved-but-unplayed position', () => {
+        // One suit per column, ace on top, so every step is a legal home move.
+        const g = deal(fixed);
+        const columns = suits.map((s) =>
+            Array.from({ length: 13 }, (_, i) => card(s, 13 - i)),
+        );
+        const start: Game = {
+            ...g,
+            stock: [],
+            waste: [],
+            foundations: [[], [], [], []],
+            tableau: [
+                columns[0] ?? [],
+                columns[1] ?? [],
+                columns[2] ?? [],
+                columns[3] ?? [],
+                [],
+                [],
+                [],
+            ],
+        };
+        expect(has_won(auto_finish(start))).toBe(true);
+    });
+
+    it('terminates instead of spinning when it cannot finish', () => {
+        /*
+         * THE case the component must handle. An Ace buried under its own 2
+         * deadlocks: the 2 cannot go home before the Ace, and this never moves
+         * the 2 aside. It must stop, not loop — and the caller must not
+         * assume a win.
+         */
+        const g = deal(fixed);
+        const stuck: Game = {
+            ...g,
+            stock: [],
+            waste: [],
+            foundations: [[], [], [], []],
+            tableau: [
+                [card('clubs', 1), card('clubs', 2)],
+                [],
+                [],
+                [],
+                [],
+                [],
+                [],
+            ],
+        };
+        const after = auto_finish(stuck);
+        expect(has_won(after)).toBe(false);
+        expect(after.tableau[0]).toHaveLength(2);
+    });
+
+    it('never mutates the game it was given', () => {
+        const g = deal(fixed);
+        const before = JSON.stringify(g);
+        auto_finish(g);
+        expect(JSON.stringify(g)).toBe(before);
+    });
+});
+
+describe('the removal helper guards against a zero count', () => {
+    it('a no-op move leaves every pile intact', () => {
+        /*
+         * Guards a JavaScript trap rather than a game rule: `slice(0, -count)`
+         * with count 0 is `slice(0, -0)`, and `-0 === 0`, so it returns an
+         * empty array and would wipe the pile. Exercised through the only
+         * public path that could ever reach it.
+         */
+        const g = with_tableau({ ...deal(fixed), waste: [] }, 0, [
+            card('spades', 7),
+        ]);
+        // An empty waste yields no cards, so this move is refused outright.
+        const after = move(g, { pile: 'waste' }, { pile: 'tableau', index: 0 });
+        expect(after.tableau[0]).toHaveLength(1);
+        expect(after).toEqual(g);
     });
 });

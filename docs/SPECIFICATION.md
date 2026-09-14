@@ -1411,8 +1411,12 @@ surprised by it:
 
 **Exit criteria:** All four games are playable within XP windows.
 
-Gate artefacts: `docs/phase-4-{spec,redteam-spec,plan,redteam-plan}.md`, with
-the handoff in `docs/phase-4-guide.md`.
+Gate artefacts:
+`docs/phase-4-{spec,redteam-spec,plan,redteam-plan,redteam-implementation}.md`,
+with the handoff in `docs/phase-4-guide.md`. **Gate 6's review was not
+independent** — two fresh-context subagents died on API rate limits, so it was
+self-reviewed; `phase-4-redteam-implementation.md` says so in its first
+paragraph and lists what a fresh pass should still cover.
 
 **§3.3 said "a simple AI" while the §5 table named Stockfish.** The owner
 resolved it in favour of §5: a real engine, deliberately weakened. `Skill

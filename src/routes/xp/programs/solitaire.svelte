@@ -13,6 +13,7 @@
     } from '../../../lib/games/solitaire/deck';
     import {
         auto_complete_available,
+        auto_finish,
         can_move,
         deal,
         draw_from_stock,
@@ -38,6 +39,8 @@
     /** The in-flight drag, or null. Reassigned, never mutated in place. */
     let dragging: { from: Source; cards: Card[]; x: number; y: number } | null =
         null;
+    /** Set when auto-complete ran and could not finish; hides the button. */
+    let auto_complete_stalled = false;
 
     export let options: WindowOptions = {
         title: 'Solitaire',
@@ -50,7 +53,7 @@
     // READ-ONLY derivations only. See the note in minesweeper.svelte: a write
     // from inside a `$:` block does not invalidate sibling `$:` blocks.
     $: won = has_won(game);
-    $: can_finish = auto_complete_available(game);
+    $: can_finish = auto_complete_available(game) && !auto_complete_stalled;
 
     let menu: MenuBarEntry[];
     $: menu = [
@@ -103,23 +106,20 @@
     function restart(draw: 1 | 3) {
         game = deal(Math.random, draw);
         dragging = null;
+        auto_complete_stalled = false;
     }
 
     /**
-     * Play every remaining card to the foundations. Only offered when nothing
-     * is face down, so the order it finds moves in cannot matter.
+     * Auto-complete, and stop offering it if it could not finish.
+     *
+     * `auto_complete_available` means the position is fully VISIBLE, not that
+     * it is winnable by sending top cards home — an Ace buried under its own 2
+     * deadlocks. Without this flag the button would sit there doing nothing on
+     * every further click.
      */
     function finish() {
-        for (let guard = 0; guard < 520 && !has_won(game); guard++) {
-            let moved = false;
-            for (let col = 0; col < game.tableau.length; col++) {
-                const from: Source = { pile: 'tableau', index: col, depth: 0 };
-                const before = game;
-                auto_home(from);
-                if (game !== before) moved = true;
-            }
-            if (!moved) break;
-        }
+        game = auto_finish(game);
+        if (!has_won(game)) auto_complete_stalled = true;
     }
 
     function face_of(card: Card): string {

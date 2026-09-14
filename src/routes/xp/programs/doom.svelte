@@ -28,6 +28,25 @@
     let next_play_at = 0;
     let state: 'idle' | 'starting' | 'running' | 'failed' = 'idle';
     let error_text = '';
+    /**
+     * Bound to Window's own `minimized` rather than read off
+     * `window?.minimized`.
+     *
+     * Both work — `Window.svelte` declares `accessors={true}`, which exposes
+     * its props as signals, so reading `window.minimized` from a reactive
+     * statement here does track it. That was checked, not assumed: reverting
+     * to `window?.minimized` and removing this binding still passes the
+     * minimize/restore E2E.
+     *
+     * The binding is kept because it is explicit. It states the dependency in
+     * the markup instead of relying on accessor-signal behaviour that is easy
+     * to break from the other side of the boundary — dropping `accessors`
+     * from Window.svelte would silently stop the pause working, and nothing
+     * in this file would look wrong.
+     */
+    let is_minimized = false;
+    /** Set before any teardown, so an in-flight `launch()` can bail. */
+    let destroyed = false;
 
     export let options: WindowOptions = {
         title: 'DOOM',
@@ -42,7 +61,7 @@
     $: if (gain != null) gain.gain.value = $systemVolume;
     // Pausing is a method call, not a state write, so a reactive statement is
     // the right place for it — a minimized DOOM must stop burning a core.
-    $: sync_running(window?.minimized === true);
+    $: sync_running(is_minimized);
 
     function sync_running(minimized: boolean) {
         if (session == null) return;
@@ -89,11 +108,24 @@
              * draws nothing at all. A canvas can only be transferred once,
              * which is fine: DOOM starts once per window.
              */
-            session = await start_doom(
+            const started = await start_doom(
                 browser_host,
                 canvas.transferControlToOffscreen(),
                 push_audio,
             );
+            /*
+             * The window can be closed DURING the await above — it is several
+             * seconds of downloading ~4MB and booting an emulator, which is
+             * exactly when someone changes their mind. `onDestroy` has already
+             * run by then and saw `session` still null, so without this the
+             * emulator it just finished starting would run forever with
+             * nobody holding a reference to stop it.
+             */
+            if (destroyed) {
+                void started.dispose();
+                return;
+            }
+            session = started;
             state = 'running';
             screen_el?.focus();
         } catch (error) {
@@ -157,6 +189,7 @@
     }
 
     onDestroy(() => {
+        destroyed = true;
         // Terminate the emulator and release the audio graph. Without this,
         // opening and closing DOOM leaks a DOSBox worker and an AudioContext
         // per open — the browser caps contexts, so it fails visibly.
@@ -175,10 +208,16 @@
     }
 </script>
 
-<Window {options} bind:this={window} on_click_close={destroy}>
+<Window
+    {options}
+    bind:this={window}
+    bind:minimized={is_minimized}
+    on_click_close={destroy}
+>
     <div
         slot="content"
         class="absolute inset-0 flex flex-col bg-black"
+        data-paused={is_minimized}
         bind:this={shell_el}
     >
         <div
