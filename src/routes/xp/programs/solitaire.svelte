@@ -17,6 +17,7 @@
         step_cascade,
         type Bouncer,
     } from '../../../lib/games/solitaire/cascade';
+    import { fan_offset } from '../../../lib/games/solitaire/fan';
     import {
         auto_complete_available,
         auto_finish,
@@ -361,7 +362,7 @@
                                     ? 'sol-face-up cursor-grab'
                                     : ''}"
                                 draggable="false"
-                                style:top="{row * 20}px"
+                                style:top="{row * fan_offset(pile.length)}px"
                                 src={face_of(card)}
                                 alt={card.face_up
                                     ? card_code(card)
