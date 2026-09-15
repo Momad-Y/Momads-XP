@@ -17,6 +17,7 @@
         step_cascade,
         type Bouncer,
     } from '../../../lib/games/solitaire/cascade';
+    import { fan_offset } from '../../../lib/games/solitaire/fan';
     import {
         auto_complete_available,
         auto_finish,
@@ -221,6 +222,19 @@
         }
     }
 
+    /**
+     * Note the `draggable="false"` on every card image in the markup.
+     *
+     * Without it this whole mechanism silently does nothing. An `<img>` is
+     * natively draggable, so pressing one and moving starts the browser's own
+     * HTML5 drag — which fires `pointercancel` at (0,0) and tears down the
+     * pointer sequence before `end_drag` ever sees the drop. The card visibly
+     * lifted and followed the cursor, then snapped back, and no move was ever
+     * made: Solitaire was playable only by double-clicking to a foundation.
+     *
+     * `touch-none` is the same story for touch: without it the browser claims
+     * the gesture as a scroll and cancels the pointer the moment it moves.
+     */
     function start_drag(from: Source, cards: Card[], event: PointerEvent) {
         if (cards.length === 0) return;
         // Capture so the drag survives the pointer leaving the card — the
@@ -285,6 +299,7 @@
                     {#if game.stock.length > 0}
                         <img
                             class="h-full w-full rounded"
+                            draggable="false"
                             src="/assets/cards/back.png"
                             alt="stock"
                         />
@@ -296,7 +311,8 @@
                         {@const top = game.waste[game.waste.length - 1]}
                         {#if top != null}
                             <img
-                                class="sol-card sol-face-up h-full w-full cursor-grab rounded shadow"
+                                class="sol-card sol-face-up h-full w-full touch-none cursor-grab rounded shadow"
+                                draggable="false"
                                 src={face_of(top)}
                                 alt={card_code(top)}
                                 data-rank={top.rank}
@@ -322,6 +338,7 @@
                         {#each pile.slice(-1) as top (card_code(top))}
                             <img
                                 class="sol-card pointer-events-none h-full w-full rounded"
+                                draggable="false"
                                 src={face_of(top)}
                                 alt={card_code(top)}
                             />
@@ -340,11 +357,12 @@
                     >
                         {#each pile as card, row (`${card.suit}${String(card.rank)}`)}
                             <img
-                                class="sol-card absolute left-0 w-[71px] rounded shadow
+                                class="sol-card absolute left-0 w-[71px] touch-none rounded shadow
                                     {card.face_up
                                     ? 'sol-face-up cursor-grab'
                                     : ''}"
-                                style:top="{row * 20}px"
+                                draggable="false"
+                                style:top="{row * fan_offset(pile.length)}px"
                                 src={face_of(card)}
                                 alt={card.face_up
                                     ? card_code(card)
@@ -386,6 +404,7 @@
                     {#each dragging.cards as card, i (`${card.suit}${String(card.rank)}`)}
                         <img
                             class="absolute w-[71px] rounded shadow-lg"
+                            draggable="false"
                             style:top="{i * 20}px"
                             src={face_of(card)}
                             alt={card_code(card)}
