@@ -1,7 +1,9 @@
 # Phase 4 — Games: handoff guide
 
-**Status:** complete on `dev`, awaiting the owner's cutover. Nothing here is in
-production yet.
+**Status:** complete and live in production. First cut over in #226
+(2026-09-14); the five defects found by the post-ship visual red team (below)
+were fixed in #227 and deployed in #228 (`6d6300a`, 2026-09-16), with the §3
+probe run against the production host.
 
 Gate artefacts: `docs/phase-4-spec.md` (Part A decisions D1–D20, Part B
 corrections and D21–D31), `docs/phase-4-redteam-spec.md`,
@@ -102,10 +104,12 @@ After deploying, against the production host (not the URL the CLI echoes):
   now enforces that no game code or WASM runtime reaches the entry bundle.
 - Only DOOM's shareware episode one.
 
-## 5. Sitting on `dev`, awaiting cutover
+## 5. Shipped
 
-Everything above. The cutover and the production deploy happen only when the
-owner asks (CLAUDE.md).
+Everything above is in production. Cutover #226 (`f22ee83`) shipped the games;
+cutover #228 (`6d6300a`) shipped the visual-red-team fixes. The §3 probe passed
+on the production host after #228: all three `Cache-Control` rules applied, both
+CSPs intact, all four games opened with zero console errors.
 
 ## Visual red team (post-ship)
 
