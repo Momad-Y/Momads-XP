@@ -1268,10 +1268,12 @@ All personal content lives in a single `src/lib/data/profile.json`. Components r
 
 ## 9. Implementation Phases
 
-> **Status (2026-09-14).** Phases 0, 1, 2 and **3** are complete and live in
-> production at <https://momad-xp.netlify.app>. **Phase 4 (Games) is complete
-> and sitting on `dev`, awaiting the owner's cutover.** Ticked boxes below mean
-> written and merged to `dev`; everything through Phase 3 is also deployed.
+> **Status (2026-09-16).** Phases 0–4 are complete and live in production at
+> <https://momad-xp.netlify.app> (`main` = `dev` = `6d6300a`, cutover #228).
+> Phase 4 (Games) shipped in #226 and was corrected by a post-ship visual red
+> team in #227/#228 — see `docs/phase-4-visual-redteam.md`. **Phases 5 and 6
+> have not started** and each waits on the owner's go. Ticked boxes below are
+> written, merged and deployed.
 >
 > Phase 3's own gate artefacts are `docs/phase-3-{spec,redteam-spec,plan,redteam-plan,redteam-implementation}.md`,
 > with the handoff in `docs/phase-3-guide.md`.

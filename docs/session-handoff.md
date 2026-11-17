@@ -1,25 +1,31 @@
-# Session handoff — Phase 3 closed out, Phase 4 next
+# Session handoff — Phase 4 closed out, Phase 5 or 6 next
 
-Read this first, then `docs/phase-3-guide.md`. §1 is the live task; everything
-after it is the record of how Phase 2 got here and the rules that must not be
-undone — still current, since none of it was undone by Phase 3.
+Read this first, then `docs/phase-4-guide.md` and
+`docs/phase-4-visual-redteam.md`. §1 is the live task; everything after it is
+the record of how earlier phases got here and the rules that must not be
+undone — still current, since none of it was undone by Phases 3 or 4.
 
 ---
 
-## 1. NEXT UP — Phase 4 (Games), on the owner's "go"
+## 1. NEXT UP — Phase 5 or Phase 6, on the owner's "go"
 
-**Phase 3 is complete and deployed.** CMD, the Python REPL, Paint and the Music
-Player all shipped, along with the jspaint hardening the owner added to its
-scope; the handoff is `docs/phase-3-guide.md`.
+**Phases 0–4 are complete and live** at <https://momad-xp.netlify.app>.
+`main` and `dev` are level at `6d6300a` (cutover PR #228, deployed and probed
+on the production host 2026-09-16). Nothing is in flight.
 
-A long run of post-Phase-3 work has shipped since, each with its own plan doc —
-see the status block in `SPECIFICATION.md` §9 for the list. The two items left
-open from it are the **custom domain** (code side is one line in
-`src/lib/site.ts`; the rest is buying it and pointing DNS) and the **`My
-Pictures` photo/video library**, which is specced into Phase 6.
+Phase 4 (Games) reached production twice. The first cutover (#226,
+2026-09-14) shipped a green suite with four live bugs — DOOM ignored every
+key, Solitaire could not be dragged, Minesweeper overflowed its window,
+maximized DOOM drew behind the taskbar. A browser-driven visual red team
+found those plus a fifth; all five were fixed in #227 and shipped in #228.
+**Open the app and play it before calling a phase done** — every one of those
+bugs sat behind a test that could not fail.
 
-**Phase 4 is specced but not started.** The owner will say "go"; until then, do
-not begin.
+**Neither Phase 5 (AI Chatbot in Internet Explorer) nor the rest of Phase 6
+(Polish & SFX) has started.** Both need an explicit go from the owner; until
+then, do not begin. Still open outside the phases: the **custom domain** (code
+side is one line in `src/lib/site.ts`; the rest is buying it and pointing DNS)
+and the **`My Pictures` photo/video library**, specced into Phase 6.
 
 > The Phase 3 scope notes below are kept as the record of what was built, not
 > as a live task list.
